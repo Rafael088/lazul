@@ -2,8 +2,9 @@
 id: dec-r2ii
 fecha: 2026-10-26
 temas: [gestos, producto]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-10-26
 ---
 # Gesto 4 por niveles: URL, archivo o app sin estado
 

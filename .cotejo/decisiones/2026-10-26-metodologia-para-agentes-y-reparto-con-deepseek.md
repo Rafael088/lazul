@@ -2,8 +2,9 @@
 id: dec-obus
 fecha: 2026-10-26
 temas: [metodologia]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-10-26
 ---
 # Metodología para agentes y reparto con DeepSeek
 

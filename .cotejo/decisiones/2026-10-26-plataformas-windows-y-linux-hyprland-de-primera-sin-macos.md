@@ -2,8 +2,9 @@
 id: dec-p06t
 fecha: 2026-10-26
 temas: [plataformas]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-10-26
 ---
 # Plataformas: Windows y Linux Hyprland de primera; sin macOS
 

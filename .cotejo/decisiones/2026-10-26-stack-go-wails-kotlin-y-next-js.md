@@ -2,8 +2,9 @@
 id: dec-tp2d
 fecha: 2026-10-26
 temas: [stack]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-10-26
 ---
 # Stack: Go, Wails, Kotlin y Next.js
 

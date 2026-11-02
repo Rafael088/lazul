@@ -1,6 +1,6 @@
 # Tareas
 
-- [ ] PC Windows listo para agentes: activar el servidor OpenSSH, entrar por clave desde el equipo Linux, instalar Go y comprobar que WebView2 está. Al terminar, ssh desde Linux corre «go version» en Windows #medio #v0.1.0 #agente/humano ^cotejo-lgjf68
+- [ ] PC Windows listo para agentes: activar el servidor OpenSSH, entrar por clave desde el equipo Linux, instalar Go y comprobar que WebView2 está. Al terminar, ssh desde Linux corre «go version» en Windows #medio #v0.1.0 #agente/humano #en-curso ^cotejo-lgjf68
 - [ ] Repo y dominios: crear el repo público Rafael088/lazul en GitHub y subir el repo local; registrar lazul.app y lazul.dev #facil #v0.1.0 #agente/humano ^cotejo-z7aj0c
 - [ ] Prueba de cámara: app mínima en Wails con MediaPipe Hand Landmarker en la webview, en Windows (WebView2) y Hyprland (WebKitGTK); medir fps, latencia de cuadro a puntos de la mano y CPU. Si falla en Linux, probar el plan B (motor de gestos como proceso aparte) y dejar la decisión propuesta #dificil #v0.1.0 #agente/opus ^cotejo-cphace
 - [ ] Esqueleto y contratos: monorepo (core/, platform/, gestures/, desktop/, proto/, fixtures/), ./dev con check, test, sim, replay y win test (salida breve), CLAUDE.md como mapa, licencia FSL, CI en Linux y Windows; esquema de mensajes en proto/ con tipos generados para Go y TS; interfaces Screenshot, Clipboard, ActiveApp y LaunchApp con sus pruebas de contrato ya escritas #dificil #v0.1.0 #agente/opus ^cotejo-f09uwv

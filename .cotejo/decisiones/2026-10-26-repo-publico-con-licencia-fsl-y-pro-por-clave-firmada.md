@@ -2,8 +2,9 @@
 id: dec-68gw
 fecha: 2026-10-26
 temas: [negocio, repo]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-10-26
 ---
 # Repo público con licencia FSL y Pro por clave firmada
 
