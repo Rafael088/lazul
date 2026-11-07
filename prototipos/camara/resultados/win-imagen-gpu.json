@@ -1,0 +1,63 @@
+{
+  "config": {
+    "modo": "imagen",
+    "segundos": 10,
+    "calentar": 5,
+    "delegado": "GPU",
+    "so": "windows"
+  },
+  "cpu_pct_nucleo": 82.86639387265797,
+  "cpu_pct_total": 10.358299234082246,
+  "cpu_seg": 8.3125,
+  "fecha": "2026-11-07T18:30:17-05:00",
+  "nucleos": 8,
+  "pared_seg": 10.0312076,
+  "procesos": [
+    "camara.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe"
+  ],
+  "web": {
+    "apis": {
+      "ImageCapture": "function",
+      "MediaStreamTrackProcessor": "function",
+      "VideoFrame": "function"
+    },
+    "captura_a_puntos_ms": null,
+    "carga_ms": 516,
+    "cuadro_a_puntos_ms": {
+      "max": 16.8,
+      "media": 13.81,
+      "n": 601,
+      "p50": 13.7,
+      "p95": 14.8
+    },
+    "cuadros_con_mano": 601,
+    "delegado_usado": "GPU",
+    "errores_cuadro": 0,
+    "fps": 60.01,
+    "fps_camara": null,
+    "inferencia_ms": {
+      "max": 16.7,
+      "media": 13.75,
+      "n": 601,
+      "p50": 13.7,
+      "p95": 14.7
+    },
+    "mediaDevices": true,
+    "modo": "imagen",
+    "resultados": 601,
+    "rvfc": true,
+    "segundos": 10.01,
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "webgl": {
+      "canvas_webgl": true,
+      "canvas_webgl2": true,
+      "offscreen_webgl2": true
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "config": {
+    "modo": "proceso+mano",
+    "segundos": 30,
+    "calentar": 5,
+    "delegado": "GPU",
+    "so": "linux"
+  },
+  "cpu_pct_nucleo": 35.3445687333328,
+  "cpu_pct_total": 4.4180710916666,
+  "cpu_seg": 10.61,
+  "fecha": "2026-11-07T18:35:15-05:00",
+  "nucleos": 8,
+  "pared_seg": 30.018756432,
+  "procesos": [
+    "camara",
+    "ffmpeg",
+    "WebKitNetworkPr",
+    "WebKitWebProces"
+  ],
+  "web": {
+    "apis": {
+      "ImageCapture": "undefined",
+      "MediaStreamTrackProcessor": "undefined",
+      "VideoFrame": "function"
+    },
+    "camara": {
+      "alto": 480,
+      "ancho": 640,
+      "por": "ffmpeg v4l2",
+      "tiene_X_T": true
+    },
+    "captura_a_puntos_ms": {
+      "max": 27.7,
+      "media": 16.75,
+      "n": 895,
+      "p50": 16.77,
+      "p95": 22.14
+    },
+    "carga_ms": 264,
+    "cuadro_a_puntos_ms": {
+      "max": 26,
+      "media": 15.33,
+      "n": 895,
+      "p50": 15,
+      "p95": 21
+    },
+    "cuadros_con_mano": 895,
+    "delegado_usado": "GPU",
+    "error_bucle": null,
+    "errores_cuadro": 0,
+    "fps": 29.83,
+    "fps_camara": 29.87,
+    "inferencia_ms": {
+      "max": 26,
+      "media": 14.94,
+      "n": 895,
+      "p50": 15,
+      "p95": 20
+    },
+    "mediaDevices": true,
+    "modo": "proceso+mano",
+    "resultados": 895,
+    "rvfc": true,
+    "segundos": 30,
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15 wails.io/605.1.15",
+    "webgl": {
+      "canvas_webgl": true,
+      "canvas_webgl2": true,
+      "offscreen_webgl2": false
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "config": {
+    "modo": "camara+mano",
+    "segundos": 30,
+    "calentar": 5,
+    "delegado": "CPU",
+    "so": "windows"
+  },
+  "cpu_pct_nucleo": 70.61280500218365,
+  "cpu_pct_total": 8.826600625272956,
+  "cpu_seg": 21.21875,
+  "fecha": "2026-11-07T18:32:33-05:00",
+  "nucleos": 8,
+  "pared_seg": 30.0494365,
+  "procesos": [
+    "camara.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe",
+    "msedgewebview2.exe"
+  ],
+  "web": {
+    "apis": {
+      "ImageCapture": "function",
+      "MediaStreamTrackProcessor": "function",
+      "VideoFrame": "function"
+    },
+    "camara": {
+      "alto": 480,
+      "ancho": 640,
+      "etiqueta": "Integrated Camera (5986:217f)",
+      "fps_pedidos": 30
+    },
+    "captura_a_puntos_ms": {
+      "max": 56.6,
+      "media": 41.21,
+      "n": 497,
+      "p50": 39.3,
+      "p95": 51.2
+    },
+    "carga_ms": 383,
+    "cuadro_a_puntos_ms": {
+      "max": 58.3,
+      "media": 37.96,
+      "n": 497,
+      "p50": 34.4,
+      "p95": 50.3
+    },
+    "cuadros_con_mano": 497,
+    "delegado_usado": "CPU",
+    "errores_cuadro": 0,
+    "fps": 16.54,
+    "fps_camara": 16.54,
+    "inferencia_ms": {
+      "max": 45.9,
+      "media": 33.13,
+      "n": 497,
+      "p50": 33,
+      "p95": 35.8
+    },
+    "mediaDevices": true,
+    "modo": "camara+mano",
+    "resultados": 497,
+    "rvfc": true,
+    "segundos": 30.04,
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "webgl": {
+      "canvas_webgl": true,
+      "canvas_webgl2": true,
+      "offscreen_webgl2": true
+    }
+  }
+}
