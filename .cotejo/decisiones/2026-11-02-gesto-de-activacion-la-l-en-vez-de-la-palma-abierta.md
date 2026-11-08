@@ -2,8 +2,9 @@
 id: dec-rwrs
 fecha: 2026-11-02
 temas: [gestos, producto, marca]
-estado: propuesta
+estado: aceptada
 autor: usuario
+aceptada_el: 2026-11-02
 ---
 # Gesto de activación: la L en vez de la palma abierta
 
