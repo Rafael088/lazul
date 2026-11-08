@@ -1,0 +1,163 @@
+// Esquema único de mensajes de Lazul. De aquí salen los tipos de Go
+// (proto/go/lazulv1) y de TypeScript (proto/ts/src); se regeneran con
+// `./dev gen` y `./dev check` falla si quedaron viejos.
+//
+// Reglas para cambiarlo: nunca reusar ni renumerar un campo; lo que se quita
+// pasa a `reserved`. Un cambio que rompa la compatibilidad sube `version`.
+syntax = "proto3";
+
+package lazul.v1;
+
+option go_package = "github.com/Rafael088/lazul/proto/go/lazulv1;lazulv1";
+
+// Versión del protocolo que hablan hoy los equipos.
+enum Version {
+  VERSION_DESCONOCIDA = 0;
+  VERSION_ACTUAL = 1;
+}
+
+// Sobre: todo lo que viaja entre equipos (WebSocket, binario) y de la
+// webview al núcleo va dentro de un Sobre.
+message Sobre {
+  uint32 version = 1;        // Version.VERSION_ACTUAL al enviar
+  string id = 2;             // único por emisor; lo cita en_respuesta_a
+  int64 enviado_ms = 3;      // reloj del emisor, ms desde la época Unix
+  string en_respuesta_a = 4; // id del Sobre que responde (Pong, Respuesta)
+
+  oneof contenido {
+    Hola hola = 10;
+    Ping ping = 11;
+    Pong pong = 12;
+    EventoGesto gesto = 13;
+    Orden orden = 14;
+    Respuesta respuesta = 15;
+  }
+}
+
+enum Sistema {
+  SISTEMA_DESCONOCIDO = 0;
+  SISTEMA_WINDOWS = 1;
+  SISTEMA_LINUX = 2;
+  SISTEMA_ANDROID = 3;
+}
+
+// Lo que un equipo sabe hacer; coincide con las interfaces de platform/.
+enum Capacidad {
+  CAPACIDAD_DESCONOCIDA = 0;
+  CAPACIDAD_CAPTURA = 1;         // platform.Screenshot
+  CAPACIDAD_PORTAPAPELES = 2;    // platform.Clipboard
+  CAPACIDAD_APP_ACTIVA = 3;      // platform.ActiveApp
+  CAPACIDAD_ABRIR_APP = 4;       // platform.LaunchApp
+  CAPACIDAD_RECIBIR_ARCHIVO = 5; // recibe por LocalSend
+}
+
+// Primer mensaje de cada conexión, en los dos sentidos.
+message Hola {
+  string equipo_id = 1; // estable por instalación
+  string nombre = 2;    // el que ve el usuario ("PC del estudio")
+  Sistema sistema = 3;
+  string version_app = 4;
+  repeated Capacidad capacidades = 5;
+}
+
+// Medida de latencia: el receptor contesta con un Pong que cita el id.
+message Ping {}
+message Pong {}
+
+// Gestos 1 a 4 (ver dec-rwrs y dec-r2ii).
+enum Gesto {
+  GESTO_NINGUNO = 0;
+  GESTO_ACTIVAR = 1;    // 1: la L (índice arriba, pulgar al lado)
+  GESTO_AGARRAR = 2;    // 2: puño
+  GESTO_SOLTAR = 3;     // 3: abrir la mano hacia un lado
+  GESTO_MANDAR_APP = 4; // 4: pinza y arrastrar
+}
+
+enum Direccion {
+  DIRECCION_NINGUNA = 0;
+  DIRECCION_IZQUIERDA = 1;
+  DIRECCION_DERECHA = 2;
+  DIRECCION_ARRIBA = 3;
+  DIRECCION_ABAJO = 4;
+}
+
+// De la webview (clasificador) al núcleo Go.
+message EventoGesto {
+  Gesto gesto = 1;
+  float confianza = 2;     // 0 a 1
+  int64 cuadro_ms = 3;     // marca del cuadro de cámara que lo disparó
+  Direccion direccion = 4; // hacia dónde se soltó o arrastró
+}
+
+// Del controlador a un receptor.
+message Orden {
+  oneof accion {
+    Tomar tomar = 1;
+    Entregar entregar = 2;
+  }
+}
+
+// Pide al receptor que agarre algo suyo y lo devuelva en la Respuesta.
+message Tomar {
+  enum Que {
+    QUE_DESCONOCIDO = 0;
+    QUE_CAPTURA = 1;      // pantalla; el archivo viaja aparte por LocalSend
+    QUE_PORTAPAPELES = 2; // texto del portapapeles
+    QUE_APP_ACTIVA = 3;   // gesto 4: URL, archivo o app, por niveles
+  }
+  Que que = 1;
+}
+
+// Pide al receptor que reciba algo: texto al portapapeles, abrir una URL,
+// un archivo o una app.
+message Entregar {
+  Objeto objeto = 1;
+}
+
+// Lo que se agarra y se suelta.
+message Objeto {
+  oneof tipo {
+    Archivo archivo = 1;
+    string texto = 2;
+    string url = 3;
+    AppRef app = 4;
+  }
+}
+
+// Metadatos de un archivo; los bytes van directo de origen a destino por
+// LocalSend, nunca dentro de un Sobre.
+message Archivo {
+  string nombre = 1;
+  uint64 bytes = 2;
+  bytes sha256 = 3;
+  string mime = 4;
+  string transferencia_id = 5; // sesión de LocalSend que lo lleva
+}
+
+// Una app sin estado (nivel 3 del gesto 4).
+message AppRef {
+  string catalogo_id = 1; // clave en el catálogo de apps (apps.json)
+  string nativo_id = 2;   // ejecutable o AUMID en Windows, .desktop en Linux
+  string nombre = 3;
+  string web = 4;         // respaldo si el receptor no la tiene
+}
+
+message Respuesta {
+  bool ok = 1;
+  Falla falla = 2;   // solo si ok es falso
+  Objeto objeto = 3; // lo tomado, en respuesta a Tomar
+}
+
+// Por qué no se pudo (no se llama Error para no chocar con el de JS).
+message Falla {
+  enum Codigo {
+    CODIGO_DESCONOCIDO = 0;
+    CODIGO_NO_SOPORTADO = 1;  // el equipo no tiene esa capacidad
+    CODIGO_SIN_PERMISO = 2;   // el usuario no se lo permitió a ese equipo
+    CODIGO_NO_ENCONTRADO = 3; // app o archivo que no existe
+    CODIGO_INVALIDO = 4;      // mensaje mal formado
+    CODIGO_INTERNO = 5;
+  }
+  Codigo codigo = 1;
+  string detalle = 2;
+}
