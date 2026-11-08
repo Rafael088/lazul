@@ -1,0 +1,89 @@
+Overriding existing handler for signal 10. Set JSC_SIGNAL_FOR_GC if you want WebKit to use a different signal
+[web] config {"modo":"camara","segundos":3,"calentar":5,"delegado":"GPU","so":"linux"} info {"ua":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15 wails.io/605.1.15","modo":"camara","rvfc":true,"mediaDevices":true,"webgl":{"canvas_webgl":true,"canvas_webgl2":true,"offscreen_webgl2":false}}
+0:00:00.010747679      54444      54444 DEBUG               pipewire gstpipewiredeviceprovider.c:825:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> starting provider
+0:00:00.012163580      54444      54444 DEBUG               pipewire gstpipewiredeviceprovider.c:833:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> connected
+0:00:00.012738039      54444      54444 DEBUG               pipewire gstpipewiredeviceprovider.c:856:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> started
+0:00:00.012777962      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<pipewiredevice2> Registering default device USB2.0 HD UVC WebCam (V4L2)
+0:00:00.012788463      54444      54444 DEBUG               pipewire gstpipewiredeviceprovider.c:875:gst_pipewire_device_provider_stop:<pipewiredeviceprovider0> stopping provider
+0:00:00.015188593      54444      54546 DEBUG               pipewire gstpipewiredeviceprovider.c:825:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> starting provider
+0:00:00.017241254      54444      54546 DEBUG               pipewire gstpipewiredeviceprovider.c:833:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> connected
+0:00:00.017762596      54444      54546 DEBUG               pipewire gstpipewiredeviceprovider.c:856:gst_pipewire_device_provider_start:<pipewiredeviceprovider0> started
+0:00:00.017822272      54444      54546 INFO    webkitmockdeviceprovider GStreamerMockDeviceProvider.cpp:53:webkitMockDeviceProviderProbe:<gstreamermockdeviceprovider0> Mock capture sources are disabled, returning empty device list
+0:00:00.057864634      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<pipewiredevice4> Registering default device Audio Interno Estéreo analógico
+0:00:00.057886263      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<pipewiredevice3> Registering default device Audio Interno Estéreo analógico
+0:00:00.057917065      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice5> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+0:00:00.057921881      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice4> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+0:00:00.057925943      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice3> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+0:00:00.057934655      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice2> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+0:00:00.057938710      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice1> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+0:00:00.057942790      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<alsadevice0> Registering non-default device HDA Intel PCH at 0x6037288000 irq 192
+[web] dispositivos [["audioinput",""],["videoinput",""]]
+[web] pidiendo la cámara…
+0:00:00.061550889      54444      54444 INFO    webkitcapturedevicemanager GStreamerCaptureDeviceManager.cpp:253:addDevice:<pipewiredevice5> Registering default device USB2.0 HD UVC WebCam (V4L2)
+0:00:00.061971353      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:182:setSize: Setting size to 640x480
+0:00:00.062005370      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:182:setSize: Setting size to 640x480
+0:00:00.077265882      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:182:setSize:<Video_capturer_pipeline0_7F57251E8BC0> Setting size to 640x480
+0:00:00.077296275      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:232:setFrameRate:<Video_capturer_pipeline0_7F57251E8BC0> Setting framerate to 30,000000 fps
+0:00:00.077310493      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:412:reconfigure:<Video_capturer_pipeline0_7F57251E8BC0> Setting video capture device caps to image/jpeg, width=(int)1280, height=(int)720
+0:00:00.077320025      54444      54444 INFO          webkitcapturer GStreamerCapturer.cpp:283:start:<Video_capturer_pipeline0_7F57251E8BC0> Starting
+0:00:00.077369987      54444      54444 DEBUG         pipewirestream gstpipewirestream.c:90:gst_pipewire_stream_open:<pipewirestream0> open
+0:00:00.077591304      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now unconnected
+0:00:00.077637771      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1113:gst_pipewire_src_negotiate:<Video7F57251E8BC0> caps of src: ANY
+0:00:00.077655032      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1123:gst_pipewire_src_negotiate:<Video7F57251E8BC0> caps of peer: image/jpeg, width=(int)1280, height=(int)720
+0:00:00.077658684      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1132:gst_pipewire_src_negotiate:<Video7F57251E8BC0> have common caps: image/jpeg, width=(int)1280, height=(int)720
+0:00:00.077663843      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1138:gst_pipewire_src_negotiate:<Video7F57251E8BC0> have common caps (sanitized): image/jpeg, width=(int)1280, height=(int)720
+0:00:00.077675269      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1200:gst_pipewire_src_negotiate:<Video7F57251E8BC0> connect capture with path (null), target-object 64
+0:00:00.077682842      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:900:on_state_changed:<Video7F57251E8BC0> got stream state connecting
+0:00:00.077922218      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now connecting
+0:00:00.077930841      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now connecting
+0:00:00.078129625      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:900:on_state_changed:<Video7F57251E8BC0> got stream state paused
+0:00:00.078165124      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now paused
+0:00:00.078185235      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now paused
+0:00:00.078215944      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now paused
+0:00:00.078223573      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now paused
+0:00:00.078269232      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now paused
+0:00:00.078276869      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now paused
+0:00:00.176022594      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:1295:handle_format_change:<Video7F57251E8BC0> peer caps image/jpeg, width=(int)1280, height=(int)720, framerate=(fraction)30/1, colorimetry=(string)2:4:5:1
+0:00:00.176041485      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:1296:handle_format_change:<Video7F57251E8BC0> possible caps image/jpeg, width=(int)1280, height=(int)720
+0:00:00.176063326      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:1386:handle_format_change:<Video7F57251E8BC0> we got format image/jpeg, width=(int)1280, height=(int)720, framerate=(fraction)30/1, colorimetry=(string)2:4:5:1
+0:00:00.176069072      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:1422:handle_format_change:<Video7F57251E8BC0> doing finish format
+0:00:00.176178063      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now paused
+0:00:00.176187776      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1094:wait_negotiated:<Video7F57251E8BC0> got negotiated signal
+0:00:00.176196229      54444      54583 INFO             pipewiresrc gstpipewiresrc.c:1229:gst_pipewire_src_negotiate:<Video7F57251E8BC0> set format image/jpeg, width=(int)1280, height=(int)720, framerate=(fraction)30/1, colorimetry=(string)2:4:5:1
+0:00:00.176244379      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now paused
+0:00:00.181107254      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:74:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap buffer, datas:1
+0:00:00.181134415      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:108:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap data (DmaBuf 3) 0 1843200
+0:00:00.181197362      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:605:on_add_buffer:<Video7F57251E8BC0> add buffer 0x55b633882e90
+0:00:00.181201134      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:74:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap buffer, datas:1
+0:00:00.181205085      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:108:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap data (DmaBuf 3) 0 1843200
+0:00:00.181246565      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:605:on_add_buffer:<Video7F57251E8BC0> add buffer 0x55b633882fb0
+0:00:00.181249548      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:74:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap buffer, datas:1
+0:00:00.181256856      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:108:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap data (DmaBuf 3) 0 1843200
+0:00:00.181301209      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:605:on_add_buffer:<Video7F57251E8BC0> add buffer 0x55b633ae6080
+0:00:00.181304416      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:74:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap buffer, datas:1
+0:00:00.181308120      54444      54547 DEBUG           pipewirepool gstpipewirepool.c:108:gst_pipewire_pool_wrap_buffer:<pipewirepool0> wrap data (DmaBuf 3) 0 1843200
+0:00:00.181345827      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:605:on_add_buffer:<Video7F57251E8BC0> add buffer 0x55b633ad2230
+0:00:00.181563362      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:900:on_state_changed:<Video7F57251E8BC0> got stream state streaming
+0:00:00.181593295      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now streaming
+0:00:00.183275893      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:959:gst_pipewire_src_stream_start:<Video7F57251E8BC0> doing stream start
+0:00:00.183291637      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:967:gst_pipewire_src_stream_start:<Video7F57251E8BC0> waiting for STREAMING, now streaming
+0:00:00.183296013      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:947:parse_stream_properties:<Video7F57251E8BC0> live 1
+0:00:00.183299007      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:986:gst_pipewire_src_stream_start:<Video7F57251E8BC0> signal started
+0:00:00.183335228      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1027:wait_started:<Video7F57251E8BC0> waiting for started signal, state now streaming
+0:00:00.183343904      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1053:wait_started:<Video7F57251E8BC0> got started signal: streaming
+0:00:00.183432048      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1774:gst_pipewire_src_change_state:<Video7F57251E8BC0> activating stream
+0:00:00.183483359      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:900:on_state_changed:<Video7F57251E8BC0> got stream state paused
+0:00:00.183502533      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1074:wait_negotiated:<Video7F57251E8BC0> waiting for NEGOTIATED, now paused
+0:00:00.183506006      54444      54444 DEBUG            pipewiresrc gstpipewiresrc.c:1094:wait_negotiated:<Video7F57251E8BC0> got negotiated signal
+0:00:00.183515683      54444      54583 DEBUG            pipewiresrc gstpipewiresrc.c:1463:gst_pipewire_src_unlock_stop:<Video7F57251E8BC0> unsetting flushing
+0:00:00.183563449      54444      54547 DEBUG            pipewiresrc gstpipewiresrc.c:900:on_state_changed:<Video7F57251E8BC0> got stream state streaming
+[web] cámara concedida: USB2.0 HD UVC WebCam (V4L2)
+0:00:00.184842613      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:182:setSize:<Video_capturer_pipeline0_7F57251E8BC0> Setting size to 640x480
+0:00:00.184912819      54444      54444 INFO     webkitvideocapturer GStreamerVideoCapturer.cpp:412:reconfigure:<Video_capturer_pipeline0_7F57251E8BC0> Setting video capture device caps to image/jpeg, width=(int)1280, height=(int)720
+0:00:00.184947038      54444      54444 WARN            webkitcommon GStreamerCommon.cpp:199:getVideoResolutionFromCaps: Failed to get the video resolution, these are not a video caps
+GStreamer element autoaudiosink not found. Please install it
+
+(WebKitWebProcess:54444): GLib-GObject-CRITICAL **: 18:25:23.705: invalid (NULL) pointer instance
+
+(WebKitWebProcess:54444): GLib-GObject-CRITICAL **: 18:25:23.705: g_signal_connect_data: assertion 'G_TYPE_CHECK_INSTANCE (instance)' failed
+tiempo agotado: la página no reportó

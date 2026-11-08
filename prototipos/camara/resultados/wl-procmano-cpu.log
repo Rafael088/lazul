@@ -1,0 +1,75 @@
+Overriding existing handler for signal 10. Set JSC_SIGNAL_FOR_GC if you want WebKit to use a different signal
+[web] config {"modo":"proceso+mano","segundos":30,"calentar":5,"delegado":"CPU","so":"linux"} info {"ua":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15 wails.io/605.1.15","modo":"proceso+mano","rvfc":true,"mediaDevices":true,"webgl":{"canvas_webgl":true,"canvas_webgl2":true,"offscreen_webgl2":false},"apis":{"MediaStreamTrackProcessor":"undefined","VideoFrame":"function","ImageCapture":"undefined"}}
+{
+  "config": {
+    "modo": "proceso+mano",
+    "segundos": 30,
+    "calentar": 5,
+    "delegado": "CPU",
+    "so": "linux"
+  },
+  "cpu_pct_nucleo": 108.32876253986367,
+  "cpu_pct_total": 13.54109531748296,
+  "cpu_seg": 32.59,
+  "fecha": "2026-11-07T18:35:51-05:00",
+  "nucleos": 8,
+  "pared_seg": 30.08434624,
+  "procesos": [
+    "camara",
+    "ffmpeg",
+    "WebKitNetworkPr",
+    "WebKitWebProces"
+  ],
+  "web": {
+    "apis": {
+      "ImageCapture": "undefined",
+      "MediaStreamTrackProcessor": "undefined",
+      "VideoFrame": "function"
+    },
+    "camara": {
+      "alto": 480,
+      "ancho": 640,
+      "por": "ffmpeg v4l2",
+      "tiene_X_T": true
+    },
+    "captura_a_puntos_ms": {
+      "max": 84.68,
+      "media": 59.64,
+      "n": 698,
+      "p50": 59.28,
+      "p95": 78.37
+    },
+    "carga_ms": 243,
+    "cuadro_a_puntos_ms": {
+      "max": 57,
+      "media": 39.79,
+      "n": 698,
+      "p50": 39,
+      "p95": 43
+    },
+    "cuadros_con_mano": 698,
+    "delegado_usado": "CPU",
+    "error_bucle": null,
+    "errores_cuadro": 0,
+    "fps": 23.24,
+    "fps_camara": 29.86,
+    "inferencia_ms": {
+      "max": 57,
+      "media": 39.37,
+      "n": 698,
+      "p50": 39,
+      "p95": 43
+    },
+    "mediaDevices": true,
+    "modo": "proceso+mano",
+    "resultados": 698,
+    "rvfc": true,
+    "segundos": 30.04,
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15 wails.io/605.1.15",
+    "webgl": {
+      "canvas_webgl": true,
+      "canvas_webgl2": true,
+      "offscreen_webgl2": false
+    }
+  }
+}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Lazul · prueba de cámara</title>
+<style>
+  body { margin: 0; background: #101428; color: #e8ecff; font: 14px/1.4 system-ui, sans-serif; }
+  #escena { position: relative; width: 640px; height: 480px; margin: 12px auto 0; }
+  video, canvas { position: absolute; inset: 0; width: 640px; height: 480px; }
+  video { transform: scaleX(-1); }
+  #estado { width: 640px; margin: 8px auto; font-family: ui-monospace, monospace; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="escena"><video id="video" playsinline muted></video><canvas id="lienzo" width="640" height="480"></canvas><canvas id="puntos" width="640" height="480"></canvas></div>
+<div id="estado">arrancando…</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
