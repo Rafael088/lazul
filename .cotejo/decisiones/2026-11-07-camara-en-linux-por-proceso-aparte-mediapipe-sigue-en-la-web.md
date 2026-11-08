@@ -2,8 +2,9 @@
 id: dec-7tgj
 fecha: 2026-11-07
 temas: [gestos, arquitectura, linux]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-11-07
 ---
 # Cámara en Linux por proceso aparte; MediaPipe sigue en la webview
 
