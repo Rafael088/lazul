@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "sin-web",
+      "nombre": "Caso sin respaldo web"
+    }
+  ]
+}
