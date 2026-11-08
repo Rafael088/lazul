@@ -12,7 +12,7 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev check` | formato, vet, compilar, pruebas, proto al día, tipos TS. Debe quedar en verde antes de entregar. |
 | `./dev test [paquetes]` | pruebas de Go (por defecto `./...`) |
 | `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio) |
-| `./dev sim [-receptores N]` | controlador + N receptores falsos por WebSocket en 127.0.0.1 |
+| `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS |
 | `./dev replay [-v] [-barrer]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L |
 | `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`) |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
@@ -33,7 +33,9 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
 | `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | hoy devuelven `ErrNoImplementado`: terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |
-| `core/` | núcleo: `Receptor` atiende Órdenes, transporte WebSocket | nunca llama al sistema, solo a `platform` |
+| `core/` | núcleo: `Receptor` atiende Órdenes, transporte WebSocket sobre TLS (`transporte.go`) | nunca llama al sistema, solo a `platform` |
+| `core/pareja.go`, `identidad.go`, `codigo.go`, `pares.go` | emparejamiento: identidad (cert autofirmado P-256, `Huella` = SHA-256 de la clave pública), código de 6 dígitos (2 min, 3 intentos, un uso), prueba HMAC atada a la sesión TLS, `Puerta` (permiso de la persona) y `Pares` fijados | solo librería estándar; el protocolo y su límite están en el comentario de `pareja.go`; pruebas primero |
+| `core/descubre/` | interfaz `Red`: `MDNS` (`_lazul._tcp`, hashicorp/mdns) y `Memoria` (sim y pruebas) | lo anunciado no es de confianza: la da la huella; la prueba con red real va con `LAZUL_MDNS=1` |
 | `core/sim/`, `core/cmd/sim/` | el recorrido de `./dev sim` | |
 | `gestures/` | `PoseDe` (forma de la mano en un cuadro, `pose.go`), `Clasificar` (máquina de estados pura, `clasificador.go`), grabaciones y medición | formato en `grabacion.go`; umbrales provisionales hasta medir con las reales |
 | `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
@@ -56,14 +58,15 @@ a unos 90° y con las puntas separadas.
 ## Cómo se habla todo
 
 webview (MediaPipe) → puntos → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
-`Sobre{Orden}` por WebSocket → receptor → `platform` → `Sobre{Respuesta}`.
+`Sobre{Orden}` por WebSocket sobre TLS 1.3 (huella fijada en los dos lados) →
+receptor → `platform` → `Sobre{Respuesta}`. Antes, una vez por par de equipos:
+mDNS → `/pareja` con el código de 6 dígitos → la persona en el receptor permite.
 Los archivos (capturas) no van en el Sobre: viajan por LocalSend.
 
 ## Pendiente en otras tareas
 
 - Adaptadores: Linux `cotejo-42s7rt`, Windows `cotejo-232tso` (hacer pasar el contrato; no tocar `platform/contrato` para que pase).
 - Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
-- Emparejamiento, TLS y permisos `cotejo-1od1ta` (hoy el transporte es WebSocket sin cifrar, solo en 127.0.0.1).
 - De punta a punta y LocalSend `cotejo-sb2kdm`.
 
 ## Reglas
