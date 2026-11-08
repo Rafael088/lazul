@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lazul/v1/lazul.proto.
  */
 export const file_lazul_v1_lazul: GenFile = /*@__PURE__*/
-  fileDesc("ChRsYXp1bC92MS9sYXp1bC5wcm90bxIIbGF6dWwudjEisQIKBVNvYnJlEg8KB3ZlcnNpb24YASABKA0SCgoCaWQYAiABKAkSEgoKZW52aWFkb19tcxgDIAEoAxIWCg5lbl9yZXNwdWVzdGFfYRgEIAEoCRIeCgRob2xhGAogASgLMg4ubGF6dWwudjEuSG9sYUgAEh4KBHBpbmcYCyABKAsyDi5sYXp1bC52MS5QaW5nSAASHgoEcG9uZxgMIAEoCzIOLmxhenVsLnYxLlBvbmdIABImCgVnZXN0bxgNIAEoCzIVLmxhenVsLnYxLkV2ZW50b0dlc3RvSAASIAoFb3JkZW4YDiABKAsyDy5sYXp1bC52MS5PcmRlbkgAEigKCXJlc3B1ZXN0YRgPIAEoCzITLmxhenVsLnYxLlJlc3B1ZXN0YUgAQgsKCWNvbnRlbmlkbyKMAQoESG9sYRIRCgllcXVpcG9faWQYASABKAkSDgoGbm9tYnJlGAIgASgJEiIKB3Npc3RlbWEYAyABKA4yES5sYXp1bC52MS5TaXN0ZW1hEhMKC3ZlcnNpb25fYXBwGAQgASgJEigKC2NhcGFjaWRhZGVzGAUgAygOMhMubGF6dWwudjEuQ2FwYWNpZGFkIgYKBFBpbmciBgoEUG9uZyJ7CgtFdmVudG9HZXN0bxIeCgVnZXN0bxgBIAEoDjIPLmxhenVsLnYxLkdlc3RvEhEKCWNvbmZpYW56YRgCIAEoAhIRCgljdWFkcm9fbXMYAyABKAMSJgoJZGlyZWNjaW9uGAQgASgOMhMubGF6dWwudjEuRGlyZWNjaW9uIlsKBU9yZGVuEiAKBXRvbWFyGAEgASgLMg8ubGF6dWwudjEuVG9tYXJIABImCghlbnRyZWdhchgCIAEoCzISLmxhenVsLnYxLkVudHJlZ2FySABCCAoGYWNjaW9uIoABCgVUb21hchIgCgNxdWUYASABKA4yEy5sYXp1bC52MS5Ub21hci5RdWUiVQoDUXVlEhMKD1FVRV9ERVNDT05PQ0lETxAAEg8KC1FVRV9DQVBUVVJBEAESFAoQUVVFX1BPUlRBUEFQRUxFUxACEhIKDlFVRV9BUFBfQUNUSVZBEAMiLAoIRW50cmVnYXISIAoGb2JqZXRvGAEgASgLMhAubGF6dWwudjEuT2JqZXRvIncKBk9iamV0bxIkCgdhcmNoaXZvGAEgASgLMhEubGF6dWwudjEuQXJjaGl2b0gAEg8KBXRleHRvGAIgASgJSAASDQoDdXJsGAMgASgJSAASHwoDYXBwGAQgASgLMhAubGF6dWwudjEuQXBwUmVmSABCBgoEdGlwbyJgCgdBcmNoaXZvEg4KBm5vbWJyZRgBIAEoCRINCgVieXRlcxgCIAEoBBIOCgZzaGEyNTYYAyABKAwSDAoEbWltZRgEIAEoCRIYChB0cmFuc2ZlcmVuY2lhX2lkGAUgASgJIk0KBkFwcFJlZhITCgtjYXRhbG9nb19pZBgBIAEoCRIRCgluYXRpdm9faWQYAiABKAkSDgoGbm9tYnJlGAMgASgJEgsKA3dlYhgEIAEoCSJZCglSZXNwdWVzdGESCgoCb2sYASABKAgSHgoFZmFsbGEYAiABKAsyDy5sYXp1bC52MS5GYWxsYRIgCgZvYmpldG8YAyABKAsyEC5sYXp1bC52MS5PYmpldG8i1wEKBUZhbGxhEiYKBmNvZGlnbxgBIAEoDjIWLmxhenVsLnYxLkZhbGxhLkNvZGlnbxIPCgdkZXRhbGxlGAIgASgJIpQBCgZDb2RpZ28SFgoSQ09ESUdPX0RFU0NPTk9DSURPEAASFwoTQ09ESUdPX05PX1NPUE9SVEFETxABEhYKEkNPRElHT19TSU5fUEVSTUlTTxACEhgKFENPRElHT19OT19FTkNPTlRSQURPEAMSEwoPQ09ESUdPX0lOVkFMSURPEAQSEgoOQ09ESUdPX0lOVEVSTk8QBSo2CgdWZXJzaW9uEhcKE1ZFUlNJT05fREVTQ09OT0NJREEQABISCg5WRVJTSU9OX0FDVFVBTBABKl8KB1Npc3RlbWESFwoTU0lTVEVNQV9ERVNDT05PQ0lETxAAEhMKD1NJU1RFTUFfV0lORE9XUxABEhEKDVNJU1RFTUFfTElOVVgQAhITCg9TSVNURU1BX0FORFJPSUQQAyqrAQoJQ2FwYWNpZGFkEhkKFUNBUEFDSURBRF9ERVNDT05PQ0lEQRAAEhUKEUNBUEFDSURBRF9DQVBUVVJBEAESGgoWQ0FQQUNJREFEX1BPUlRBUEFQRUxFUxACEhgKFENBUEFDSURBRF9BUFBfQUNUSVZBEAMSFwoTQ0FQQUNJREFEX0FCUklSX0FQUBAEEh0KGUNBUEFDSURBRF9SRUNJQklSX0FSQ0hJVk8QBSpoCgVHZXN0bxIRCg1HRVNUT19OSU5HVU5PEAASEQoNR0VTVE9fQUNUSVZBUhABEhEKDUdFU1RPX0FHQVJSQVIQAhIQCgxHRVNUT19TT0xUQVIQAxIUChBHRVNUT19NQU5EQVJfQVBQEAQqfQoJRGlyZWNjaW9uEhUKEURJUkVDQ0lPTl9OSU5HVU5BEAASFwoTRElSRUNDSU9OX0laUVVJRVJEQRABEhUKEURJUkVDQ0lPTl9ERVJFQ0hBEAISFAoQRElSRUNDSU9OX0FSUklCQRADEhMKD0RJUkVDQ0lPTl9BQkFKTxAEQjVaM2dpdGh1Yi5jb20vUmFmYWVsMDg4L2xhenVsL3Byb3RvL2dvL2xhenVsdjE7bGF6dWx2MWIGcHJvdG8z");
+  fileDesc("ChRsYXp1bC92MS9sYXp1bC5wcm90bxIIbGF6dWwudjEilwMKBVNvYnJlEg8KB3ZlcnNpb24YASABKA0SCgoCaWQYAiABKAkSEgoKZW52aWFkb19tcxgDIAEoAxIWCg5lbl9yZXNwdWVzdGFfYRgEIAEoCRIeCgRob2xhGAogASgLMg4ubGF6dWwudjEuSG9sYUgAEh4KBHBpbmcYCyABKAsyDi5sYXp1bC52MS5QaW5nSAASHgoEcG9uZxgMIAEoCzIOLmxhenVsLnYxLlBvbmdIABImCgVnZXN0bxgNIAEoCzIVLmxhenVsLnYxLkV2ZW50b0dlc3RvSAASIAoFb3JkZW4YDiABKAsyDy5sYXp1bC52MS5PcmRlbkgAEigKCXJlc3B1ZXN0YRgPIAEoCzITLmxhenVsLnYxLlJlc3B1ZXN0YUgAEi0KDHBlZGlyX3BhcmVqYRgQIAEoCzIVLmxhenVsLnYxLlBlZGlyUGFyZWphSAASNQoQcmVzcHVlc3RhX3BhcmVqYRgRIAEoCzIZLmxhenVsLnYxLlJlc3B1ZXN0YVBhcmVqYUgAQgsKCWNvbnRlbmlkbyKMAQoESG9sYRIRCgllcXVpcG9faWQYASABKAkSDgoGbm9tYnJlGAIgASgJEiIKB3Npc3RlbWEYAyABKA4yES5sYXp1bC52MS5TaXN0ZW1hEhMKC3ZlcnNpb25fYXBwGAQgASgJEigKC2NhcGFjaWRhZGVzGAUgAygOMhMubGF6dWwudjEuQ2FwYWNpZGFkIgYKBFBpbmciBgoEUG9uZyJ7CgtFdmVudG9HZXN0bxIeCgVnZXN0bxgBIAEoDjIPLmxhenVsLnYxLkdlc3RvEhEKCWNvbmZpYW56YRgCIAEoAhIRCgljdWFkcm9fbXMYAyABKAMSJgoJZGlyZWNjaW9uGAQgASgOMhMubGF6dWwudjEuRGlyZWNjaW9uIlsKBU9yZGVuEiAKBXRvbWFyGAEgASgLMg8ubGF6dWwudjEuVG9tYXJIABImCghlbnRyZWdhchgCIAEoCzISLmxhenVsLnYxLkVudHJlZ2FySABCCAoGYWNjaW9uIoABCgVUb21hchIgCgNxdWUYASABKA4yEy5sYXp1bC52MS5Ub21hci5RdWUiVQoDUXVlEhMKD1FVRV9ERVNDT05PQ0lETxAAEg8KC1FVRV9DQVBUVVJBEAESFAoQUVVFX1BPUlRBUEFQRUxFUxACEhIKDlFVRV9BUFBfQUNUSVZBEAMiLAoIRW50cmVnYXISIAoGb2JqZXRvGAEgASgLMhAubGF6dWwudjEuT2JqZXRvIncKBk9iamV0bxIkCgdhcmNoaXZvGAEgASgLMhEubGF6dWwudjEuQXJjaGl2b0gAEg8KBXRleHRvGAIgASgJSAASDQoDdXJsGAMgASgJSAASHwoDYXBwGAQgASgLMhAubGF6dWwudjEuQXBwUmVmSABCBgoEdGlwbyJgCgdBcmNoaXZvEg4KBm5vbWJyZRgBIAEoCRINCgVieXRlcxgCIAEoBBIOCgZzaGEyNTYYAyABKAwSDAoEbWltZRgEIAEoCRIYChB0cmFuc2ZlcmVuY2lhX2lkGAUgASgJIk0KBkFwcFJlZhITCgtjYXRhbG9nb19pZBgBIAEoCRIRCgluYXRpdm9faWQYAiABKAkSDgoGbm9tYnJlGAMgASgJEgsKA3dlYhgEIAEoCSJZCglSZXNwdWVzdGESCgoCb2sYASABKAgSHgoFZmFsbGEYAiABKAsyDy5sYXp1bC52MS5GYWxsYRIgCgZvYmpldG8YAyABKAsyEC5sYXp1bC52MS5PYmpldG8i1wEKBUZhbGxhEiYKBmNvZGlnbxgBIAEoDjIWLmxhenVsLnYxLkZhbGxhLkNvZGlnbxIPCgdkZXRhbGxlGAIgASgJIpQBCgZDb2RpZ28SFgoSQ09ESUdPX0RFU0NPTk9DSURPEAASFwoTQ09ESUdPX05PX1NPUE9SVEFETxABEhYKEkNPRElHT19TSU5fUEVSTUlTTxACEhgKFENPRElHT19OT19FTkNPTlRSQURPEAMSEwoPQ09ESUdPX0lOVkFMSURPEAQSEgoOQ09ESUdPX0lOVEVSTk8QBSI7CgtQZWRpclBhcmVqYRIcCgRob2xhGAEgASgLMg4ubGF6dWwudjEuSG9sYRIOCgZwcnVlYmEYAiABKAwiugIKD1Jlc3B1ZXN0YVBhcmVqYRI2CglyZXN1bHRhZG8YASABKA4yIy5sYXp1bC52MS5SZXNwdWVzdGFQYXJlamEuUmVzdWx0YWRvEg4KBnBydWViYRgCIAEoDBIcCgRob2xhGAMgASgLMg4ubGF6dWwudjEuSG9sYRIaChJpbnRlbnRvc19yZXN0YW50ZXMYBCABKA0ipAEKCVJlc3VsdGFkbxIZChVSRVNVTFRBRE9fREVTQ09OT0NJRE8QABIWChJSRVNVTFRBRE9fQUNFUFRBRE8QARIcChhSRVNVTFRBRE9fQ09ESUdPX0VSUk9ORU8QAhIWChJSRVNVTFRBRE9fQ0FEVUNBRE8QAxIXChNSRVNVTFRBRE9fUkVDSEFaQURPEAQSFQoRUkVTVUxUQURPX0NFUlJBRE8QBSo2CgdWZXJzaW9uEhcKE1ZFUlNJT05fREVTQ09OT0NJREEQABISCg5WRVJTSU9OX0FDVFVBTBABKl8KB1Npc3RlbWESFwoTU0lTVEVNQV9ERVNDT05PQ0lETxAAEhMKD1NJU1RFTUFfV0lORE9XUxABEhEKDVNJU1RFTUFfTElOVVgQAhITCg9TSVNURU1BX0FORFJPSUQQAyqrAQoJQ2FwYWNpZGFkEhkKFUNBUEFDSURBRF9ERVNDT05PQ0lEQRAAEhUKEUNBUEFDSURBRF9DQVBUVVJBEAESGgoWQ0FQQUNJREFEX1BPUlRBUEFQRUxFUxACEhgKFENBUEFDSURBRF9BUFBfQUNUSVZBEAMSFwoTQ0FQQUNJREFEX0FCUklSX0FQUBAEEh0KGUNBUEFDSURBRF9SRUNJQklSX0FSQ0hJVk8QBSpoCgVHZXN0bxIRCg1HRVNUT19OSU5HVU5PEAASEQoNR0VTVE9fQUNUSVZBUhABEhEKDUdFU1RPX0FHQVJSQVIQAhIQCgxHRVNUT19TT0xUQVIQAxIUChBHRVNUT19NQU5EQVJfQVBQEAQqfQoJRGlyZWNjaW9uEhUKEURJUkVDQ0lPTl9OSU5HVU5BEAASFwoTRElSRUNDSU9OX0laUVVJRVJEQRABEhUKEURJUkVDQ0lPTl9ERVJFQ0hBEAISFAoQRElSRUNDSU9OX0FSUklCQRADEhMKD0RJUkVDQ0lPTl9BQkFKTxAEQjVaM2dpdGh1Yi5jb20vUmFmYWVsMDg4L2xhenVsL3Byb3RvL2dvL2xhenVsdjE7bGF6dWx2MWIGcHJvdG8z");
 
 /**
  * Sobre: todo lo que viaja entre equipos (WebSocket, binario) y de la
@@ -93,6 +93,18 @@ export type Sobre = Message<"lazul.v1.Sobre"> & {
      */
     value: Respuesta;
     case: "respuesta";
+  } | {
+    /**
+     * @generated from field: lazul.v1.PedirPareja pedir_pareja = 16;
+     */
+    value: PedirPareja;
+    case: "pedirPareja";
+  } | {
+    /**
+     * @generated from field: lazul.v1.RespuestaPareja respuesta_pareja = 17;
+     */
+    value: RespuestaPareja;
+    case: "respuestaPareja";
   } | { case: undefined; value?: undefined };
 };
 
@@ -549,6 +561,121 @@ export enum Falla_Codigo {
  */
 export const Falla_CodigoSchema: GenEnum<Falla_Codigo> = /*@__PURE__*/
   enumDesc(file_lazul_v1_lazul, 12, 0);
+
+/**
+ * Del controlador al receptor, en la ruta /pareja.
+ *
+ * @generated from message lazul.v1.PedirPareja
+ */
+export type PedirPareja = Message<"lazul.v1.PedirPareja"> & {
+  /**
+   * quién pide (nombre que verá la persona en el receptor)
+   *
+   * @generated from field: lazul.v1.Hola hola = 1;
+   */
+  hola?: Hola | undefined;
+
+  /**
+   * HMAC del código; ver core/pareja.go
+   *
+   * @generated from field: bytes prueba = 2;
+   */
+  prueba: Uint8Array;
+};
+
+/**
+ * Describes the message lazul.v1.PedirPareja.
+ * Use `create(PedirParejaSchema)` to create a new message.
+ */
+export const PedirParejaSchema: GenMessage<PedirPareja> = /*@__PURE__*/
+  messageDesc(file_lazul_v1_lazul, 13);
+
+/**
+ * @generated from message lazul.v1.RespuestaPareja
+ */
+export type RespuestaPareja = Message<"lazul.v1.RespuestaPareja"> & {
+  /**
+   * @generated from field: lazul.v1.RespuestaPareja.Resultado resultado = 1;
+   */
+  resultado: RespuestaPareja_Resultado;
+
+  /**
+   * HMAC del receptor, solo si fue aceptado
+   *
+   * @generated from field: bytes prueba = 2;
+   */
+  prueba: Uint8Array;
+
+  /**
+   * el receptor, solo si fue aceptado
+   *
+   * @generated from field: lazul.v1.Hola hola = 3;
+   */
+  hola?: Hola | undefined;
+
+  /**
+   * tras un código erróneo
+   *
+   * @generated from field: uint32 intentos_restantes = 4;
+   */
+  intentosRestantes: number;
+};
+
+/**
+ * Describes the message lazul.v1.RespuestaPareja.
+ * Use `create(RespuestaParejaSchema)` to create a new message.
+ */
+export const RespuestaParejaSchema: GenMessage<RespuestaPareja> = /*@__PURE__*/
+  messageDesc(file_lazul_v1_lazul, 14);
+
+/**
+ * @generated from enum lazul.v1.RespuestaPareja.Resultado
+ */
+export enum RespuestaPareja_Resultado {
+  /**
+   * @generated from enum value: RESULTADO_DESCONOCIDO = 0;
+   */
+  DESCONOCIDO = 0,
+
+  /**
+   * la persona dijo que sí; huellas fijadas
+   *
+   * @generated from enum value: RESULTADO_ACEPTADO = 1;
+   */
+  ACEPTADO = 1,
+
+  /**
+   * @generated from enum value: RESULTADO_CODIGO_ERRONEO = 2;
+   */
+  CODIGO_ERRONEO = 2,
+
+  /**
+   * el código venció o se acabaron los intentos
+   *
+   * @generated from enum value: RESULTADO_CADUCADO = 3;
+   */
+  CADUCADO = 3,
+
+  /**
+   * la persona en el receptor dijo que no
+   *
+   * @generated from enum value: RESULTADO_RECHAZADO = 4;
+   */
+  RECHAZADO = 4,
+
+  /**
+   * el receptor no está emparejando ahora
+   *
+   * @generated from enum value: RESULTADO_CERRADO = 5;
+   */
+  CERRADO = 5,
+}
+
+/**
+ * Describes the enum lazul.v1.RespuestaPareja.Resultado.
+ */
+export const RespuestaPareja_ResultadoSchema: GenEnum<RespuestaPareja_Resultado> = /*@__PURE__*/
+  enumDesc(file_lazul_v1_lazul, 14, 0);
 
 /**
  * Versión del protocolo que hablan hoy los equipos.

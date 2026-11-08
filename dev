@@ -5,7 +5,7 @@
 #   ./dev check              formato, vet, compilar, pruebas, proto al día, tipos TS
 #   ./dev test [paquetes]    pruebas de Go (por defecto ./...)
 #   ./dev contrato           contrato de platform contra el adaptador de este sistema
-#   ./dev sim [-receptores N]  un controlador y N receptores falsos en local
+#   ./dev sim [-receptores N] [-mdns]  controlador y N receptores: descubrir, emparejar, rechazar
 #   ./dev replay [-v] [-barrer]  mide el clasificador (grabaciones reales y sintéticas)
 #   ./dev grabar [-dir D]    página local para grabar gestos con la cámara
 #   ./dev gen                regenera los tipos de Go y TS desde proto/

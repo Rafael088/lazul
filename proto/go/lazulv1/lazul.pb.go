@@ -407,6 +407,64 @@ func (Falla_Codigo) EnumDescriptor() ([]byte, []int) {
 	return file_lazul_v1_lazul_proto_rawDescGZIP(), []int{12, 0}
 }
 
+type RespuestaPareja_Resultado int32
+
+const (
+	RespuestaPareja_RESULTADO_DESCONOCIDO    RespuestaPareja_Resultado = 0
+	RespuestaPareja_RESULTADO_ACEPTADO       RespuestaPareja_Resultado = 1 // la persona dijo que sí; huellas fijadas
+	RespuestaPareja_RESULTADO_CODIGO_ERRONEO RespuestaPareja_Resultado = 2
+	RespuestaPareja_RESULTADO_CADUCADO       RespuestaPareja_Resultado = 3 // el código venció o se acabaron los intentos
+	RespuestaPareja_RESULTADO_RECHAZADO      RespuestaPareja_Resultado = 4 // la persona en el receptor dijo que no
+	RespuestaPareja_RESULTADO_CERRADO        RespuestaPareja_Resultado = 5 // el receptor no está emparejando ahora
+)
+
+// Enum value maps for RespuestaPareja_Resultado.
+var (
+	RespuestaPareja_Resultado_name = map[int32]string{
+		0: "RESULTADO_DESCONOCIDO",
+		1: "RESULTADO_ACEPTADO",
+		2: "RESULTADO_CODIGO_ERRONEO",
+		3: "RESULTADO_CADUCADO",
+		4: "RESULTADO_RECHAZADO",
+		5: "RESULTADO_CERRADO",
+	}
+	RespuestaPareja_Resultado_value = map[string]int32{
+		"RESULTADO_DESCONOCIDO":    0,
+		"RESULTADO_ACEPTADO":       1,
+		"RESULTADO_CODIGO_ERRONEO": 2,
+		"RESULTADO_CADUCADO":       3,
+		"RESULTADO_RECHAZADO":      4,
+		"RESULTADO_CERRADO":        5,
+	}
+)
+
+func (x RespuestaPareja_Resultado) Enum() *RespuestaPareja_Resultado {
+	p := new(RespuestaPareja_Resultado)
+	*p = x
+	return p
+}
+
+func (x RespuestaPareja_Resultado) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RespuestaPareja_Resultado) Descriptor() protoreflect.EnumDescriptor {
+	return file_lazul_v1_lazul_proto_enumTypes[7].Descriptor()
+}
+
+func (RespuestaPareja_Resultado) Type() protoreflect.EnumType {
+	return &file_lazul_v1_lazul_proto_enumTypes[7]
+}
+
+func (x RespuestaPareja_Resultado) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RespuestaPareja_Resultado.Descriptor instead.
+func (RespuestaPareja_Resultado) EnumDescriptor() ([]byte, []int) {
+	return file_lazul_v1_lazul_proto_rawDescGZIP(), []int{14, 0}
+}
+
 // Sobre: todo lo que viaja entre equipos (WebSocket, binario) y de la
 // webview al núcleo va dentro de un Sobre.
 type Sobre struct {
@@ -423,6 +481,8 @@ type Sobre struct {
 	//	*Sobre_Gesto
 	//	*Sobre_Orden
 	//	*Sobre_Respuesta
+	//	*Sobre_PedirPareja
+	//	*Sobre_RespuestaPareja
 	Contenido     isSobre_Contenido `protobuf_oneof:"contenido"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -547,6 +607,24 @@ func (x *Sobre) GetRespuesta() *Respuesta {
 	return nil
 }
 
+func (x *Sobre) GetPedirPareja() *PedirPareja {
+	if x != nil {
+		if x, ok := x.Contenido.(*Sobre_PedirPareja); ok {
+			return x.PedirPareja
+		}
+	}
+	return nil
+}
+
+func (x *Sobre) GetRespuestaPareja() *RespuestaPareja {
+	if x != nil {
+		if x, ok := x.Contenido.(*Sobre_RespuestaPareja); ok {
+			return x.RespuestaPareja
+		}
+	}
+	return nil
+}
+
 type isSobre_Contenido interface {
 	isSobre_Contenido()
 }
@@ -575,6 +653,14 @@ type Sobre_Respuesta struct {
 	Respuesta *Respuesta `protobuf:"bytes,15,opt,name=respuesta,proto3,oneof"`
 }
 
+type Sobre_PedirPareja struct {
+	PedirPareja *PedirPareja `protobuf:"bytes,16,opt,name=pedir_pareja,json=pedirPareja,proto3,oneof"`
+}
+
+type Sobre_RespuestaPareja struct {
+	RespuestaPareja *RespuestaPareja `protobuf:"bytes,17,opt,name=respuesta_pareja,json=respuestaPareja,proto3,oneof"`
+}
+
 func (*Sobre_Hola) isSobre_Contenido() {}
 
 func (*Sobre_Ping) isSobre_Contenido() {}
@@ -586,6 +672,10 @@ func (*Sobre_Gesto) isSobre_Contenido() {}
 func (*Sobre_Orden) isSobre_Contenido() {}
 
 func (*Sobre_Respuesta) isSobre_Contenido() {}
+
+func (*Sobre_PedirPareja) isSobre_Contenido() {}
+
+func (*Sobre_RespuestaPareja) isSobre_Contenido() {}
 
 // Primer mensaje de cada conexión, en los dos sentidos.
 type Hola struct {
@@ -1355,11 +1445,132 @@ func (x *Falla) GetDetalle() string {
 	return ""
 }
 
+// Del controlador al receptor, en la ruta /pareja.
+type PedirPareja struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hola          *Hola                  `protobuf:"bytes,1,opt,name=hola,proto3" json:"hola,omitempty"`     // quién pide (nombre que verá la persona en el receptor)
+	Prueba        []byte                 `protobuf:"bytes,2,opt,name=prueba,proto3" json:"prueba,omitempty"` // HMAC del código; ver core/pareja.go
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PedirPareja) Reset() {
+	*x = PedirPareja{}
+	mi := &file_lazul_v1_lazul_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PedirPareja) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PedirPareja) ProtoMessage() {}
+
+func (x *PedirPareja) ProtoReflect() protoreflect.Message {
+	mi := &file_lazul_v1_lazul_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PedirPareja.ProtoReflect.Descriptor instead.
+func (*PedirPareja) Descriptor() ([]byte, []int) {
+	return file_lazul_v1_lazul_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PedirPareja) GetHola() *Hola {
+	if x != nil {
+		return x.Hola
+	}
+	return nil
+}
+
+func (x *PedirPareja) GetPrueba() []byte {
+	if x != nil {
+		return x.Prueba
+	}
+	return nil
+}
+
+type RespuestaPareja struct {
+	state             protoimpl.MessageState    `protogen:"open.v1"`
+	Resultado         RespuestaPareja_Resultado `protobuf:"varint,1,opt,name=resultado,proto3,enum=lazul.v1.RespuestaPareja_Resultado" json:"resultado,omitempty"`
+	Prueba            []byte                    `protobuf:"bytes,2,opt,name=prueba,proto3" json:"prueba,omitempty"`                                                 // HMAC del receptor, solo si fue aceptado
+	Hola              *Hola                     `protobuf:"bytes,3,opt,name=hola,proto3" json:"hola,omitempty"`                                                     // el receptor, solo si fue aceptado
+	IntentosRestantes uint32                    `protobuf:"varint,4,opt,name=intentos_restantes,json=intentosRestantes,proto3" json:"intentos_restantes,omitempty"` // tras un código erróneo
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RespuestaPareja) Reset() {
+	*x = RespuestaPareja{}
+	mi := &file_lazul_v1_lazul_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RespuestaPareja) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RespuestaPareja) ProtoMessage() {}
+
+func (x *RespuestaPareja) ProtoReflect() protoreflect.Message {
+	mi := &file_lazul_v1_lazul_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RespuestaPareja.ProtoReflect.Descriptor instead.
+func (*RespuestaPareja) Descriptor() ([]byte, []int) {
+	return file_lazul_v1_lazul_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RespuestaPareja) GetResultado() RespuestaPareja_Resultado {
+	if x != nil {
+		return x.Resultado
+	}
+	return RespuestaPareja_RESULTADO_DESCONOCIDO
+}
+
+func (x *RespuestaPareja) GetPrueba() []byte {
+	if x != nil {
+		return x.Prueba
+	}
+	return nil
+}
+
+func (x *RespuestaPareja) GetHola() *Hola {
+	if x != nil {
+		return x.Hola
+	}
+	return nil
+}
+
+func (x *RespuestaPareja) GetIntentosRestantes() uint32 {
+	if x != nil {
+		return x.IntentosRestantes
+	}
+	return 0
+}
+
 var File_lazul_v1_lazul_proto protoreflect.FileDescriptor
 
 const file_lazul_v1_lazul_proto_rawDesc = "" +
 	"\n" +
-	"\x14lazul/v1/lazul.proto\x12\blazul.v1\"\x82\x03\n" +
+	"\x14lazul/v1/lazul.proto\x12\blazul.v1\"\x86\x04\n" +
 	"\x05Sobre\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\rR\aversion\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x1d\n" +
@@ -1372,7 +1583,9 @@ const file_lazul_v1_lazul_proto_rawDesc = "" +
 	"\x04pong\x18\f \x01(\v2\x0e.lazul.v1.PongH\x00R\x04pong\x12-\n" +
 	"\x05gesto\x18\r \x01(\v2\x15.lazul.v1.EventoGestoH\x00R\x05gesto\x12'\n" +
 	"\x05orden\x18\x0e \x01(\v2\x0f.lazul.v1.OrdenH\x00R\x05orden\x123\n" +
-	"\trespuesta\x18\x0f \x01(\v2\x13.lazul.v1.RespuestaH\x00R\trespuestaB\v\n" +
+	"\trespuesta\x18\x0f \x01(\v2\x13.lazul.v1.RespuestaH\x00R\trespuesta\x12:\n" +
+	"\fpedir_pareja\x18\x10 \x01(\v2\x15.lazul.v1.PedirParejaH\x00R\vpedirPareja\x12F\n" +
+	"\x10respuesta_pareja\x18\x11 \x01(\v2\x19.lazul.v1.RespuestaParejaH\x00R\x0frespuestaParejaB\v\n" +
 	"\tcontenido\"\xc0\x01\n" +
 	"\x04Hola\x12\x1b\n" +
 	"\tequipo_id\x18\x01 \x01(\tR\bequipoId\x12\x16\n" +
@@ -1432,7 +1645,22 @@ const file_lazul_v1_lazul_proto_rawDesc = "" +
 	"\x12CODIGO_SIN_PERMISO\x10\x02\x12\x18\n" +
 	"\x14CODIGO_NO_ENCONTRADO\x10\x03\x12\x13\n" +
 	"\x0fCODIGO_INVALIDO\x10\x04\x12\x12\n" +
-	"\x0eCODIGO_INTERNO\x10\x05*6\n" +
+	"\x0eCODIGO_INTERNO\x10\x05\"I\n" +
+	"\vPedirPareja\x12\"\n" +
+	"\x04hola\x18\x01 \x01(\v2\x0e.lazul.v1.HolaR\x04hola\x12\x16\n" +
+	"\x06prueba\x18\x02 \x01(\fR\x06prueba\"\xe6\x02\n" +
+	"\x0fRespuestaPareja\x12A\n" +
+	"\tresultado\x18\x01 \x01(\x0e2#.lazul.v1.RespuestaPareja.ResultadoR\tresultado\x12\x16\n" +
+	"\x06prueba\x18\x02 \x01(\fR\x06prueba\x12\"\n" +
+	"\x04hola\x18\x03 \x01(\v2\x0e.lazul.v1.HolaR\x04hola\x12-\n" +
+	"\x12intentos_restantes\x18\x04 \x01(\rR\x11intentosRestantes\"\xa4\x01\n" +
+	"\tResultado\x12\x19\n" +
+	"\x15RESULTADO_DESCONOCIDO\x10\x00\x12\x16\n" +
+	"\x12RESULTADO_ACEPTADO\x10\x01\x12\x1c\n" +
+	"\x18RESULTADO_CODIGO_ERRONEO\x10\x02\x12\x16\n" +
+	"\x12RESULTADO_CADUCADO\x10\x03\x12\x17\n" +
+	"\x13RESULTADO_RECHAZADO\x10\x04\x12\x15\n" +
+	"\x11RESULTADO_CERRADO\x10\x05*6\n" +
 	"\aVersion\x12\x17\n" +
 	"\x13VERSION_DESCONOCIDA\x10\x00\x12\x12\n" +
 	"\x0eVERSION_ACTUAL\x10\x01*_\n" +
@@ -1473,55 +1701,63 @@ func file_lazul_v1_lazul_proto_rawDescGZIP() []byte {
 	return file_lazul_v1_lazul_proto_rawDescData
 }
 
-var file_lazul_v1_lazul_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_lazul_v1_lazul_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_lazul_v1_lazul_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_lazul_v1_lazul_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lazul_v1_lazul_proto_goTypes = []any{
-	(Version)(0),        // 0: lazul.v1.Version
-	(Sistema)(0),        // 1: lazul.v1.Sistema
-	(Capacidad)(0),      // 2: lazul.v1.Capacidad
-	(Gesto)(0),          // 3: lazul.v1.Gesto
-	(Direccion)(0),      // 4: lazul.v1.Direccion
-	(Tomar_Que)(0),      // 5: lazul.v1.Tomar.Que
-	(Falla_Codigo)(0),   // 6: lazul.v1.Falla.Codigo
-	(*Sobre)(nil),       // 7: lazul.v1.Sobre
-	(*Hola)(nil),        // 8: lazul.v1.Hola
-	(*Ping)(nil),        // 9: lazul.v1.Ping
-	(*Pong)(nil),        // 10: lazul.v1.Pong
-	(*EventoGesto)(nil), // 11: lazul.v1.EventoGesto
-	(*Orden)(nil),       // 12: lazul.v1.Orden
-	(*Tomar)(nil),       // 13: lazul.v1.Tomar
-	(*Entregar)(nil),    // 14: lazul.v1.Entregar
-	(*Objeto)(nil),      // 15: lazul.v1.Objeto
-	(*Archivo)(nil),     // 16: lazul.v1.Archivo
-	(*AppRef)(nil),      // 17: lazul.v1.AppRef
-	(*Respuesta)(nil),   // 18: lazul.v1.Respuesta
-	(*Falla)(nil),       // 19: lazul.v1.Falla
+	(Version)(0),                   // 0: lazul.v1.Version
+	(Sistema)(0),                   // 1: lazul.v1.Sistema
+	(Capacidad)(0),                 // 2: lazul.v1.Capacidad
+	(Gesto)(0),                     // 3: lazul.v1.Gesto
+	(Direccion)(0),                 // 4: lazul.v1.Direccion
+	(Tomar_Que)(0),                 // 5: lazul.v1.Tomar.Que
+	(Falla_Codigo)(0),              // 6: lazul.v1.Falla.Codigo
+	(RespuestaPareja_Resultado)(0), // 7: lazul.v1.RespuestaPareja.Resultado
+	(*Sobre)(nil),                  // 8: lazul.v1.Sobre
+	(*Hola)(nil),                   // 9: lazul.v1.Hola
+	(*Ping)(nil),                   // 10: lazul.v1.Ping
+	(*Pong)(nil),                   // 11: lazul.v1.Pong
+	(*EventoGesto)(nil),            // 12: lazul.v1.EventoGesto
+	(*Orden)(nil),                  // 13: lazul.v1.Orden
+	(*Tomar)(nil),                  // 14: lazul.v1.Tomar
+	(*Entregar)(nil),               // 15: lazul.v1.Entregar
+	(*Objeto)(nil),                 // 16: lazul.v1.Objeto
+	(*Archivo)(nil),                // 17: lazul.v1.Archivo
+	(*AppRef)(nil),                 // 18: lazul.v1.AppRef
+	(*Respuesta)(nil),              // 19: lazul.v1.Respuesta
+	(*Falla)(nil),                  // 20: lazul.v1.Falla
+	(*PedirPareja)(nil),            // 21: lazul.v1.PedirPareja
+	(*RespuestaPareja)(nil),        // 22: lazul.v1.RespuestaPareja
 }
 var file_lazul_v1_lazul_proto_depIdxs = []int32{
-	8,  // 0: lazul.v1.Sobre.hola:type_name -> lazul.v1.Hola
-	9,  // 1: lazul.v1.Sobre.ping:type_name -> lazul.v1.Ping
-	10, // 2: lazul.v1.Sobre.pong:type_name -> lazul.v1.Pong
-	11, // 3: lazul.v1.Sobre.gesto:type_name -> lazul.v1.EventoGesto
-	12, // 4: lazul.v1.Sobre.orden:type_name -> lazul.v1.Orden
-	18, // 5: lazul.v1.Sobre.respuesta:type_name -> lazul.v1.Respuesta
-	1,  // 6: lazul.v1.Hola.sistema:type_name -> lazul.v1.Sistema
-	2,  // 7: lazul.v1.Hola.capacidades:type_name -> lazul.v1.Capacidad
-	3,  // 8: lazul.v1.EventoGesto.gesto:type_name -> lazul.v1.Gesto
-	4,  // 9: lazul.v1.EventoGesto.direccion:type_name -> lazul.v1.Direccion
-	13, // 10: lazul.v1.Orden.tomar:type_name -> lazul.v1.Tomar
-	14, // 11: lazul.v1.Orden.entregar:type_name -> lazul.v1.Entregar
-	5,  // 12: lazul.v1.Tomar.que:type_name -> lazul.v1.Tomar.Que
-	15, // 13: lazul.v1.Entregar.objeto:type_name -> lazul.v1.Objeto
-	16, // 14: lazul.v1.Objeto.archivo:type_name -> lazul.v1.Archivo
-	17, // 15: lazul.v1.Objeto.app:type_name -> lazul.v1.AppRef
-	19, // 16: lazul.v1.Respuesta.falla:type_name -> lazul.v1.Falla
-	15, // 17: lazul.v1.Respuesta.objeto:type_name -> lazul.v1.Objeto
-	6,  // 18: lazul.v1.Falla.codigo:type_name -> lazul.v1.Falla.Codigo
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	9,  // 0: lazul.v1.Sobre.hola:type_name -> lazul.v1.Hola
+	10, // 1: lazul.v1.Sobre.ping:type_name -> lazul.v1.Ping
+	11, // 2: lazul.v1.Sobre.pong:type_name -> lazul.v1.Pong
+	12, // 3: lazul.v1.Sobre.gesto:type_name -> lazul.v1.EventoGesto
+	13, // 4: lazul.v1.Sobre.orden:type_name -> lazul.v1.Orden
+	19, // 5: lazul.v1.Sobre.respuesta:type_name -> lazul.v1.Respuesta
+	21, // 6: lazul.v1.Sobre.pedir_pareja:type_name -> lazul.v1.PedirPareja
+	22, // 7: lazul.v1.Sobre.respuesta_pareja:type_name -> lazul.v1.RespuestaPareja
+	1,  // 8: lazul.v1.Hola.sistema:type_name -> lazul.v1.Sistema
+	2,  // 9: lazul.v1.Hola.capacidades:type_name -> lazul.v1.Capacidad
+	3,  // 10: lazul.v1.EventoGesto.gesto:type_name -> lazul.v1.Gesto
+	4,  // 11: lazul.v1.EventoGesto.direccion:type_name -> lazul.v1.Direccion
+	14, // 12: lazul.v1.Orden.tomar:type_name -> lazul.v1.Tomar
+	15, // 13: lazul.v1.Orden.entregar:type_name -> lazul.v1.Entregar
+	5,  // 14: lazul.v1.Tomar.que:type_name -> lazul.v1.Tomar.Que
+	16, // 15: lazul.v1.Entregar.objeto:type_name -> lazul.v1.Objeto
+	17, // 16: lazul.v1.Objeto.archivo:type_name -> lazul.v1.Archivo
+	18, // 17: lazul.v1.Objeto.app:type_name -> lazul.v1.AppRef
+	20, // 18: lazul.v1.Respuesta.falla:type_name -> lazul.v1.Falla
+	16, // 19: lazul.v1.Respuesta.objeto:type_name -> lazul.v1.Objeto
+	6,  // 20: lazul.v1.Falla.codigo:type_name -> lazul.v1.Falla.Codigo
+	9,  // 21: lazul.v1.PedirPareja.hola:type_name -> lazul.v1.Hola
+	7,  // 22: lazul.v1.RespuestaPareja.resultado:type_name -> lazul.v1.RespuestaPareja.Resultado
+	9,  // 23: lazul.v1.RespuestaPareja.hola:type_name -> lazul.v1.Hola
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_lazul_v1_lazul_proto_init() }
@@ -1536,6 +1772,8 @@ func file_lazul_v1_lazul_proto_init() {
 		(*Sobre_Gesto)(nil),
 		(*Sobre_Orden)(nil),
 		(*Sobre_Respuesta)(nil),
+		(*Sobre_PedirPareja)(nil),
+		(*Sobre_RespuestaPareja)(nil),
 	}
 	file_lazul_v1_lazul_proto_msgTypes[5].OneofWrappers = []any{
 		(*Orden_Tomar)(nil),
@@ -1552,8 +1790,8 @@ func file_lazul_v1_lazul_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lazul_v1_lazul_proto_rawDesc), len(file_lazul_v1_lazul_proto_rawDesc)),
-			NumEnums:      7,
-			NumMessages:   13,
+			NumEnums:      8,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
