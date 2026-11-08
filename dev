@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# ./dev: único punto de entrada de Lazul. Salida breve: una línea por paso;
+# si algo falla, lo esencial y la ruta del registro completo en .dev/.
+#
+#   ./dev check              formato, vet, compilar, pruebas, proto al día, tipos TS
+#   ./dev test [paquetes]    pruebas de Go (por defecto ./...)
+#   ./dev contrato           contrato de platform contra el adaptador de este sistema
+#   ./dev sim [-receptores N]  un controlador y N receptores falsos en local
+#   ./dev replay [-dir D] [-v]  mide el clasificador sobre fixtures/gestos
+#   ./dev gen                regenera los tipos de Go y TS desde proto/
+#   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`
+set -uo pipefail
+cd "$(dirname "$0")"
+RAIZ=$PWD
+mkdir -p .dev
+MOD=github.com/Rafael088/lazul
+
+# paso NOMBRE comando...: corre en silencio; "ok" o el resumen del error.
+paso() {
+	local nombre=$1; shift
+	local log=".dev/$nombre.log" ini=$SECONDS
+	if "$@" >"$log" 2>&1; then
+		printf 'ok     %-10s %ss\n' "$nombre" $((SECONDS - ini))
+		return 0
+	fi
+	printf 'FALLA  %-10s (registro: %s)\n' "$nombre" "$log"
+	resumen "$log"
+	return 1
+}
+
+# resumen: solo las líneas que dicen qué falló.
+resumen() {
+	local lineas
+	lineas=$(grep -E -- '--- FAIL|^FAIL|panic:|\.go:[0-9]+|error|Error|^[A-Za-z/._-]+\.go$|^diff|^[-+][^-+]' "$1" | grep -v '^ok ' | head -40)
+	[ -n "$lineas" ] || lineas=$(tail -20 "$1")
+	printf '%s\n' "$lineas" | sed 's/^/       /'
+}
+
+archivos_go() { git ls-files -co --exclude-standard '*.go' | grep -v '^prototipos/' | while read -r f; do [ -f "$f" ] && echo "$f"; done; }
+
+fmt_check() {
+	local mal
+	mal=$(archivos_go | xargs gofmt -l)
+	[ -z "$mal" ] || { echo "sin gofmt (corre gofmt -w):"; echo "$mal"; return 1; }
+}
+
+go_test() {
+	local salida estado
+	salida=$(go test "$@" 2>&1); estado=$?
+	echo "$salida"
+	echo "paquetes con pruebas: $(grep -c '^ok ' <<<"$salida")"
+	return $estado
+}
+
+hay_protoc() { command -v protoc >/dev/null; }
+
+# generar DESTINO: escribe los tipos en DESTINO/go y DESTINO/ts.
+generar() {
+	local dst=$1
+	hay_protoc || { echo "falta protoc"; return 1; }
+	[ -x proto/ts/node_modules/.bin/protoc-gen-es ] || (cd proto/ts && npm ci --silent --no-audit --no-fund) || return 1
+	go build -o .dev/bin/protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go || return 1
+	mkdir -p "$dst/go" "$dst/ts"
+	protoc -I proto \
+		--plugin=protoc-gen-go=.dev/bin/protoc-gen-go --go_out="$dst/go" --go_opt=module=$MOD/proto/go \
+		--plugin=protoc-gen-es=proto/ts/node_modules/.bin/protoc-gen-es --es_out="$dst/ts" --es_opt=target=ts,import_extension=ts \
+		lazul/v1/lazul.proto
+}
+
+# La línea con la versión de protoc cambia entre máquinas; no cuenta.
+sin_version() { grep -v -E '^//[[:space:]]+protoc[[:space:]]+v' "$1"; }
+
+proto_al_dia() {
+	local tmp=.dev/gen
+	rm -rf "$tmp"
+	generar "$tmp" || return 1
+	local f d=0
+	for f in go/lazulv1/lazul.pb.go ts/lazul/v1/lazul_pb.ts; do
+		local destino=proto/${f/ts\//ts/src/}
+		if ! diff -u <(sin_version "$destino") <(sin_version "$tmp/$f") >/dev/null 2>&1; then
+			echo "$destino no coincide con proto/lazul/v1/lazul.proto: corre ./dev gen"
+			d=1
+		fi
+	done
+	return $d
+}
+
+cmd_gen() {
+	local tmp=.dev/gen
+	rm -rf "$tmp"
+	paso gen generar "$tmp" || return 1
+	cp "$tmp/go/lazulv1/lazul.pb.go" proto/go/lazulv1/
+	mkdir -p proto/ts/src/lazul/v1
+	cp "$tmp/ts/lazul/v1/lazul_pb.ts" proto/ts/src/lazul/v1/
+	echo "listo: proto/go/lazulv1 y proto/ts/src"
+}
+
+ts_check() {
+	(cd proto/ts && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npx --no-install tsc --noEmit -p . && node --experimental-transform-types --no-warnings --test --test-reporter=dot prueba.test.ts)
+}
+
+cmd_check() {
+	local fallo=0
+	paso formato fmt_check || fallo=1
+	paso vet go vet ./... || fallo=1
+	paso compilar go build ./... || fallo=1
+	paso pruebas go_test ./... || fallo=1
+	if hay_protoc && [ "$(go env GOOS)" != windows ]; then
+		paso proto proto_al_dia || fallo=1
+	else
+		echo "omitido proto      (sin protoc o en Windows; en el CI de Linux sí corre)"
+	fi
+	if command -v node >/dev/null; then
+		paso tipos-ts ts_check || fallo=1
+	else
+		echo "omitido tipos-ts   (falta node)"
+	fi
+	[ $fallo = 0 ] && echo "check: todo bien" || echo "check: hay fallas"
+	return $fallo
+}
+
+# tabla_contrato LOG: una línea por regla del contrato, con el motivo si falla.
+tabla_contrato() {
+	tr -d '\r' <"$1" | awk '
+		/^=== RUN/ { t = $3; next }
+		/^ +[A-Za-z_]+\.go:[0-9]+: / && t != "" && !(t in msg) { sub(/^ +[A-Za-z_]+\.go:[0-9]+: /, ""); msg[t] = $0 }
+		/--- (PASS|FAIL|SKIP): TestContrato\// {
+			s = $2; n = $3; sub(":", "", s)
+			printf "       %-4s %s%s\n", s, substr(n, 14), (s == "FAIL" && n in msg) ? "  <- " msg[n] : ""
+		}'
+}
+
+# contrato NOMBRE comando...: como paso, pero el resumen es la tabla.
+contrato() {
+	local nombre=$1; shift
+	local log=".dev/$nombre.log" r
+	"$@" >"$log" 2>&1; r=$?
+	local pasa total
+	pasa=$(grep -c -- '--- PASS: TestContrato/' "$log")
+	total=$(grep -c -E -- '--- (PASS|FAIL|SKIP): TestContrato/' "$log")
+	if [ $r = 0 ]; then printf 'ok     %-10s %s/%s reglas\n' "$nombre" "$pasa" "$total"
+	else printf 'FALLA  %-10s %s/%s reglas (registro: %s)\n' "$nombre" "$pasa" "$total" "$log"; fi
+	[ "$total" -gt 0 ] && tabla_contrato "$log" || [ $r = 0 ] || resumen "$log"
+	return $r
+}
+
+cmd_contrato() {
+	local so
+	so=$(go env GOOS)
+	case $so in
+	linux | windows) LAZUL_CONTRATO=1 contrato contrato go test -count=1 -v ./platform/$so/ ;;
+	*) echo "sin adaptador para $so"; return 1 ;;
+	esac
+}
+
+# win: copia el árbol de trabajo (sin prototipos/) al PC Windows y corre ahí.
+cmd_win() {
+	local que=${1:-test}
+	local tgz=.dev/win.tgz
+	git ls-files -co --exclude-standard | grep -v -E '^prototipos/|node_modules/' |
+		while read -r f; do [ -f "$f" ] && echo "$f"; done | tar -czf "$tgz" -T - || return 1
+	scp -q -o LogLevel=ERROR "$tgz" win:lazul-dev.tgz 2>/dev/null || { echo "no pude copiar a win (¿ssh win?)"; return 1; }
+	local preparar='$ErrorActionPreference="Stop"; $d="$HOME\lazul-dev"; if (Test-Path $d) { Remove-Item -Recurse -Force $d }; New-Item -ItemType Directory $d | Out-Null; tar -xzf "$HOME\lazul-dev.tgz" -C $d; Set-Location $d;'
+	case $que in
+	test) paso win-test ssh -o LogLevel=ERROR win "$preparar go vet ./... ; if (\$LASTEXITCODE) { exit 1 }; go test ./... ; exit \$LASTEXITCODE" ;;
+	check) paso win-check ssh -o LogLevel=ERROR win "$preparar if (gofmt -l core platform gestures proto desktop) { 'sin gofmt'; exit 1 }; go vet ./... ; if (\$LASTEXITCODE) { exit 1 }; go build ./... ; if (\$LASTEXITCODE) { exit 1 }; go test ./... ; exit \$LASTEXITCODE" ;;
+	contrato)
+		# El portapapeles, la captura y la ventana activa solo existen en la
+		# sesión del escritorio, no en la de ssh: se corre como tarea programada.
+		contrato win-contrato ssh -o LogLevel=ERROR win "$preparar go test -c -o contrato.test.exe ./platform/windows/ ; if (\$LASTEXITCODE) { exit 1 }; & .\\herramientas\\win-escritorio.ps1 -exe (Join-Path \$d contrato.test.exe) -argumentos '-test.v -test.count=1' -entorno 'LAZUL_CONTRATO=1;LAZUL_CONTRATO_ABRIR=${LAZUL_CONTRATO_ABRIR:-0}'; exit \$LASTEXITCODE" ;;
+	*) echo "uso: ./dev win test|check|contrato"; return 2 ;;
+	esac
+}
+
+cmd_sim() { paso sim go run ./core/cmd/sim "$@"; local r=$?; grep -v '^ok' .dev/sim.log | head -20 | sed 's/^/       /'; return $r; }
+
+cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; head -20 .dev/replay.log | sed 's/^/       /'; return $r; }
+
+uso() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+
+orden=${1:-}
+[ $# -gt 0 ] && shift
+case $orden in
+check) cmd_check ;;
+test) paso test go_test "${@:-./...}" && tail -1 .dev/test.log | sed 's/^/       /' ;;
+contrato) cmd_contrato ;;
+sim) cmd_sim "$@" ;;
+replay) cmd_replay "$@" ;;
+gen) cmd_gen ;;
+win) cmd_win "$@" ;;
+*) uso; [ -z "$orden" ] || [ "$orden" = ayuda ] || exit 2 ;;
+esac

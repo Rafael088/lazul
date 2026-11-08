@@ -1,0 +1,5 @@
+# Herramientas y salidas de ./dev
+/.dev/
+node_modules/
+*.test
+*.test.exe
