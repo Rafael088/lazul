@@ -54,7 +54,7 @@ const (
 	puntasL     = 0.90
 	puntasPinza = 0.30
 	// En la pinza el índice no está recogido del todo (si no, es un puño).
-	indicePinzaMin = 0.15
+	indicePinzaMin = -0.10
 )
 
 type vec struct{ x, y float64 }
