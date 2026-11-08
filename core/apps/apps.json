@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "chrome",
+      "nombre": "Google Chrome",
+      "windows": { "tipo": "ejecutable", "id": "chrome.exe" },
+      "linux": "google-chrome.desktop",
+      "android": "com.android.chrome",
+      "web": "https://www.google.com/chrome/"
+    },
+    {
+      "id": "firefox",
+      "nombre": "Mozilla Firefox",
+      "windows": { "tipo": "ejecutable", "id": "firefox.exe" },
+      "linux": "firefox.desktop",
+      "android": "org.mozilla.firefox",
+      "web": "https://www.mozilla.org/firefox/"
+    },
+    {
+      "id": "edge",
+      "nombre": "Microsoft Edge",
+      "windows": { "tipo": "ejecutable", "id": "msedge.exe" },
+      "linux": "microsoft-edge.desktop",
+      "android": "com.microsoft.emmx",
+      "web": "https://www.microsoft.com/edge/"
+    },
+    {
+      "id": "brave",
+      "nombre": "Brave",
+      "windows": { "tipo": "ejecutable", "id": "brave.exe" },
+      "linux": "brave-browser.desktop",
+      "android": "com.brave.browser",
+      "web": "https://brave.com/"
+    },
+    {
+      "id": "outlook",
+      "nombre": "Microsoft Outlook",
+      "windows": { "tipo": "ejecutable", "id": "olk.exe" },
+      "android": "com.microsoft.office.outlook",
+      "web": "https://outlook.office.com/mail/"
+    },
+    {
+      "id": "thunderbird",
+      "nombre": "Mozilla Thunderbird",
+      "windows": { "tipo": "ejecutable", "id": "thunderbird.exe" },
+      "linux": "thunderbird.desktop",
+      "android": "net.thunderbird.android",
+      "web": "https://www.thunderbird.net/"
+    },
+    {
+      "id": "gmail",
+      "nombre": "Gmail",
+      "android": "com.google.android.gm",
+      "web": "https://mail.google.com/"
+    },
+    {
+      "id": "google-calendar",
+      "nombre": "Google Calendar",
+      "android": "com.google.android.calendar",
+      "web": "https://calendar.google.com/"
+    },
+    {
+      "id": "word",
+      "nombre": "Microsoft Word",
+      "windows": { "tipo": "ejecutable", "id": "WINWORD.EXE" },
+      "android": "com.microsoft.office.word",
+      "web": "https://word.cloud.microsoft/"
+    },
+    {
+      "id": "excel",
+      "nombre": "Microsoft Excel",
+      "windows": { "tipo": "ejecutable", "id": "EXCEL.EXE" },
+      "android": "com.microsoft.office.excel",
+      "web": "https://excel.cloud.microsoft/"
+    },
+    {
+      "id": "powerpoint",
+      "nombre": "Microsoft PowerPoint",
+      "windows": { "tipo": "ejecutable", "id": "POWERPNT.EXE" },
+      "android": "com.microsoft.office.powerpoint",
+      "web": "https://powerpoint.cloud.microsoft/"
+    },
+    {
+      "id": "libreoffice-writer",
+      "nombre": "LibreOffice Writer",
+      "windows": { "tipo": "ejecutable", "id": "swriter.exe" },
+      "linux": "libreoffice-writer.desktop",
+      "android": "com.collabora.libreoffice",
+      "web": "https://www.libreoffice.org/discover/writer/"
+    },
+    {
+      "id": "libreoffice-calc",
+      "nombre": "LibreOffice Calc",
+      "windows": { "tipo": "ejecutable", "id": "scalc.exe" },
+      "linux": "libreoffice-calc.desktop",
+      "android": "com.collabora.libreoffice",
+      "web": "https://www.libreoffice.org/discover/calc/"
+    },
+    {
+      "id": "vscode",
+      "nombre": "Visual Studio Code",
+      "windows": { "tipo": "ejecutable", "id": "Code.exe" },
+      "linux": "code.desktop",
+      "web": "https://vscode.dev/"
+    },
+    {
+      "id": "calculator",
+      "nombre": "Calculadora",
+      "windows": { "tipo": "aumid", "id": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App" },
+      "linux": "org.gnome.Calculator.desktop",
+      "android": "com.google.android.calculator",
+      "web": "https://www.google.com/search?q=calculator"
+    },
+    {
+      "id": "terminal",
+      "nombre": "Terminal",
+      "windows": { "tipo": "aumid", "id": "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App" },
+      "linux": "org.gnome.Terminal.desktop",
+      "android": "com.termux",
+      "web": "https://shell.cloud.google.com/"
+    },
+    {
+      "id": "files",
+      "nombre": "Archivos",
+      "windows": { "tipo": "ejecutable", "id": "explorer.exe" },
+      "linux": "org.gnome.Nautilus.desktop",
+      "android": "com.google.android.documentsui",
+      "web": "https://drive.google.com/"
+    },
+    {
+      "id": "spotify",
+      "nombre": "Spotify",
+      "windows": { "tipo": "ejecutable", "id": "Spotify.exe" },
+      "linux": "spotify.desktop",
+      "android": "com.spotify.music",
+      "web": "https://open.spotify.com/"
+    },
+    {
+      "id": "vlc",
+      "nombre": "VLC media player",
+      "windows": { "tipo": "ejecutable", "id": "vlc.exe" },
+      "linux": "vlc.desktop",
+      "android": "org.videolan.vlc",
+      "web": "https://www.videolan.org/vlc/"
+    },
+    {
+      "id": "discord",
+      "nombre": "Discord",
+      "windows": { "tipo": "ejecutable", "id": "Discord.exe" },
+      "linux": "discord.desktop",
+      "android": "com.discord",
+      "web": "https://discord.com/app"
+    },
+    {
+      "id": "slack",
+      "nombre": "Slack",
+      "windows": { "tipo": "ejecutable", "id": "slack.exe" },
+      "linux": "slack.desktop",
+      "android": "com.Slack",
+      "web": "https://app.slack.com/"
+    },
+    {
+      "id": "teams",
+      "nombre": "Microsoft Teams",
+      "windows": { "tipo": "ejecutable", "id": "ms-teams.exe" },
+      "android": "com.microsoft.teams",
+      "web": "https://teams.microsoft.com/"
+    },
+    {
+      "id": "zoom",
+      "nombre": "Zoom",
+      "windows": { "tipo": "ejecutable", "id": "Zoom.exe" },
+      "linux": "Zoom.desktop",
+      "android": "us.zoom.videomeetings",
+      "web": "https://app.zoom.us/wc/"
+    },
+    {
+      "id": "telegram",
+      "nombre": "Telegram",
+      "windows": { "tipo": "ejecutable", "id": "Telegram.exe" },
+      "linux": "org.telegram.desktop.desktop",
+      "android": "org.telegram.messenger",
+      "web": "https://web.telegram.org/"
+    },
+    {
+      "id": "whatsapp",
+      "nombre": "WhatsApp",
+      "windows": { "tipo": "aumid", "id": "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App" },
+      "linux": "com.github.eneshecan.WhatsAppForLinux.desktop",
+      "android": "com.whatsapp",
+      "web": "https://web.whatsapp.com/"
+    },
+    {
+      "id": "signal",
+      "nombre": "Signal",
+      "windows": { "tipo": "ejecutable", "id": "Signal.exe" },
+      "linux": "signal-desktop.desktop",
+      "android": "org.thoughtcrime.securesms",
+      "web": "https://signal.org/"
+    },
+    {
+      "id": "obsidian",
+      "nombre": "Obsidian",
+      "windows": { "tipo": "ejecutable", "id": "Obsidian.exe" },
+      "linux": "obsidian.desktop",
+      "android": "md.obsidian",
+      "web": "https://obsidian.md/"
+    },
+    {
+      "id": "notion",
+      "nombre": "Notion",
+      "windows": { "tipo": "ejecutable", "id": "Notion.exe" },
+      "android": "notion.id",
+      "web": "https://www.notion.so/"
+    },
+    {
+      "id": "dropbox",
+      "nombre": "Dropbox",
+      "windows": { "tipo": "ejecutable", "id": "Dropbox.exe" },
+      "linux": "dropbox.desktop",
+      "android": "com.dropbox.android",
+      "web": "https://www.dropbox.com/home"
+    },
+    {
+      "id": "onedrive",
+      "nombre": "Microsoft OneDrive",
+      "windows": { "tipo": "ejecutable", "id": "OneDrive.exe" },
+      "android": "com.microsoft.skydrive",
+      "web": "https://onedrive.live.com/"
+    }
+  ]
+}

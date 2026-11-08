@@ -1,0 +1,1 @@
+Esquema v1: `{"version":1,"apps":[{"id":"…","nombre":"…","windows":{"tipo":"ejecutable|aumid","id":"…"},"linux":"….desktop","android":"…","web":"https://…"}]}`; solo `windows`, `linux` y `android` son opcionales.

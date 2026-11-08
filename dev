@@ -104,6 +104,7 @@ cmd_check() {
 	paso formato fmt_check || fallo=1
 	paso vet go vet ./... || fallo=1
 	paso compilar go build ./... || fallo=1
+	paso apps go test ./core/apps -run TestCatalogoIncluido || fallo=1
 	paso pruebas go_test ./... || fallo=1
 	if hay_protoc && [ "$(go env GOOS)" != windows ]; then
 		paso proto proto_al_dia || fallo=1
