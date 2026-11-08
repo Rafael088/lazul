@@ -13,7 +13,8 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev test [paquetes]` | pruebas de Go (por defecto `./...`) |
 | `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio) |
 | `./dev sim [-receptores N]` | controlador + N receptores falsos por WebSocket en 127.0.0.1 |
-| `./dev replay [-dir D] [-v]` | precisión y falsos positivos del clasificador sobre `fixtures/gestos` |
+| `./dev replay [-v] [-barrer]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L |
+| `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`) |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
 | `./dev win test\|check\|contrato` | copia el árbol al PC Windows (`ssh win`) y corre ahí; `contrato` corre en la sesión del escritorio |
 
@@ -34,24 +35,34 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |
 | `core/` | núcleo: `Receptor` atiende Órdenes, transporte WebSocket | nunca llama al sistema, solo a `platform` |
 | `core/sim/`, `core/cmd/sim/` | el recorrido de `./dev sim` | |
-| `gestures/` | tipos de la mano, `Clasificar` (función pura), grabaciones y medición | formato de grabación en `grabacion.go` |
-| `gestures/cmd/replay/` | `./dev replay` | |
-| `fixtures/gestos/` | grabaciones reales `*.jsonl` | las sintéticas van en `gestures/testdata` |
+| `gestures/` | `PoseDe` (forma de la mano en un cuadro, `pose.go`), `Clasificar` (máquina de estados pura, `clasificador.go`), grabaciones y medición | formato en `grabacion.go`; umbrales provisionales hasta medir con las reales |
+| `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
+| `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
+| `fixtures/gestos/` | grabaciones reales `*.jsonl` | las sintéticas van en `gestures/testdata/sinteticas` |
 | `desktop/` | app Wails (vacía; la base está en `prototipos/camara`) | |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
 | `.cotejo/` | tareas, decisiones, arquitectura (Cotejo) | se escribe con el CLI `cotejo`, no a mano |
 
+## Gestos (dec-rwrs)
+
+`Clasificar` arranca en reposo; solo la L sostenida (400 ms) activa. En
+activo (5 s), el puño agarra y la pinza arrastrada manda la app; agarrando,
+abrir la mano moviéndola a un lado suelta. La dirección es la de la persona
+(la imagen no se espeja). La L se separa de la pinza (puntas juntas) y de
+señalar (pulgar pegado, a medias o perdido) por el pulgar: lejos del índice,
+a unos 90° y con las puntas separadas.
+
 ## Cómo se habla todo
 
-webview (MediaPipe + `gestures.Clasificar`) → `EventoGesto` → núcleo Go →
+webview (MediaPipe) → puntos → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
 `Sobre{Orden}` por WebSocket → receptor → `platform` → `Sobre{Respuesta}`.
 Los archivos (capturas) no van en el Sobre: viajan por LocalSend.
 
 ## Pendiente en otras tareas
 
 - Adaptadores: Linux `cotejo-42s7rt`, Windows `cotejo-232tso` (hacer pasar el contrato; no tocar `platform/contrato` para que pase).
-- Clasificador `cotejo-tw9i76`; grabaciones `cotejo-x2hyu0`; catálogo de apps `cotejo-qxb94p`.
+- Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
 - Emparejamiento, TLS y permisos `cotejo-1od1ta` (hoy el transporte es WebSocket sin cifrar, solo en 127.0.0.1).
 - De punta a punta y LocalSend `cotejo-sb2kdm`.
 
