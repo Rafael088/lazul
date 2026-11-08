@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazul · grabar gestos</title>
+<style>
+  :root { color-scheme: dark; --fondo: #101428; --texto: #e8ecff; --tenue: #9aa3c7; --lapis: #7fa8ff; --bien: #6fdc9a; --mal: #ff8a80; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: 640px 1fr; gap: 20px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  #escena { position: relative; width: 640px; max-width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 8px; overflow: hidden; }
+  video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+  #escena.grabando { outline: 4px solid var(--mal); }
+  #vivo { margin-top: 8px; font-family: ui-monospace, monospace; }
+  #evento { color: var(--bien); font-weight: 600; }
+  label { display: block; margin: 10px 0 4px; color: var(--tenue); font-size: 13px; }
+  select, input, button { font: inherit; color: var(--texto); background: #1b2244; border: 1px solid #2c3566; border-radius: 6px; padding: 6px 10px; }
+  select, input { width: 100%; box-sizing: border-box; }
+  button { cursor: pointer; margin-top: 14px; margin-right: 6px; }
+  button.principal { background: var(--lapis); color: #0b1020; border: 0; font-weight: 600; }
+  #guia { margin-top: 12px; padding: 10px 12px; background: #161c3a; border-radius: 6px; }
+  #ultima { margin-top: 12px; }
+  .bien { color: var(--bien); } .mal { color: var(--mal); }
+  #cuenta { margin-top: 12px; font-size: 13px; color: var(--tenue); font-family: ui-monospace, monospace; white-space: pre-wrap; }
+  kbd { background: #2c3566; border-radius: 4px; padding: 0 5px; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <div id="escena"><video id="video" playsinline muted></video><canvas id="puntos" width="640" height="480"></canvas></div>
+    <div id="vivo">arrancando…</div>
+  </section>
+  <section>
+    <label for="gesto">Qué grabas</label>
+    <select id="gesto">
+      <option value="ACTIVAR">1 · la L (activar)</option>
+      <option value="AGARRAR">2 · puño (agarrar)</option>
+      <option value="SOLTAR">3 · abrir la mano a un lado (soltar)</option>
+      <option value="MANDAR_APP">4 · pinza y arrastrar (mandar la app)</option>
+      <option value="NINGUNO:pinza">negativo · pinza</option>
+      <option value="NINGUNO:senalar">negativo · señalar con el índice</option>
+      <option value="NINGUNO:normal">negativo · movimiento normal (2 min)</option>
+    </select>
+    <label for="luz">Luz</label>
+    <select id="luz"><option value="buena">buena</option><option value="mala">mala (luz normal de cuarto, de noche)</option></select>
+    <label for="nota">Nota (opcional)</label>
+    <input id="nota" placeholder="p. ej. mano izquierda, lejos de la cámara">
+    <div>
+      <button id="grabar" class="principal" disabled>Grabar <kbd>espacio</kbd></button>
+      <button id="descartar" disabled>Descartar la última</button>
+    </div>
+    <div id="guia"></div>
+    <div id="ultima"></div>
+    <div id="cuenta"></div>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -6,7 +6,8 @@
 #   ./dev test [paquetes]    pruebas de Go (por defecto ./...)
 #   ./dev contrato           contrato de platform contra el adaptador de este sistema
 #   ./dev sim [-receptores N]  un controlador y N receptores falsos en local
-#   ./dev replay [-dir D] [-v]  mide el clasificador sobre fixtures/gestos
+#   ./dev replay [-v] [-barrer]  mide el clasificador (grabaciones reales y sintéticas)
+#   ./dev grabar [-dir D]    página local para grabar gestos con la cámara
 #   ./dev gen                regenera los tipos de Go y TS desde proto/
 #   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`
 set -uo pipefail
@@ -174,9 +175,12 @@ cmd_win() {
 
 cmd_sim() { paso sim go run ./core/cmd/sim "$@"; local r=$?; grep -v '^ok' .dev/sim.log | head -20 | sed 's/^/       /'; return $r; }
 
-cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; head -20 .dev/replay.log | sed 's/^/       /'; return $r; }
+cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; sed 's/^/       /' .dev/replay.log; return $r; }
 
-uso() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+# grabar no es un paso: queda corriendo hasta Ctrl+C.
+cmd_grabar() { go run ./gestures/cmd/grabar "$@"; }
+
+uso() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
 
 orden=${1:-}
 [ $# -gt 0 ] && shift
@@ -186,6 +190,7 @@ test) paso test go_test "${@:-./...}" && tail -1 .dev/test.log | sed 's/^/      
 contrato) cmd_contrato ;;
 sim) cmd_sim "$@" ;;
 replay) cmd_replay "$@" ;;
+grabar) cmd_grabar "$@" ;;
 gen) cmd_gen ;;
 win) cmd_win "$@" ;;
 *) uso; [ -z "$orden" ] || [ "$orden" = ayuda ] || exit 2 ;;
