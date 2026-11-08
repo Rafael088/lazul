@@ -69,7 +69,7 @@ var AjustesPorDefecto = Ajustes{
 	SostenerL:       400,
 	SostenerPuno:    150,
 	SostenerPinza:   100,
-	Gracia:          120,
+	Gracia:          250,
 	VentanaActivo:   5000,
 	VentanaSoltar:   500,
 	TiempoAgarrando: 15000,
