@@ -31,6 +31,8 @@ message Sobre {
     EventoGesto gesto = 13;
     Orden orden = 14;
     Respuesta respuesta = 15;
+    PedirPareja pedir_pareja = 16;
+    RespuestaPareja respuesta_pareja = 17;
   }
 }
 
@@ -160,4 +162,32 @@ message Falla {
   }
   Codigo codigo = 1;
   string detalle = 2;
+}
+
+// Emparejamiento (cotejo-1od1ta). El receptor muestra un código de 6 dígitos
+// y el controlador lo escribe. Va por TLS 1.3 con certificados propios en los
+// dos lados; el código nunca viaja: cada lado manda un HMAC-SHA256 del código
+// sobre el material exportado de esa sesión TLS y las dos huellas, así que una
+// prueba no sirve en otra conexión. Al aceptar, cada lado fija la huella del
+// otro y desde ahí solo se habla con esa huella.
+
+// Del controlador al receptor, en la ruta /pareja.
+message PedirPareja {
+  Hola hola = 1;    // quién pide (nombre que verá la persona en el receptor)
+  bytes prueba = 2; // HMAC del código; ver core/pareja.go
+}
+
+message RespuestaPareja {
+  enum Resultado {
+    RESULTADO_DESCONOCIDO = 0;
+    RESULTADO_ACEPTADO = 1;      // la persona dijo que sí; huellas fijadas
+    RESULTADO_CODIGO_ERRONEO = 2;
+    RESULTADO_CADUCADO = 3;      // el código venció o se acabaron los intentos
+    RESULTADO_RECHAZADO = 4;     // la persona en el receptor dijo que no
+    RESULTADO_CERRADO = 5;       // el receptor no está emparejando ahora
+  }
+  Resultado resultado = 1;
+  bytes prueba = 2;            // HMAC del receptor, solo si fue aceptado
+  Hola hola = 3;               // el receptor, solo si fue aceptado
+  uint32 intentos_restantes = 4; // tras un código erróneo
 }

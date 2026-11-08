@@ -1,10 +1,11 @@
 // Package core es el núcleo de Lazul: recibe Sobres, decide y responde
 // usando solo las interfaces de platform. Nunca llama al sistema.
 //
-// Hoy tiene el receptor (atiende las Órdenes de un controlador) y el
-// transporte por WebSocket. Faltan, en sus tareas: descubrimiento mDNS,
-// emparejamiento con código y TLS con huella fijada, y permisos por equipo
-// (cotejo-1od1ta); el enrutador del controlador y LocalSend (cotejo-sb2kdm).
+// Hoy tiene el receptor (atiende las Órdenes de un controlador), el
+// transporte por WebSocket sobre TLS 1.3 con huella fijada y el
+// emparejamiento con código de 6 dígitos y permiso de la persona (pareja.go);
+// el descubrimiento mDNS está en core/descubre. Falta el enrutador del
+// controlador y LocalSend (cotejo-sb2kdm).
 package core
 
 import (
