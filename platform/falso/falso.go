@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"os"
 	"sync"
 
 	"github.com/Rafael088/lazul/platform"
@@ -48,7 +49,8 @@ func (f *Falso) Sistema() platform.Sistema {
 // PonerApp cambia la ventana con el foco.
 func (f *Falso) PonerApp(app platform.App) { f.mu.Lock(); f.app = app; f.mu.Unlock() }
 
-// PonerArchivo hace que exista un archivo (para Launch con Archivo).
+// PonerArchivo hace que exista un archivo (para Launch con Archivo); los
+// que están en el disco también existen.
 func (f *Falso) PonerArchivo(ruta string) { f.mu.Lock(); f.archivos[ruta] = true; f.mu.Unlock() }
 
 // Abiertas devuelve lo que se pidió abrir, en orden.
@@ -115,7 +117,9 @@ func (f *Falso) Launch(ctx context.Context, ref platform.AppRef) error {
 	switch {
 	case ref.URL != "":
 	case ref.Archivo != "":
-		if !f.archivos[ref.Archivo] {
+		// Existe si se puso con PonerArchivo o si está en el disco (lo que
+		// llegó por LocalSend en ./dev sim).
+		if _, err := os.Stat(ref.Archivo); !f.archivos[ref.Archivo] && err != nil {
 			return fmt.Errorf("archivo %q: %w", ref.Archivo, platform.ErrNoEncontrada)
 		}
 	case ref.ID != "":
