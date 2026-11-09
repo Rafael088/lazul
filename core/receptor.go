@@ -159,6 +159,9 @@ func (r *Receptor) entregar(ctx context.Context, o *lazulv1.Objeto) error {
 		if s.LaunchApp == nil {
 			return platform.ErrNoImplementado
 		}
+		if !urlSegura(t.Url) {
+			return fmt.Errorf("%w: solo se abren URL http y https", errInvalido)
+		}
 		return s.LaunchApp.Launch(ctx, platform.AppRef{URL: t.Url})
 	case *lazulv1.Objeto_App:
 		if s.LaunchApp == nil {
@@ -173,17 +176,22 @@ func (r *Receptor) entregar(ctx context.Context, o *lazulv1.Objeto) error {
 		if err != nil {
 			return fmt.Errorf("%w: %v", platform.ErrNoEncontrada, err)
 		}
-		if s.LaunchApp == nil {
-			return nil // llegó; no hay cómo abrirlo
+		if s.LaunchApp == nil || !archivoAbrible(rec.Ruta) {
+			return nil // llegó a la bandeja; no se abre (sin cómo, o no es un tipo seguro de abrir)
 		}
 		return s.LaunchApp.Launch(ctx, platform.AppRef{Archivo: rec.Ruta})
 	}
 	return fmt.Errorf("%w: objeto vacío", errInvalido)
 }
 
+func (r *Receptor) conocida(nativo string) bool {
+	_, ok := r.Catalogo.PorNativo(r.so(), nativo)
+	return ok
+}
+
 // abrirApp abre la app del gesto 4 en este equipo: la del catálogo para
-// este sistema si la conoce; si no, el nativo_id que llegó (solo cuando el
-// catálogo no sabe de esa app); y si no está instalada, su web.
+// este sistema si la conoce; si no, la web de respaldo. Un nativo_id que el
+// catálogo no conoce no se lanza.
 func (r *Receptor) abrirApp(ctx context.Context, ref *lazulv1.AppRef) error {
 	nativo, web := ref.GetNativoId(), ref.GetWeb()
 	if r.Catalogo != nil && ref.GetCatalogoId() != "" {
@@ -193,6 +201,11 @@ func (r *Receptor) abrirApp(ctx context.Context, ref *lazulv1.AppRef) error {
 				web = a.Web
 			}
 		}
+	}
+	// Solo se lanza un id nativo que el catálogo conoce en este sistema: el
+	// id viene de otro equipo y en Windows puede ser una ruta de programa.
+	if nativo != "" && (r.Catalogo == nil || !r.conocida(nativo)) {
+		nativo = ""
 	}
 	err := fmt.Errorf("app %q: %w", ref.GetNombre(), platform.ErrNoEncontrada)
 	if nativo != "" {
