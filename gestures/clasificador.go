@@ -112,6 +112,12 @@ func (s sosten) confianza() float32 {
 	return float32(s.coinciden) / float32(s.cuadros)
 }
 
+// confianzaPuno: de los cuadros que dura el sostén del puño (huecos de la
+// gracia incluidos), al menos esta fracción tiene que ser puño. Sin esto, dos
+// cuadros sueltos de puño unidos por la gracia cuentan como un puño sostenido
+// (así agarraba una mano que pinza con el índice doblado).
+const confianzaPuno = 0.7
+
 const tamHistoria = 32 // ~1 s a 30 fps
 
 type muestra struct {
@@ -240,7 +246,7 @@ func Clasificar(e Estado, c Cuadro) (Estado, Evento) {
 		}
 		esPuno := pose == PosePuno
 		e.puno = e.puno.avanzar(esPuno, t, aj.Gracia)
-		if e.puno.listo(esPuno, aj.SostenerPuno) {
+		if e.puno.listo(esPuno, aj.SostenerPuno) && e.puno.confianza() >= confianzaPuno {
 			ev = Evento{Gesto: lazulv1.Gesto_GESTO_AGARRAR, Confianza: e.puno.confianza()}
 			e.pasarA(ModoAgarrando, t, aj)
 			break
