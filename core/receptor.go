@@ -4,8 +4,9 @@
 // Hoy tiene el receptor (atiende las Órdenes de un controlador), el
 // transporte por WebSocket sobre TLS 1.3 con huella fijada y el
 // emparejamiento con código de 6 dígitos y permiso de la persona (pareja.go);
-// el descubrimiento mDNS está en core/descubre. Falta el enrutador del
-// controlador y LocalSend (cotejo-sb2kdm).
+// el descubrimiento mDNS está en core/descubre. El enrutador del controlador
+// (enrutador.go) convierte gestos en Órdenes, y los archivos viajan por el
+// protocolo de LocalSend (core/localsend) en el mismo puerto TLS.
 package core
 
 import (
@@ -13,8 +14,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"runtime"
 	"time"
 
+	"github.com/Rafael088/lazul/core/apps"
+	"github.com/Rafael088/lazul/core/localsend"
 	"github.com/Rafael088/lazul/platform"
 	"github.com/Rafael088/lazul/proto/go/lazulv1"
 )
@@ -23,8 +27,27 @@ import (
 type Receptor struct {
 	Sistema platform.Sistema
 	Hola    *lazulv1.Hola
+	// Catalogo traduce las apps del gesto 4 entre sistemas (apps.json).
+	// nil: solo se prueba el nativo_id que llegó y después la web.
+	Catalogo *apps.Catalogo
+	// SO es el sistema de este equipo en el catálogo ("linux", "windows");
+	// vacío es runtime.GOOS.
+	SO string
+	// Archivos recibe por LocalSend; Servir lo monta en el mismo puerto y
+	// solo deja subir a equipos emparejados. nil: no recibe archivos.
+	Archivos *localsend.Servidor
+	// Registro, si no es nil, se llama tras atender cada Orden con lo que
+	// se pidió, lo que se contestó y cuánto tardó aquí.
+	Registro func(o *lazulv1.Orden, resp *lazulv1.Respuesta, d time.Duration)
 	// Reloj se puede cambiar en pruebas.
 	Reloj func() time.Time
+}
+
+func (r *Receptor) so() string {
+	if r.SO != "" {
+		return r.SO
+	}
+	return runtime.GOOS
 }
 
 func (r *Receptor) ahora() int64 {
@@ -52,7 +75,12 @@ func (r *Receptor) Atender(ctx context.Context, s *lazulv1.Sobre) *lazulv1.Sobre
 	case *lazulv1.Sobre_Ping:
 		resp.Contenido = &lazulv1.Sobre_Pong{Pong: &lazulv1.Pong{}}
 	case *lazulv1.Sobre_Orden:
-		resp.Contenido = &lazulv1.Sobre_Respuesta{Respuesta: r.orden(ctx, c.Orden)}
+		ini := time.Now()
+		rr := r.orden(ctx, c.Orden)
+		if r.Registro != nil {
+			r.Registro(c.Orden, rr, time.Since(ini))
+		}
+		resp.Contenido = &lazulv1.Sobre_Respuesta{Respuesta: rr}
 	default:
 		return nil
 	}
@@ -114,14 +142,7 @@ func (r *Receptor) tomar(ctx context.Context, que lazulv1.Tomar_Que) (*lazulv1.O
 		if err != nil {
 			return nil, err
 		}
-		// Gesto 4 por niveles (dec-r2ii): URL, archivo o app sin estado.
-		switch {
-		case app.URL != "":
-			return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_Url{Url: app.URL}}, nil
-		case app.Archivo != "":
-			return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_Archivo{Archivo: &lazulv1.Archivo{Nombre: app.Archivo}}}, nil
-		}
-		return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_App{App: &lazulv1.AppRef{NativoId: app.ID, Nombre: app.Nombre}}}, nil
+		return ObjetoDeApp(app, r.Catalogo, r.so()), nil
 	}
 	return nil, fmt.Errorf("%w: Tomar %v", errInvalido, que)
 }
@@ -143,16 +164,64 @@ func (r *Receptor) entregar(ctx context.Context, o *lazulv1.Objeto) error {
 		if s.LaunchApp == nil {
 			return platform.ErrNoImplementado
 		}
-		// El catálogo (cotejo-qxb94p) traducirá catalogo_id a nativo_id.
-		err := s.LaunchApp.Launch(ctx, platform.AppRef{ID: t.App.GetNativoId()})
-		if errors.Is(err, platform.ErrNoEncontrada) && t.App.GetWeb() != "" {
-			return s.LaunchApp.Launch(ctx, platform.AppRef{URL: t.App.GetWeb()})
-		}
-		return err
+		return r.abrirApp(ctx, t.App)
 	case *lazulv1.Objeto_Archivo:
-		return fmt.Errorf("%w: recibir archivos llega con LocalSend", platform.ErrNoImplementado)
+		if r.Archivos == nil {
+			return fmt.Errorf("%w: este equipo no recibe archivos", platform.ErrNoImplementado)
+		}
+		rec, err := r.Archivos.Buscar(t.Archivo.GetTransferenciaId(), t.Archivo.GetSha256())
+		if err != nil {
+			return fmt.Errorf("%w: %v", platform.ErrNoEncontrada, err)
+		}
+		if s.LaunchApp == nil {
+			return nil // llegó; no hay cómo abrirlo
+		}
+		return s.LaunchApp.Launch(ctx, platform.AppRef{Archivo: rec.Ruta})
 	}
 	return fmt.Errorf("%w: objeto vacío", errInvalido)
+}
+
+// abrirApp abre la app del gesto 4 en este equipo: la del catálogo para
+// este sistema si la conoce; si no, el nativo_id que llegó (solo cuando el
+// catálogo no sabe de esa app); y si no está instalada, su web.
+func (r *Receptor) abrirApp(ctx context.Context, ref *lazulv1.AppRef) error {
+	nativo, web := ref.GetNativoId(), ref.GetWeb()
+	if r.Catalogo != nil && ref.GetCatalogoId() != "" {
+		if a, ok := r.Catalogo.Buscar(ref.GetCatalogoId()); ok {
+			nativo = a.Nativo(r.so())
+			if a.Web != "" {
+				web = a.Web
+			}
+		}
+	}
+	err := fmt.Errorf("app %q: %w", ref.GetNombre(), platform.ErrNoEncontrada)
+	if nativo != "" {
+		err = r.Sistema.LaunchApp.Launch(ctx, platform.AppRef{ID: nativo})
+	}
+	if errors.Is(err, platform.ErrNoEncontrada) && web != "" {
+		return r.Sistema.LaunchApp.Launch(ctx, platform.AppRef{URL: web})
+	}
+	return err
+}
+
+// ObjetoDeApp es el gesto 4 por niveles (dec-r2ii): la URL si es el
+// navegador y se pudo leer; si no, el archivo abierto; si no, la app sin
+// estado, con su id de catálogo y su web de respaldo si el catálogo la
+// conoce en este sistema (so).
+func ObjetoDeApp(app platform.App, cat *apps.Catalogo, so string) *lazulv1.Objeto {
+	switch {
+	case app.URL != "":
+		return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_Url{Url: app.URL}}
+	case app.Archivo != "":
+		return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_Archivo{Archivo: &lazulv1.Archivo{Nombre: app.Archivo}}}
+	}
+	ref := &lazulv1.AppRef{NativoId: app.ID, Nombre: app.Nombre}
+	if cat != nil {
+		if a, ok := cat.PorNativo(so, app.ID); ok {
+			ref.CatalogoId, ref.Nombre, ref.Web = a.ID, a.Nombre, a.Web
+		}
+	}
+	return &lazulv1.Objeto{Tipo: &lazulv1.Objeto_App{App: ref}}
 }
 
 func respuestaFalla(c lazulv1.Falla_Codigo, detalle string) *lazulv1.Sobre_Respuesta {
