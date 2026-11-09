@@ -3,6 +3,7 @@ package desktop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -215,5 +216,22 @@ func TestVentanaPropiaNoSeManda(t *testing.T) {
 	_, err := sinVentanaPropia{f.Sistema().ActiveApp}.Active(context.Background())
 	if !errors.Is(err, errVentanaPropia) || ClaseError(err) != "ventana_propia" {
 		t.Fatalf("err = %v (%s)", err, ClaseError(err))
+	}
+}
+
+func TestClaseErrorRemotoSoloLlevaElCodigo(t *testing.T) {
+	err := &core.ErrRemoto{Nombre: "PC Windows", Codigo: lazulv1.Falla_CODIGO_NO_ENCONTRADO, Detalle: `app "Secreta de Ana": no encontrada en C:\\Users\\ana`}
+	c := ClaseError(fmt.Errorf("envuelto: %w", err))
+	if c != "remoto_no_encontrado" {
+		t.Fatalf("clase %q", c)
+	}
+	if strings.Contains(c, "Ana") || strings.Contains(c, "Users") {
+		t.Fatalf("la clase lleva texto del otro equipo: %q", c)
+	}
+	if c := ClaseError(fmt.Errorf("%w: ruta /home/ana/x", core.ErrVentana)); c != "no_leyo_ventana" {
+		t.Errorf("clase %q", c)
+	}
+	if c := ClaseError(fmt.Errorf("%w: /home/ana/x.pdf", core.ErrArchivoAbierto)); c != "documento_no_enviable" {
+		t.Errorf("clase %q", c)
 	}
 }
