@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -35,7 +36,8 @@ func TestEstadoVentanaSeGuardaYSeLee(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	// Windows no tiene permisos tipo Unix: Perm() siempre da 666.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("permisos = %o; quiero 600", info.Mode().Perm())
 	}
 }
