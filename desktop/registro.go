@@ -62,9 +62,12 @@ type Linea struct {
 	Que        string `json:"que,omitempty"`
 	Destino    string `json:"destino,omitempty"` // nombre del equipo (el que dio al emparejar)
 	Error      string `json:"error,omitempty"`
-	Ms         int64  `json:"ms,omitempty"`
-	Cuadros    int    `json:"cuadros,omitempty"`
-	ConMano    int    `json:"con_mano,omitempty"`
+	// App: en el gesto 4, el id del catálogo de la app mandada o
+	// "fuera_del_catalogo". Nunca nombres, ejecutables, URL ni rutas.
+	App     string `json:"app,omitempty"`
+	Ms      int64  `json:"ms,omitempty"`
+	Cuadros int    `json:"cuadros,omitempty"`
+	ConMano int    `json:"con_mano,omitempty"`
 	// Prueba: en la prueba de trabajo normal (toda activación cuenta como
 	// falsa y no se manda nada).
 	Prueba bool `json:"prueba,omitempty"`

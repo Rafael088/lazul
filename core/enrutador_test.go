@@ -198,3 +198,12 @@ func TestArchivoEjecutableLlegaPeroNoSeAbre(t *testing.T) {
 		t.Fatalf("el archivo tenía que quedar en la bandeja: %v", entradas)
 	}
 }
+
+func TestHechoDiceLaAppDelCatalogoSinNombres(t *testing.T) {
+	m := nuevaMesa(t)
+	m.local.PonerApp(platform.App{ID: "app-rara-de-ana.exe", Nombre: "Mi App Rara", Titulo: "secreto"})
+	h, _ := m.e.Gesto(context.Background(), &lazulv1.EventoGesto{Gesto: lazulv1.Gesto_GESTO_MANDAR_APP, Direccion: lazulv1.Direccion_DIRECCION_DERECHA})
+	if h.App != "fuera_del_catalogo" {
+		t.Fatalf("App = %q", h.App)
+	}
+}

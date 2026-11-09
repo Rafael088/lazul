@@ -61,10 +61,29 @@ func (r *Remoto) Entregar(ctx context.Context, o *lazulv1.Objeto) error {
 		return err
 	}
 	if rr := resp.GetRespuesta(); !rr.GetOk() {
-		return fmt.Errorf("%s no pudo: %v %s", r.Nombre, rr.GetFalla().GetCodigo(), rr.GetFalla().GetDetalle())
+		return &ErrRemoto{Nombre: r.Nombre, Codigo: rr.GetFalla().GetCodigo(), Detalle: rr.GetFalla().GetDetalle()}
 	}
 	return nil
 }
+
+// ErrRemoto es la falla con que el otro equipo contestó una Orden. El Detalle
+// puede llevar nombres o rutas de ese equipo: para el registro vale solo el
+// Codigo.
+type ErrRemoto struct {
+	Nombre  string
+	Codigo  lazulv1.Falla_Codigo
+	Detalle string
+}
+
+func (e *ErrRemoto) Error() string {
+	return fmt.Sprintf("%s no pudo: %v %s", e.Nombre, e.Codigo, e.Detalle)
+}
+
+// ErrVentana: no se pudo leer la ventana activa de este equipo.
+var ErrVentana = errors.New("no se pudo leer la ventana activa")
+
+// ErrArchivoAbierto: el documento abierto no se pudo leer o es demasiado grande.
+var ErrArchivoAbierto = errors.New("documento abierto no enviable")
 
 // Enrutador convierte los gestos de la cámara de este equipo en Órdenes:
 // agarrar toma la captura de esta pantalla, soltar hacia un lado la manda al
@@ -111,6 +130,10 @@ type Hecho struct {
 	Subir   time.Duration // bytes por LocalSend
 	Orden   time.Duration // Entregar hasta la Respuesta ok
 	Total   time.Duration // desde que llegó el gesto hasta la Respuesta
+	// App es el id del catálogo de la app mandada en el gesto 4, o
+	// "fuera_del_catalogo" si el catálogo no la conoce en este sistema.
+	// Nunca el nombre ni el ejecutable (eso puede decir qué usa la persona).
+	App string
 	// Adelantada: la captura se subió desde el agarrar; Subir es solo lo
 	// que hubo que esperarla después de soltar.
 	Adelantada bool
@@ -257,26 +280,34 @@ func (e *Enrutador) mandarApp(ctx context.Context, d lazulv1.Direccion, h *Hecho
 	app, err := e.Local.ActiveApp.Active(ctx)
 	h.Tomar = e.ahora().Sub(t)
 	if err != nil {
-		return err
+		if errors.Is(err, platform.ErrNoImplementado) || errors.Is(err, platform.ErrSinVentana) {
+			return err
+		}
+		return fmt.Errorf("%w: %v", ErrVentana, err)
 	}
 	so := e.SO
 	if so == "" {
 		so = (&Receptor{}).so()
 	}
 	obj := ObjetoDeApp(app, e.Catalogo, so)
+	if a := obj.GetApp(); a != nil {
+		if h.App = a.GetCatalogoId(); h.App == "" {
+			h.App = "fuera_del_catalogo"
+		}
+	}
 	if ar := obj.GetArchivo(); ar != nil {
 		// Nivel 2: el documento viaja por LocalSend y el otro lo abre.
 		h.Que = "archivo"
 		info, err := os.Stat(ar.GetNombre())
 		if err != nil {
-			return fmt.Errorf("archivo abierto: %w", err)
+			return fmt.Errorf("%w: %v", ErrArchivoAbierto, err)
 		}
 		if info.Size() > MaxArchivoGesto4 {
-			return fmt.Errorf("archivo abierto de %d bytes: más de %d", info.Size(), MaxArchivoGesto4)
+			return fmt.Errorf("%w: %d bytes, más de %d", ErrArchivoAbierto, info.Size(), MaxArchivoGesto4)
 		}
 		datos, err := os.ReadFile(ar.GetNombre())
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %v", ErrArchivoAbierto, err)
 		}
 		tipo := mime.TypeByExtension(filepath.Ext(ar.GetNombre()))
 		if tipo == "" {

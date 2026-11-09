@@ -444,15 +444,24 @@ var errSinDestino = errors.New("no hay ningún equipo emparejado al que mandar (
 // llevar rutas o direcciones: ese solo se muestra en la ventana).
 func ClaseError(err error) string {
 	var ne net.Error
+	var re *core.ErrRemoto
 	switch {
 	case err == nil:
 		return ""
+	case errors.As(err, &re):
+		// Solo el código con que contestó el otro equipo; su detalle puede
+		// llevar nombres o rutas.
+		return "remoto_" + strings.ToLower(strings.TrimPrefix(re.Codigo.String(), "CODIGO_"))
 	case errors.Is(err, core.ErrNadaAgarrado):
 		return "nada_agarrado"
 	case errors.Is(err, errSinDestino):
 		return "sin_destino"
 	case errors.Is(err, errVentanaPropia):
 		return "ventana_propia"
+	case errors.Is(err, core.ErrVentana):
+		return "no_leyo_ventana"
+	case errors.Is(err, core.ErrArchivoAbierto):
+		return "documento_no_enviable"
 	case errors.Is(err, platform.ErrNoImplementado):
 		return "no_implementado"
 	case errors.Is(err, platform.ErrSinVentana):
@@ -492,7 +501,7 @@ func (n *Nucleo) hacer(ctx context.Context, d Disparo) {
 		// La conexión pudo caerse (el otro se reinició): otra vez, conectando de nuevo.
 		n.soltarConexion()
 	}
-	l.Que, l.Destino, l.Ms = h.Que, h.Destino, h.Total.Milliseconds()
+	l.Que, l.Destino, l.Ms, l.App = h.Que, h.Destino, h.Total.Milliseconds(), h.App
 	if err != nil {
 		l.Resultado, l.Error = "falla", ClaseError(err)
 		n.op.Reg.Anotar(l)
