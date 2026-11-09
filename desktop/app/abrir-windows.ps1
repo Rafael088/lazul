@@ -6,7 +6,12 @@ $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $exe = Join-Path $dir 'lazul.exe'
 $nombre = 'LazulApp'
-$accion = New-ScheduledTaskAction -Execute $exe -Argument $argumentos -WorkingDirectory $dir
+# -Argument no acepta una cadena vacía: sin argumentos, se omite.
+if ($argumentos) {
+    $accion = New-ScheduledTaskAction -Execute $exe -Argument $argumentos -WorkingDirectory $dir
+} else {
+    $accion = New-ScheduledTaskAction -Execute $exe -WorkingDirectory $dir
+}
 $quien = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
 # Sin límite de tiempo: si no, el programador la cierra a las 72 h.
 $ajustes = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
