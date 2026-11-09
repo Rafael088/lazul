@@ -13,6 +13,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// appActiva implementa platform.ActiveApp con la ventana en primer plano; la
+// URL y el documento abierto salen de niveles.go.
 type appActiva struct{}
 
 var (
@@ -102,5 +104,7 @@ func (appActiva) Active(ctx context.Context) (platform.App, error) {
 		id = aumid
 	}
 	nombre := strings.TrimSuffix(ejecutable, filepath.Ext(ejecutable))
-	return platform.App{ID: id, Nombre: nombre, Titulo: titulo, PID: int(pid)}, nil
+	app := platform.App{ID: id, Nombre: nombre, Titulo: titulo, PID: int(pid)}
+	app.URL, app.Archivo = niveles(ventana, proceso, ejecutable, titulo)
+	return app, nil
 }

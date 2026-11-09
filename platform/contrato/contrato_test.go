@@ -36,3 +36,30 @@ func TestNilFalla(t *testing.T) {
 func TestFalsoCumple(t *testing.T) {
 	contrato.Correr(t, falso.New("prueba", "calculadora").Sistema(), opciones)
 }
+
+// appMal devuelve niveles mal formados (URL relativa, archivo relativo).
+type appMal struct{ app platform.App }
+
+func (a appMal) Active(ctx context.Context) (platform.App, error) {
+	if err := ctx.Err(); err != nil {
+		return platform.App{}, err
+	}
+	return a.app, nil
+}
+
+// La regla de los niveles distingue una URL o un archivo mal formados.
+func TestNivelesMalFormadosFallan(t *testing.T) {
+	malos := []platform.App{
+		{ID: "x", Nombre: "x", URL: "example.org/sin-esquema"},
+		{ID: "x", Nombre: "x", Archivo: "relativo/informe.pdf"},
+		{ID: "x", Nombre: "x", Archivo: "/lazul-contrato-no-existe/informe.pdf"},
+	}
+	for _, app := range malos {
+		s := platform.Sistema{ActiveApp: appMal{app}}
+		for _, p := range contrato.Pruebas(s, opciones) {
+			if p.Nombre == "ActiveApp/niveles_bien_formados" && p.Correr(context.Background()) == nil {
+				t.Errorf("pasó con %+v", app)
+			}
+		}
+	}
+}

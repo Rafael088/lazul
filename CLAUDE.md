@@ -11,7 +11,7 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | --- | --- |
 | `./dev check` | formato, vet, compilar, pruebas, proto al día, tipos TS. Debe quedar en verde antes de entregar. |
 | `./dev test [paquetes]` | pruebas de Go (por defecto `./...`) |
-| `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio) |
+| `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio); con `LAZUL_CONTRATO_ABRIR=1` también «en vivo»: abre cada navegador y visor instalado con perfil y archivos temporales (Linux: en el espacio 6 sin foco) y comprueba la URL y el documento leídos |
 | `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS y, al final, de punta a punta con las grabaciones reales (captura por LocalSend, gesto 4 por niveles) |
 | `./dev e2e win\|linux [args]` | de punta a punta entre los 2 PCs de verdad: `win` controla este Linux y recibe Windows (túnel de ssh: el cortafuegos de Windows no deja entrar), `linux` al revés por la red local (puerto 53317). `LAZUL_ABRIR=1` abre de verdad; args del controlador: `-adelantar`, `-intentos N`, `-casos`, `-ventanas` |
 | `./dev replay [-v] [-barrer]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L |
@@ -33,6 +33,8 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp y errores | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
 | `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | hoy devuelven `ErrNoImplementado`: terminados cuando `./dev contrato` / `./dev win contrato` pasan |
+| `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
+| `platform/internal/documento/` | nivel 2: elige el documento abierto (nombre en el título, mismos tipos que `core/seguro.go`) | una prueba exige las mismas extensiones que el receptor |
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |
 | `core/` | núcleo: `Receptor` atiende Órdenes, transporte WebSocket sobre TLS (`transporte.go`) | nunca llama al sistema, solo a `platform` |
 | `core/pareja.go`, `identidad.go`, `codigo.go`, `pares.go` | emparejamiento: identidad (cert autofirmado P-256, `Huella` = SHA-256 de la clave pública), código de 6 dígitos (2 min, 3 intentos, un uso), prueba HMAC atada a la sesión TLS, `Puerta` (permiso de la persona) y `Pares` fijados | solo librería estándar; el protocolo y su límite están en el comentario de `pareja.go`; pruebas primero |
@@ -77,7 +79,7 @@ el receptor solo lo acepta si llegó entero.
 - Adaptadores: Linux `cotejo-42s7rt`, Windows `cotejo-232tso` (hacer pasar el contrato; no tocar `platform/contrato` para que pase).
 - Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
 - Precisión real 93,9 % (< 95 %): más tomas o ajustar con las que fallan (informe de `cotejo-sb2kdm`).
-- Leer la URL del navegador y el documento abierto en los adaptadores (niveles 1 y 2 del gesto 4).
+- Niveles 1 y 2 del gesto 4 hechos (`cotejo-82qb85`, `niveles.go` de cada adaptador); quedan sus límites. Windows: URL por UI Automation (Chrome y Edge probados; Firefox y Brave sin probar, no están en el PC), documento si su ruta va en la línea de órdenes o en el título (doble clic sí; abierto desde el menú de la app no; Office por COM no). Linux: URL leída de la sesión que el navegador ya guarda (sin depuración remota ni cambiar nada): Chromium y Edge con hasta ~2,5 s de atraso, Firefox y Zen hasta 15 s, y solo si el título guardado es el de la ventana (privadas: nunca); documento por título, argumentos o `/proc/<pid>/fd` (imv, evince, mpv probados). Flatpak/snap sin probar.
 - Abrir en pantalla tarda 260–545 ms (`ShellExecute`, `xdg-open`): decidir si el receptor contesta al despachar.
 
 ## Reglas

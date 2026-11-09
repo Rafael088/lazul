@@ -19,7 +19,9 @@ import (
 	"errors"
 	"fmt"
 	"image/png"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -205,6 +207,29 @@ func pruebasActiveApp(aa platform.ActiveApp) []Prueba {
 			}
 			if app.PID < 0 {
 				return fmt.Errorf("PID negativo: %d", app.PID)
+			}
+			return nil
+		}},
+		{"ActiveApp/niveles_bien_formados", func(ctx context.Context) error {
+			// URL y Archivo (niveles 1 y 2 del gesto 4) pueden ir vacíos; si
+			// van, la URL es absoluta y el archivo es una ruta absoluta que
+			// existe. No se muestran en el error: pueden llevar datos personales.
+			app, err := aa.Active(ctx)
+			if err != nil {
+				return fmt.Errorf("Active: %w", err)
+			}
+			if app.URL != "" {
+				if u, err := url.Parse(app.URL); err != nil || u.Scheme == "" {
+					return fmt.Errorf("la URL de %s no es absoluta", app.ID)
+				}
+			}
+			if app.Archivo != "" {
+				if !filepath.IsAbs(app.Archivo) {
+					return fmt.Errorf("el archivo de %s no es una ruta absoluta", app.ID)
+				}
+				if info, err := os.Stat(app.Archivo); err != nil || !info.Mode().IsRegular() {
+					return fmt.Errorf("el archivo de %s no existe o no es un archivo", app.ID)
+				}
 			}
 			return nil
 		}},
