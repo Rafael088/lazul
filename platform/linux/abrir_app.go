@@ -50,12 +50,13 @@ func (abrirApp) Launch(ctx context.Context, ref platform.AppRef) error {
 	}
 }
 
-// esperaLanzar: lo que se espera a que xdg-open o gio terminen. Algunos
-// manejadores (imv para las imágenes, por ejemplo) hacen que xdg-open no
-// vuelva hasta que se cierra la ventana; el contrato dice que Launch no
-// espera a eso. Si en este tiempo el comando falla, se devuelve su error; si
-// sigue corriendo, se da por abierto y se recoge en segundo plano.
-const esperaLanzar = 500 * time.Millisecond
+// esperaLanzar: lo que se espera a que xdg-open o gio terminen. xdg-open
+// tarda 260-545 ms en volver y algunos manejadores (imv para las imágenes)
+// no vuelven hasta cerrar la ventana; Launch no espera a eso. Un comando que
+// no existe falla en Start, y uno que rechaza el destino sale con error en
+// pocos ms: si en este tiempo falla se devuelve su error; si sigue corriendo
+// se da por abierto y Wait lo recoge en segundo plano.
+var esperaLanzar = 50 * time.Millisecond
 
 // lanzar corre el comando sin atarlo a ctx (cancelar no debe cerrar lo que
 // se abrió) y espera como mucho esperaLanzar.
