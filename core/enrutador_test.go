@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"net"
 	"os"
@@ -173,5 +174,27 @@ func TestGesto4PorNiveles(t *testing.T) {
 	m.local.PonerApp(platform.App{ID: "app-rara", Nombre: "Rara"})
 	if _, err := m.gesto(t, lazulv1.Gesto_GESTO_MANDAR_APP); err == nil || !strings.Contains(err.Error(), "NO_ENCONTRADO") {
 		t.Fatalf("app desconocida: %v", err)
+	}
+}
+
+func TestArchivoEjecutableLlegaPeroNoSeAbre(t *testing.T) {
+	m := nuevaMesa(t)
+	datos := []byte("MZ no soy un programa")
+	suma := sha256.Sum256(datos)
+	id, err := localsend.Enviar(context.Background(), ClienteHTTP(m.ctrl, m.receptor.Huella), "https://"+m.dir,
+		localsend.Dispositivo{}, localsend.Archivo{Nombre: "instalador.exe", Datos: datos})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = m.e.PorDefecto.Entregar(context.Background(), &lazulv1.Objeto{Tipo: &lazulv1.Objeto_Archivo{Archivo: &lazulv1.Archivo{
+		Nombre: "instalador.exe", Sha256: suma[:], TransferenciaId: id}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ab := m.otro.Abiertas(); len(ab) != 0 {
+		t.Fatalf("el receptor abrió un ejecutable: %v", ab)
+	}
+	if entradas, _ := os.ReadDir(m.bandeja); len(entradas) != 1 {
+		t.Fatalf("el archivo tenía que quedar en la bandeja: %v", entradas)
 	}
 }
