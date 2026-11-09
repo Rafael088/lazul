@@ -62,7 +62,9 @@ activo (5 s), el puño agarra y la pinza arrastrada manda la app; agarrando,
 abrir la mano moviéndola a un lado suelta. La dirección es la de la persona
 (la imagen no se espeja). La L se separa de la pinza (puntas juntas) y de
 señalar (pulgar pegado, a medias o perdido) por el pulgar: lejos del índice,
-a unos 90° y con las puntas separadas.
+a unos 90° y con las puntas separadas. El puño exige el índice de verdad
+recogido (a medio doblar no lo es) y que el sostén de 150 ms sea al menos 70 %
+puño: dos cuadros sueltos unidos por la gracia no agarran.
 
 ## Cómo se habla todo
 
@@ -80,7 +82,7 @@ el receptor solo lo acepta si llegó entero.
 - Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
 - Precisión real 93,9 % (< 95 %): más tomas o ajustar con las que fallan (informe de `cotejo-sb2kdm`).
 - Niveles 1 y 2 del gesto 4 hechos (`cotejo-82qb85`, `niveles.go` de cada adaptador); quedan sus límites. Windows: URL por UI Automation (Chrome y Edge probados; Firefox y Brave sin probar, no están en el PC), documento si su ruta va en la línea de órdenes o en el título (doble clic sí; abierto desde el menú de la app no; Office por COM no). Linux: URL leída de la sesión que el navegador ya guarda (sin depuración remota ni cambiar nada): Chromium y Edge con hasta ~2,5 s de atraso, Firefox y Zen hasta 15 s, y solo si el título guardado es el de la ventana (privadas: nunca); documento por título, argumentos o `/proc/<pid>/fd` (imv, evince, mpv probados). Flatpak/snap sin probar.
-- Abrir en pantalla tarda 260–545 ms (`ShellExecute`, `xdg-open`): decidir si el receptor contesta al despachar.
+- Abrir en pantalla ya no frena la Orden: el adaptador lanza (`xdg-open`, `ShellExecute`) y contesta ok tras 25–50 ms de gracia (`esperaLanzar`); un fallo inmediato (comando o archivo inexistente, código de ShellExecute ≤ 32) sí se devuelve; uno que llega después se pierde. Medido con `LAZUL_ABRIR=1 ./dev e2e`: la Orden Entregar baja de 260–545 ms a ~20–60 ms (Windows: la búsqueda en frío del ejecutable puede sumar hasta ~200 ms la primera vez).
 
 ## Reglas
 
