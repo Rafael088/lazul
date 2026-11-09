@@ -9,11 +9,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Rafael088/lazul/platform"
 )
 
 // abrirApp implementa platform.LaunchApp con archivos .desktop y xdg-open.
+// No espera a que se cierre lo abierto (ver esperaLanzar).
 type abrirApp struct{}
 
 func (abrirApp) Launch(ctx context.Context, ref platform.AppRef) error {
@@ -36,8 +38,7 @@ func (abrirApp) Launch(ctx context.Context, ref platform.AppRef) error {
 		if !ok {
 			return fmt.Errorf("app %q: %w", ref.ID, platform.ErrNoEncontrada)
 		}
-		comando := exec.CommandContext(ctx, "gio", "launch", ruta)
-		if err := comando.Run(); err != nil {
+		if err := lanzar(ctx, "gio", "launch", ruta); err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -49,8 +50,37 @@ func (abrirApp) Launch(ctx context.Context, ref platform.AppRef) error {
 	}
 }
 
+// esperaLanzar: lo que se espera a que xdg-open o gio terminen. Algunos
+// manejadores (imv para las imágenes, por ejemplo) hacen que xdg-open no
+// vuelva hasta que se cierra la ventana; el contrato dice que Launch no
+// espera a eso. Si en este tiempo el comando falla, se devuelve su error; si
+// sigue corriendo, se da por abierto y se recoge en segundo plano.
+const esperaLanzar = 500 * time.Millisecond
+
+// lanzar corre el comando sin atarlo a ctx (cancelar no debe cerrar lo que
+// se abrió) y espera como mucho esperaLanzar.
+func lanzar(ctx context.Context, nombre string, args ...string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	cmd := exec.Command(nombre, args...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	fin := make(chan error, 1)
+	go func() { fin <- cmd.Wait() }()
+	select {
+	case err := <-fin:
+		return err
+	case <-time.After(esperaLanzar):
+		return nil
+	case <-ctx.Done():
+		return nil // ya se lanzó; Wait lo recoge cuando termine
+	}
+}
+
 func abrirConXDG(ctx context.Context, destino, tipo string) error {
-	if err := exec.CommandContext(ctx, "xdg-open", destino).Run(); err != nil {
+	if err := lanzar(ctx, "xdg-open", destino); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

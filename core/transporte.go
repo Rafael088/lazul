@@ -14,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/Rafael088/lazul/core/localsend"
 	"github.com/Rafael088/lazul/proto/go/lazulv1"
 )
 
@@ -63,6 +64,19 @@ func Conectar(ctx context.Context, dir string, yo *Identidad, huella Huella) (*C
 		return nil
 	}))
 	return c, err
+}
+
+// ClienteHTTP es un cliente HTTPS que presenta la identidad propia y solo
+// habla con el certificado de huella: es el que usa LocalSend para subirle
+// archivos a un receptor emparejado.
+func ClienteHTTP(yo *Identidad, huella Huella) *http.Client {
+	cfg := configCliente(yo, func(h Huella) error {
+		if huella.cero() || h != huella {
+			return ErrHuellaCambiada
+		}
+		return nil
+	})
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: cfg, ForceAttemptHTTP2: true}, Timeout: 2 * time.Minute}
 }
 
 func dialTLS(ctx context.Context, url string, cfg *tls.Config) (*Conexion, *tls.ConnectionState, error) {
@@ -127,6 +141,11 @@ func Servir(ctx context.Context, ln net.Listener, r *Receptor, p *Puerta) error 
 			}
 		}
 	})
+	if r.Archivos != nil {
+		// LocalSend en el mismo puerto: solo suben los emparejados.
+		r.Archivos.Permitir = func(req *http.Request) bool { return p.emparejado(req.TLS) }
+		mux.Handle(localsend.Ruta, r.Archivos)
+	}
 	mux.HandleFunc("/pareja", func(w http.ResponseWriter, req *http.Request) {
 		ws, err := websocket.Accept(w, req, nil)
 		if err != nil {

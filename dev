@@ -10,6 +10,7 @@
 #   ./dev grabar [-dir D]    página local para grabar gestos con la cámara
 #   ./dev gen                regenera los tipos de Go y TS desde proto/
 #   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`
+#   ./dev e2e win|linux [args]  de punta a punta entre este Linux y el PC Windows
 set -uo pipefail
 cd "$(dirname "$0")"
 RAIZ=$PWD
@@ -174,14 +175,105 @@ cmd_win() {
 	esac
 }
 
-cmd_sim() { paso sim go run ./core/cmd/sim "$@"; local r=$?; grep -v '^ok' .dev/sim.log | head -20 | sed 's/^/       /'; return $r; }
+# Los intentos fallidos uno a uno (líneas "  caso · ...") quedan en el registro.
+cmd_sim() { paso sim go run ./core/cmd/sim "$@"; local r=$?; grep -v -E '^ok|^  [a-z0-9]+ · ' .dev/sim.log | head -40 | sed 's/^/       /'; return $r; }
 
 cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; sed 's/^/       /' .dev/replay.log; return $r; }
 
 # grabar no es un paso: queda corriendo hasta Ctrl+C.
 cmd_grabar() { go run ./gestures/cmd/grabar "$@"; }
 
-uso() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
+# e2e win|linux [args del controlador]: de punta a punta entre los 2 PCs de
+# verdad, con las grabaciones reales de gestos.
+#   win    controlador aquí (pantalla y ventana de este Linux), receptor en el
+#          escritorio de Windows. El cortafuegos de Windows no deja entrar
+#          conexiones nuevas, así que el puerto va por un túnel de ssh.
+#   linux  controlador en el escritorio de Windows, receptor aquí en el puerto
+#          de LocalSend (53317, el que deja entrar el cortafuegos), directo
+#          por la red local.
+# Por defecto el receptor no abre nada (solo anota); LAZUL_ABRIR=1 abre de
+# verdad. Lo recibido se borra al terminar.
+E2E=.dev/e2e
+WIN_DIR='$HOME\lazul-e2e'
+VENTANAS_WIN='url:https://example.org/,archivo:fixtures/gestos/activar-buena-002.jsonl,app:firefox,real'
+VENTANAS_LINUX='url:https://example.org/,archivo:fixtures\gestos\activar-buena-002.jsonl,app:msedge.exe,real'
+
+abrir_bool() { [ "${LAZUL_ABRIR:-0}" = 1 ] && echo true || echo false; }
+
+# esperar_codigo LOG: hasta que el receptor muestre huella y código.
+leer_receptor() { HR=$(grep -a -oP 'huella \K[0-9a-f]{64}' "$1" | head -1); COD=$(grep -a -oP 'codigo \K[0-9]{6}' "$1" | head -1); }
+
+e2e_win() {
+	local puerto=${LAZUL_PUERTO:-47900}
+	GOOS=windows GOARCH=amd64 go build -o $E2E/receptor.exe ./core/cmd/receptor || return 1
+	go build -o $E2E/controlador ./core/cmd/controlador || return 1
+	local hc
+	hc=$($E2E/controlador -solo-huella -estado $E2E/c) || return 1
+	ssh -o LogLevel=ERROR win "\$d=\"$WIN_DIR\"; New-Item -Force -ItemType Directory \$d | Out-Null; Get-ChildItem \$d | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; exit 0" || return 1
+	scp -q -o LogLevel=ERROR $E2E/receptor.exe herramientas/win-escritorio.ps1 win:lazul-e2e/ || return 1
+	echo "receptor en el escritorio de Windows (127.0.0.1:$puerto, abrir=$(abrir_bool))"
+	ssh -o LogLevel=ERROR win "& \"$WIN_DIR\win-escritorio.ps1\" -exe \"$WIN_DIR\receptor.exe\" -argumentos '-escucha 127.0.0.1:$puerto -estado estado -emparejar -permitir $hc -abrir=$(abrir_bool) -duracion 600s' -segundos 620" >$E2E/receptor-fin.log 2>&1 &
+	local i
+	for i in $(seq 40); do
+		sleep 1
+		ssh -o LogLevel=ERROR win "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Encoding UTF8 \"$WIN_DIR\escritorio-salida.txt\" -ErrorAction SilentlyContinue" >$E2E/receptor.log 2>/dev/null
+		leer_receptor $E2E/receptor.log
+		[ -n "$COD" ] && break
+	done
+	[ -n "$COD" ] || { echo "el receptor de Windows no arrancó (¿sesión de escritorio abierta?)"; cat $E2E/receptor.log; return 1; }
+	ssh -o LogLevel=ERROR -o ExitOnForwardFailure=yes -N -L $puerto:127.0.0.1:$puerto win &
+	local tunel=$!
+	sleep 2
+	$E2E/controlador -receptor 127.0.0.1:$puerto -huella "$HR" -codigo "$COD" -estado $E2E/c -nombre "PC Linux" -ventanas "$VENTANAS_WIN" "$@"
+	local r=$?
+	kill $tunel 2>/dev/null
+	ssh -o LogLevel=ERROR win "Get-Process receptor -ErrorAction SilentlyContinue | Stop-Process -Force" >/dev/null 2>&1
+	wait
+	ssh -o LogLevel=ERROR win "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Encoding UTF8 \"$WIN_DIR\escritorio-salida.txt\"" >$E2E/receptor.log 2>/dev/null
+	echo "receptor (Windows): $(grep -a -c ' orden .* ok (aquí' $E2E/receptor.log) órdenes ok, $(grep -a -c 'FALLA' $E2E/receptor.log) fallas (registro: $E2E/receptor.log)"
+	ssh -o LogLevel=ERROR win "Remove-Item -Recurse -Force \"$WIN_DIR\estado\recibidos\" -ErrorAction SilentlyContinue" >/dev/null 2>&1
+	return $r
+}
+
+e2e_linux() {
+	local puerto=${LAZUL_PUERTO:-53317} ipwin ipaqui
+	ipwin=$(ssh -G win | awk '/^hostname /{print $2}')
+	ipaqui=$(ip -4 route get "$ipwin" | grep -oP 'src \K\S+')
+	[ -n "$ipaqui" ] || { echo "no sé por qué IP me ve Windows"; return 1; }
+	GOOS=windows GOARCH=amd64 go build -o $E2E/controlador.exe ./core/cmd/controlador || return 1
+	go build -o $E2E/receptor ./core/cmd/receptor || return 1
+	tar -czf $E2E/fixtures.tgz fixtures/gestos || return 1
+	ssh -o LogLevel=ERROR win "\$d=\"$WIN_DIR\"; New-Item -Force -ItemType Directory \$d | Out-Null; Get-ChildItem \$d | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; exit 0" || return 1
+	scp -q -o LogLevel=ERROR $E2E/controlador.exe $E2E/fixtures.tgz herramientas/win-escritorio.ps1 win:lazul-e2e/ || return 1
+	local hc
+	hc=$(ssh -o LogLevel=ERROR win "Set-Location \"$WIN_DIR\"; tar -xzf fixtures.tgz; .\controlador.exe -solo-huella -estado c" | tr -d '\r') || return 1
+	rm -rf $E2E/r
+	$E2E/receptor -escucha ":$puerto" -estado $E2E/r -emparejar -permitir "$hc" -abrir=$(abrir_bool) -duracion 600s >$E2E/receptor.log 2>&1 &
+	local rec=$!
+	sleep 1
+	leer_receptor $E2E/receptor.log
+	[ -n "$COD" ] || { echo "el receptor no arrancó"; cat $E2E/receptor.log; kill $rec; return 1; }
+	echo "receptor aquí ($ipaqui:$puerto, abrir=$(abrir_bool)); controlador en el escritorio de Windows"
+	local args="-receptor $ipaqui:$puerto -huella $HR -codigo $COD -estado c -nombre PC-Windows -ventanas $VENTANAS_LINUX $*"
+	ssh -o LogLevel=ERROR win "& \"$WIN_DIR\win-escritorio.ps1\" -exe \"$WIN_DIR\controlador.exe\" -argumentos '$args' -segundos 900" | tr -d '\r'
+	local r=${PIPESTATUS[0]}
+	kill $rec 2>/dev/null
+	wait $rec 2>/dev/null
+	echo "receptor (Linux): $(grep -a -c ' orden .* ok (aquí' $E2E/receptor.log) órdenes ok, $(grep -a -c 'FALLA' $E2E/receptor.log) fallas (registro: $E2E/receptor.log)"
+	rm -rf $E2E/r/recibidos
+	return $r
+}
+
+cmd_e2e() {
+	mkdir -p $E2E
+	case ${1:-} in
+	win) shift; e2e_win "$@" ;;
+	linux) shift; e2e_linux "$@" ;;
+	*) echo "uso: ./dev e2e win|linux [args del controlador]"; return 2 ;;
+	esac
+}
+
+uso() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
 
 orden=${1:-}
 [ $# -gt 0 ] && shift
@@ -194,5 +286,6 @@ replay) cmd_replay "$@" ;;
 grabar) cmd_grabar "$@" ;;
 gen) cmd_gen ;;
 win) cmd_win "$@" ;;
+e2e) cmd_e2e "$@" ;;
 *) uso; [ -z "$orden" ] || [ "$orden" = ayuda ] || exit 2 ;;
 esac

@@ -112,3 +112,77 @@ func validarWeb(valor string) error {
 	}
 	return nil
 }
+
+// Sistemas que entiende Nativo y PorNativo (los de runtime.GOOS).
+const (
+	SistemaWindows = "windows"
+	SistemaLinux   = "linux"
+)
+
+// Nativo es el identificador de la app en el sistema so ("windows" o
+// "linux"): el ejecutable o AUMID en Windows, el id del .desktop en Linux.
+// Vacío si el catálogo no la tiene para ese sistema.
+func (a App) Nativo(so string) string {
+	switch so {
+	case SistemaWindows:
+		if a.Windows != nil {
+			return a.Windows.ID
+		}
+	case SistemaLinux:
+		return a.Linux
+	}
+	return ""
+}
+
+// Buscar devuelve la app con ese id de catálogo.
+func (c Catalogo) Buscar(id string) (App, bool) {
+	for _, a := range c.Apps {
+		if a.ID == id {
+			return a, true
+		}
+	}
+	return App{}, false
+}
+
+// PorNativo busca la app cuyo identificador en so es nativo, tal como lo da
+// platform.ActiveApp: en Windows el ejecutable (sin importar mayúsculas ni
+// la carpeta) o el AUMID; en Linux la clase de la ventana, que suele ser el
+// id del .desktop sin el sufijo (firefox, Code, org.gnome.Nautilus).
+func (c Catalogo) PorNativo(so, nativo string) (App, bool) {
+	n := strings.ToLower(strings.TrimSpace(nativo))
+	if n == "" {
+		return App{}, false
+	}
+	if so == SistemaWindows {
+		n = strings.ToLower(baseWindows(nativo))
+	}
+	n = strings.TrimSuffix(n, ".desktop")
+	for _, a := range c.Apps {
+		id := strings.ToLower(a.Nativo(so))
+		if id == "" {
+			continue
+		}
+		if so == SistemaLinux {
+			id = strings.TrimSuffix(id, ".desktop")
+			// code.desktop tiene la clase "Code"; google-chrome.desktop, "google-chrome".
+			if id == n || strings.ToLower(a.ID) == n {
+				return a, true
+			}
+			continue
+		}
+		if id == n {
+			return a, true
+		}
+	}
+	return App{}, false
+}
+
+// baseWindows: el último tramo de una ruta de Windows (con \ o /), sin
+// tocar un AUMID (que lleva "!" pero no barras).
+func baseWindows(ruta string) string {
+	ruta = strings.TrimSpace(ruta)
+	if i := strings.LastIndexAny(ruta, `\/`); i >= 0 {
+		return ruta[i+1:]
+	}
+	return ruta
+}

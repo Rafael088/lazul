@@ -10,12 +10,19 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Rafael088/lazul/core"
+	"github.com/Rafael088/lazul/core/apps"
 	"github.com/Rafael088/lazul/core/descubre"
+	"github.com/Rafael088/lazul/core/ensayo"
+	"github.com/Rafael088/lazul/core/localsend"
+	"github.com/Rafael088/lazul/gestures"
 	"github.com/Rafael088/lazul/platform"
 	"github.com/Rafael088/lazul/platform/falso"
 	"github.com/Rafael088/lazul/proto/go/lazulv1"
@@ -27,6 +34,7 @@ type receptor struct {
 	puerta *core.Puerta
 	dir    string
 	con    *core.Conexion
+	id     *core.Identidad
 }
 
 // Opciones de Correr. Red nil usa descubre.Memoria (sin red).
@@ -34,6 +42,12 @@ type Opciones struct {
 	Receptores int
 	Pings      int
 	Red        descubre.Red
+	// Grabaciones: carpeta con las grabaciones reales de gestos. Si no es
+	// vacía, al final se hace el recorrido de punta a punta (gesto
+	// reconocido → Orden en el otro equipo) con ellas.
+	Grabaciones string
+	// Intentos por caso de punta a punta (0: todas las grabaciones).
+	Intentos int
 }
 
 // Correr ejecuta el recorrido completo con un controlador y o.Receptores
@@ -82,6 +96,16 @@ func Correr(ctx context.Context, o Opciones, out io.Writer) error {
 		}
 	}
 
+	cat, err := apps.Cargar()
+	if err != nil {
+		return err
+	}
+	bandejas, err := os.MkdirTemp("", "lazul-sim-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(bandejas)
+
 	rs := make([]*receptor, n)
 	for i := range rs {
 		nombre := fmt.Sprintf("receptor-%d", i+1)
@@ -89,7 +113,12 @@ func Correr(ctx context.Context, o Opciones, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		f := falso.New(nombre, "firefox")
+		// El segundo hace de PC Windows: el catálogo traduce las apps.
+		so, instaladas := apps.SistemaLinux, []string{"firefox", "firefox.desktop", "code.desktop"}
+		if i == 1 {
+			so, instaladas = apps.SistemaWindows, []string{"firefox.exe", "Code.exe"}
+		}
+		f := falso.New(nombre, instaladas...)
 		ln, err := net.Listen("tcp", escucha)
 		if err != nil {
 			return err
@@ -97,8 +126,9 @@ func Correr(ctx context.Context, o Opciones, out io.Writer) error {
 		r := &core.Receptor{Sistema: f.Sistema(), Hola: &lazulv1.Hola{
 			EquipoId: nombre + "-" + sufijo, Nombre: nombre, Sistema: lazulv1.Sistema_SISTEMA_LINUX, VersionApp: "sim",
 			Capacidades: []lazulv1.Capacidad{lazulv1.Capacidad_CAPACIDAD_CAPTURA, lazulv1.Capacidad_CAPACIDAD_PORTAPAPELES,
-				lazulv1.Capacidad_CAPACIDAD_APP_ACTIVA, lazulv1.Capacidad_CAPACIDAD_ABRIR_APP},
-		}}
+				lazulv1.Capacidad_CAPACIDAD_APP_ACTIVA, lazulv1.Capacidad_CAPACIDAD_ABRIR_APP, lazulv1.Capacidad_CAPACIDAD_RECIBIR_ARCHIVO},
+		}, Catalogo: &cat, SO: so, Archivos: &localsend.Servidor{
+			Bandeja: filepath.Join(bandejas, nombre), Info: localsend.Dispositivo{Alias: nombre, Version: "2.0", Fingerprint: id.Huella.String()}}}
 		p := &core.Puerta{Identidad: id, Pares: core.NuevosPares(), Permiso: permiso(nombre), Reloj: reloj}
 		go core.Servir(ctx, ln, r, p)
 		detener, err := red.Anunciar(descubre.Anuncio{EquipoID: r.Hola.EquipoId, Nombre: nombre, Huella: id.Huella.String(), Dir: ln.Addr().String()})
@@ -106,7 +136,7 @@ func Correr(ctx context.Context, o Opciones, out io.Writer) error {
 			return err
 		}
 		defer detener()
-		rs[i] = &receptor{nombre: nombre, falso: f, puerta: p}
+		rs[i] = &receptor{nombre: nombre, falso: f, puerta: p, id: id}
 	}
 
 	// Descubrir: el controlador busca y se queda con la dirección y la huella
@@ -310,6 +340,69 @@ func Correr(ctx context.Context, o Opciones, out io.Writer) error {
 		return fmt.Errorf("respaldo web: %s abrió %v", b.nombre, ab)
 	}
 	fmt.Fprintf(out, "gesto 4: URL %s → %s ok; app ausente cae a la web ok\n", a.nombre, b.nombre)
+
+	if o.Grabaciones == "" {
+		return nil
+	}
+	return puntaAPunta(ctx, o, out, ctrl, pares, anunciadas, b, bandejas)
+}
+
+// puntaAPunta: las grabaciones reales pasan por el clasificador y cada gesto
+// reconocido va al Enrutador del controlador, que manda la Orden a b (el
+// receptor que hace de Windows) por TLS y la captura por LocalSend.
+func puntaAPunta(ctx context.Context, o Opciones, out io.Writer, ctrl *core.Identidad, pares *core.Pares,
+	anunciadas map[string]core.Huella, b *receptor, bandejas string) error {
+	gs, err := gestures.LeerDirectorio(o.Grabaciones)
+	if err != nil {
+		return err
+	}
+	cat, _ := apps.Cargar()
+	par, _ := pares.Buscar(anunciadas[b.nombre])
+	local := falso.New("controlador")
+	otro := &core.Remoto{Nombre: b.nombre, Con: b.con, HTTP: core.ClienteHTTP(ctrl, par.Huella), Base: "https://" + b.dir}
+	e := &core.Enrutador{Local: local.Sistema(), Catalogo: &cat, SO: apps.SistemaLinux, PorDefecto: otro,
+		Yo: localsend.Dispositivo{Alias: "Controlador", Version: "2.0", Fingerprint: ctrl.Huella.String()}}
+
+	// El gesto 4 rota por los niveles: URL del navegador, documento abierto,
+	// app del catálogo que el otro tiene, y una que no tiene (cae a su web).
+	doc := filepath.Join(bandejas, "nota.txt")
+	if err := os.WriteFile(doc, []byte("nota de prueba de Lazul\n"), 0o600); err != nil {
+		return err
+	}
+	ventanas := []platform.App{
+		{ID: "firefox", Nombre: "firefox", URL: "https://lazul.dev/sim"},
+		{ID: "org.gnome.TextEditor", Nombre: "Editor", Archivo: doc},
+		{ID: "Code", Nombre: "Code"},
+		{ID: "obsidian", Nombre: "obsidian"},
+	}
+	antes := len(b.falso.Abiertas())
+	casos := ensayo.Correr(ctx, e, gs, ensayo.Opciones{Max: o.Intentos, Casos: []string{"captura", "gesto4"},
+		Antes: func(_ string, i int) { local.PonerApp(ventanas[i%len(ventanas)]) }}, out)
+	fmt.Fprintf(out, "punta a punta (simulado: 2 procesos en este equipo, TLS por 127.0.0.1, %s): grabaciones reales de %s\n", b.nombre, o.Grabaciones)
+	ensayo.Resumen(out, casos)
+
+	// Lo que abrió b: cada nivel tiene que haber caído donde debía.
+	vistos := map[string]bool{}
+	for _, ab := range b.falso.Abiertas()[antes:] {
+		switch {
+		case ab.URL == "https://lazul.dev/sim":
+			vistos["url"] = true
+		case ab.Archivo != "" && filepath.Base(ab.Archivo) == "nota.txt":
+			vistos["archivo"] = true
+		case ab.Archivo != "" && strings.HasPrefix(filepath.Base(ab.Archivo), "captura-"):
+			vistos["captura"] = true
+		case ab.ID == "Code.exe":
+			vistos["app"] = true
+		case ab.URL == "https://obsidian.md/":
+			vistos["web"] = true
+		}
+	}
+	for _, k := range []string{"captura", "url", "archivo", "app", "web"} {
+		if !vistos[k] {
+			return fmt.Errorf("punta a punta: %s no abrió ninguna %s (abrió %v)", b.nombre, k, b.falso.Abiertas()[antes:])
+		}
+	}
+	fmt.Fprintf(out, "punta a punta: %s abrió la captura recibida, la URL, el documento, Code.exe (vscode del catálogo) y la web de Obsidian\n", b.nombre)
 	return nil
 }
 

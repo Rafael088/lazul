@@ -12,7 +12,8 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev check` | formato, vet, compilar, pruebas, proto al día, tipos TS. Debe quedar en verde antes de entregar. |
 | `./dev test [paquetes]` | pruebas de Go (por defecto `./...`) |
 | `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio) |
-| `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS |
+| `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS y, al final, de punta a punta con las grabaciones reales (captura por LocalSend, gesto 4 por niveles) |
+| `./dev e2e win\|linux [args]` | de punta a punta entre los 2 PCs de verdad: `win` controla este Linux y recibe Windows (túnel de ssh: el cortafuegos de Windows no deja entrar), `linux` al revés por la red local (puerto 53317). `LAZUL_ABRIR=1` abre de verdad; args del controlador: `-adelantar`, `-intentos N`, `-casos`, `-ventanas` |
 | `./dev replay [-v] [-barrer]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L |
 | `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`) |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
@@ -36,7 +37,13 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `core/` | núcleo: `Receptor` atiende Órdenes, transporte WebSocket sobre TLS (`transporte.go`) | nunca llama al sistema, solo a `platform` |
 | `core/pareja.go`, `identidad.go`, `codigo.go`, `pares.go` | emparejamiento: identidad (cert autofirmado P-256, `Huella` = SHA-256 de la clave pública), código de 6 dígitos (2 min, 3 intentos, un uso), prueba HMAC atada a la sesión TLS, `Puerta` (permiso de la persona) y `Pares` fijados | solo librería estándar; el protocolo y su límite están en el comentario de `pareja.go`; pruebas primero |
 | `core/descubre/` | interfaz `Red`: `MDNS` (`_lazul._tcp`, hashicorp/mdns) y `Memoria` (sim y pruebas) | lo anunciado no es de confianza: la da la huella; la prueba con red real va con `LAZUL_MDNS=1` |
+| `core/enrutador.go` | el controlador: gesto → Órdenes (agarrar la captura de esta pantalla, soltarla en el otro, gesto 4 por niveles) | lo agarrado sale del equipo de la cámara |
+| `core/localsend/` | protocolo LocalSend v2 (info, prepare-upload, upload): los bytes de capturas y archivos | se sirve en el mismo puerto TLS que las Órdenes y solo para emparejados |
+| `core/ensayo/` | pasa grabaciones reales por el clasificador y le da los gestos al Enrutador; percentiles | lo usan `./dev sim` y `./dev e2e` |
 | `core/sim/`, `core/cmd/sim/` | el recorrido de `./dev sim` | |
+| `core/cmd/receptor/`, `core/cmd/controlador/` | receptor y controlador de verdad para `./dev e2e` | `-permitir HUELLA` da el permiso solo a esa huella (para medir sin nadie) |
+| `platform/real/` | el adaptador del sistema en que corre | |
+| `docs/informes/` | informes de medición (punta a punta: `2026-11-08-punta-a-punta.md`) | |
 | `gestures/` | `PoseDe` (forma de la mano en un cuadro, `pose.go`), `Clasificar` (máquina de estados pura, `clasificador.go`), grabaciones y medición | formato en `grabacion.go`; umbrales provisionales hasta medir con las reales |
 | `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
@@ -61,13 +68,17 @@ webview (MediaPipe) → puntos → `gestures.Clasificar` → `EventoGesto` → n
 `Sobre{Orden}` por WebSocket sobre TLS 1.3 (huella fijada en los dos lados) →
 receptor → `platform` → `Sobre{Respuesta}`. Antes, una vez por par de equipos:
 mDNS → `/pareja` con el código de 6 dígitos → la persona en el receptor permite.
-Los archivos (capturas) no van en el Sobre: viajan por LocalSend.
+Los archivos (capturas) no van en el Sobre: viajan por el protocolo de LocalSend
+(`core/localsend`, mismo puerto TLS) y después `Entregar{Archivo}` con su sha256;
+el receptor solo lo acepta si llegó entero.
 
 ## Pendiente en otras tareas
 
 - Adaptadores: Linux `cotejo-42s7rt`, Windows `cotejo-232tso` (hacer pasar el contrato; no tocar `platform/contrato` para que pase).
 - Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
-- De punta a punta y LocalSend `cotejo-sb2kdm`.
+- Precisión real 93,9 % (< 95 %): más tomas o ajustar con las que fallan (informe de `cotejo-sb2kdm`).
+- Leer la URL del navegador y el documento abierto en los adaptadores (niveles 1 y 2 del gesto 4).
+- Abrir en pantalla tarda 260–545 ms (`ShellExecute`, `xdg-open`): decidir si el receptor contesta al despachar.
 
 ## Reglas
 
