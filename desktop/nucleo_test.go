@@ -3,6 +3,7 @@ package desktop
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/Rafael088/lazul/core"
 	"github.com/Rafael088/lazul/gestures"
+	"github.com/Rafael088/lazul/platform"
 	"github.com/Rafael088/lazul/platform/falso"
 	"github.com/Rafael088/lazul/proto/go/lazulv1"
 )
@@ -189,5 +191,29 @@ func TestClaseErrorNoLlevaTexto(t *testing.T) {
 	}
 	if c := ClaseError(core.ErrNadaAgarrado); c != "nada_agarrado" {
 		t.Errorf("clase %q", c)
+	}
+}
+
+func TestVentanaPropiaNoSeManda(t *testing.T) {
+	for _, a := range []platform.App{
+		{ID: "lazul", Nombre: "Lazul"},
+		{ID: "lazul.exe", Nombre: "Lazul"},
+		{ID: "lazul-prueba"},
+		{ID: "otra", PID: os.Getpid()},
+	} {
+		if !esVentanaPropia(a) {
+			t.Errorf("no reconoció %+v como la ventana propia", a)
+		}
+	}
+	for _, a := range []platform.App{{ID: "firefox", Nombre: "Firefox", PID: 1}, {ID: "msedge.exe", Nombre: "Microsoft Edge"}} {
+		if esVentanaPropia(a) {
+			t.Errorf("tomó %+v por la ventana propia", a)
+		}
+	}
+	f := falso.New("a")
+	f.PonerApp(platform.App{ID: "lazul", Nombre: "Lazul"})
+	_, err := sinVentanaPropia{f.Sistema().ActiveApp}.Active(context.Background())
+	if !errors.Is(err, errVentanaPropia) || ClaseError(err) != "ventana_propia" {
+		t.Fatalf("err = %v (%s)", err, ClaseError(err))
 	}
 }

@@ -157,7 +157,13 @@ func NuevoNucleo(op Opciones) (*Nucleo, error) {
 			DeviceType: "desktop", Fingerprint: id.Huella.String(), Protocol: "https"}},
 		Registro: n.alRecibir,
 	}
-	n.enr = &core.Enrutador{Local: op.Sistema, Catalogo: &n.cat, Adelantar: op.Adelantar,
+	// El gesto 4 manda la ventana activa; si esa es la de esta misma app, no
+	// hay nada útil que mandar y se avisa en vez de fallar en silencio.
+	local := op.Sistema
+	if local.ActiveApp != nil {
+		local.ActiveApp = sinVentanaPropia{local.ActiveApp}
+	}
+	n.enr = &core.Enrutador{Local: local, Catalogo: &n.cat, Adelantar: op.Adelantar,
 		Yo: localsend.Dispositivo{Alias: op.Nombre, Version: "2.0", DeviceType: "desktop", Fingerprint: id.Huella.String(), Protocol: "https"}}
 	return n, nil
 }
@@ -412,6 +418,26 @@ func (n *Nucleo) vigilar(ctx context.Context) {
 	}
 }
 
+var errVentanaPropia = errors.New("la ventana activa es la de Lazul: antes del gesto pon en primer plano la página o el programa que quieres mandar (la ventana de Lazul solo tiene que verse, no tener el foco)")
+
+// sinVentanaPropia envuelve ActiveApp: si la ventana con el foco es la de esta
+// app, devuelve errVentanaPropia.
+type sinVentanaPropia struct{ platform.ActiveApp }
+
+func (s sinVentanaPropia) Active(ctx context.Context) (platform.App, error) {
+	a, err := s.ActiveApp.Active(ctx)
+	if err == nil && esVentanaPropia(a) {
+		return a, errVentanaPropia
+	}
+	return a, err
+}
+
+func esVentanaPropia(a platform.App) bool {
+	return (a.PID != 0 && a.PID == os.Getpid()) ||
+		strings.Contains(strings.ToLower(a.ID), "lazul") ||
+		strings.EqualFold(a.Nombre, "lazul")
+}
+
 var errSinDestino = errors.New("no hay ningún equipo emparejado al que mandar (empareja uno)")
 
 // ClaseError reduce un error a una palabra para el registro (el texto puede
@@ -425,6 +451,8 @@ func ClaseError(err error) string {
 		return "nada_agarrado"
 	case errors.Is(err, errSinDestino):
 		return "sin_destino"
+	case errors.Is(err, errVentanaPropia):
+		return "ventana_propia"
 	case errors.Is(err, platform.ErrNoImplementado):
 		return "no_implementado"
 	case errors.Is(err, platform.ErrSinVentana):
