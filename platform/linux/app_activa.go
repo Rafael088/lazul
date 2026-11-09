@@ -12,7 +12,8 @@ import (
 	"github.com/Rafael088/lazul/platform"
 )
 
-// appActiva implementa platform.ActiveApp con hyprctl activewindow -j.
+// appActiva implementa platform.ActiveApp con hyprctl activewindow -j; la URL
+// y el documento abierto salen de niveles.go.
 type appActiva struct{}
 
 func (appActiva) Active(ctx context.Context) (platform.App, error) {
@@ -42,7 +43,7 @@ func (appActiva) Active(ctx context.Context) (platform.App, error) {
 	if id == "" {
 		return platform.App{}, platform.ErrSinVentana
 	}
-	return platform.App{
-		ID: id, Nombre: id, Titulo: ventana.Titulo, PID: ventana.PID,
-	}, nil
+	app := platform.App{ID: id, Nombre: id, Titulo: ventana.Titulo, PID: ventana.PID}
+	app.URL, app.Archivo = niveles(ventana.PID, ventana.Titulo)
+	return app, nil
 }

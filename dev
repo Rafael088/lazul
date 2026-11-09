@@ -127,9 +127,9 @@ tabla_contrato() {
 	tr -d '\r' <"$1" | awk '
 		/^=== RUN/ { t = $3; next }
 		/^ +[A-Za-z_]+\.go:[0-9]+: / && t != "" && !(t in msg) { sub(/^ +[A-Za-z_]+\.go:[0-9]+: /, ""); msg[t] = $0 }
-		/--- (PASS|FAIL|SKIP): TestContrato\// {
-			s = $2; n = $3; sub(":", "", s)
-			printf "       %-4s %s%s\n", s, substr(n, 14), (s == "FAIL" && n in msg) ? "  <- " msg[n] : ""
+		/--- (PASS|FAIL|SKIP): TestContrato(Vivo)?\// {
+			s = $2; n = $3; sub(":", "", s); r = n; sub(/^TestContrato\//, "", r); sub(/^TestContratoVivo\//, "en vivo/", r)
+			printf "       %-4s %s%s\n", s, r, (s == "FAIL" && n in msg) ? "  <- " msg[n] : ""
 		}'
 }
 
@@ -139,8 +139,8 @@ contrato() {
 	local log=".dev/$nombre.log" r
 	"$@" >"$log" 2>&1; r=$?
 	local pasa total
-	pasa=$(grep -c -- '--- PASS: TestContrato/' "$log")
-	total=$(grep -c -E -- '--- (PASS|FAIL|SKIP): TestContrato/' "$log")
+	pasa=$(grep -c -E -- '--- PASS: TestContrato(Vivo)?/' "$log")
+	total=$(grep -c -E -- '--- (PASS|FAIL|SKIP): TestContrato(Vivo)?/' "$log")
 	if [ $r = 0 ]; then printf 'ok     %-10s %s/%s reglas\n' "$nombre" "$pasa" "$total"
 	else printf 'FALLA  %-10s %s/%s reglas (registro: %s)\n' "$nombre" "$pasa" "$total" "$log"; fi
 	[ "$total" -gt 0 ] && tabla_contrato "$log" || [ $r = 0 ] || resumen "$log"
