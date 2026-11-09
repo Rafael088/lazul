@@ -39,17 +39,15 @@ hl.window_rule({
   match = { class = "lazul" },
   float = true,
   pin = true,
-  size = { 360, 300 },             -- por comprobar con la versión instalada
-  move = { "100%-372", "100%-312" }, -- por comprobar con la versión instalada
+  size = { 360, 300 },
+  move = { "monitor_w-window_w-12", "monitor_h-window_h-12" },
 })
 ```
 
-`float` y `pin` siguen la sintaxis Lua nueva indicada por Hyprland. Las claves
-`size` y `move`, y en particular las expresiones porcentuales, están **por
-comprobar** porque su representación Lua puede variar con la capa que carga la
-configuración. El margen propuesto es de 12 px. El fijado a todos los espacios
-depende de `pin`; `AlwaysOnTop` de Wails por sí solo no sustituye esta regla en
-Wayland.
+Comprobada en Hyprland 0.56.2: la ventana sale flotante, fijada a todos los
+espacios, de 360 × 300 y a 12 px de la esquina inferior derecha. Va en un
+archivo aparte (`~/.config/hypr/lazul.lua`) cargado con `require("hypr.lazul")`.
+`AlwaysOnTop` de Wails por sí solo no sustituye esta regla en Wayland.
 
 ## Emparejar los dos PCs (una sola vez)
 
