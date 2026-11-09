@@ -2,8 +2,9 @@
 id: dec-9xxg
 fecha: 2026-11-08
 temas: [gestos, clasificador]
-estado: propuesta
+estado: aceptada
 autor: sonnet
+aceptada_el: 2026-11-08
 ---
 # Clasificador: el puño exige índice recogido y sostén mayoritario de puño
 
