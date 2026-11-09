@@ -80,7 +80,7 @@ el receptor solo lo acepta si llegó entero.
 - Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
 - Precisión real 93,9 % (< 95 %): más tomas o ajustar con las que fallan (informe de `cotejo-sb2kdm`).
 - Leer la URL del navegador y el documento abierto en los adaptadores (niveles 1 y 2 del gesto 4).
-- Abrir en pantalla tarda 260–545 ms (`ShellExecute`, `xdg-open`): decidir si el receptor contesta al despachar.
+- Abrir en pantalla ya no frena la Orden: el adaptador lanza (`xdg-open`, `ShellExecute`) y contesta ok tras 25–50 ms de gracia (`esperaLanzar`); un fallo inmediato (comando o archivo inexistente, código de ShellExecute ≤ 32) sí se devuelve; uno que llega después se pierde. Medido con `LAZUL_ABRIR=1 ./dev e2e`: la Orden Entregar baja de 260–545 ms a ~20–60 ms (Windows: la búsqueda en frío del ejecutable puede sumar hasta ~200 ms la primera vez).
 
 ## Reglas
 
