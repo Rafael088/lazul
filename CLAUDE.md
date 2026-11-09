@@ -60,7 +60,9 @@ activo (5 s), el puño agarra y la pinza arrastrada manda la app; agarrando,
 abrir la mano moviéndola a un lado suelta. La dirección es la de la persona
 (la imagen no se espeja). La L se separa de la pinza (puntas juntas) y de
 señalar (pulgar pegado, a medias o perdido) por el pulgar: lejos del índice,
-a unos 90° y con las puntas separadas.
+a unos 90° y con las puntas separadas. El puño exige el índice de verdad
+recogido (a medio doblar no lo es) y que el sostén de 150 ms sea al menos 70 %
+puño: dos cuadros sueltos unidos por la gracia no agarran.
 
 ## Cómo se habla todo
 

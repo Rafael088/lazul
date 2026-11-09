@@ -55,6 +55,8 @@ const (
 	puntasPinza = 0.30
 	// En la pinza el índice no está recogido del todo (si no, es un puño).
 	indicePinzaMin = -0.10
+	// En el puño el índice está de verdad recogido; a medio doblar no es puño.
+	indicePunoMax = 0.0
 )
 
 type vec struct{ x, y float64 }
@@ -139,7 +141,7 @@ func (r rasgos) clasificarPose() Pose {
 		return PosePinza
 	case r.esL(recogidos, men):
 		return PoseL
-	case idx < dedoRecogido && recogidos && men < dedoRecogido && r.pulgar < pulgarPegado:
+	case idx < indicePunoMax && recogidos && men < dedoRecogido && r.pulgar < pulgarPegado:
 		return PosePuno
 	case r.estirado >= 3 && r.pulgar > pulgarFuera:
 		return PoseAbierta
