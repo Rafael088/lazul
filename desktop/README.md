@@ -18,9 +18,38 @@ local) y **mandar** (si tiene cámara).
 La primera vez se baja MediaPipe (unos 37 MB) y queda dentro del programa.
 En Linux la cámara la abre `ffmpeg` (tiene que estar instalado).
 
+La ventana arranca pequeña, permanece sobre las demás y recuerda su tamaño y
+posición. Estos datos se guardan en `ventana.json`, junto al estado de la app
+(`~/.local/state/lazul` en Linux o `%LOCALAPPDATA%\lazul` en Windows). En
+Wayland Wails no garantiza que el compositor acepte restaurar la posición; el
+tamaño sí se conserva.
+
 Deja la ventana **a la vista** (puede ser chica, en una esquina): si queda
 escondida en otro espacio o minimizada, el sistema deja de darle cuadros y la
 cámara se detiene.
+
+### Hyprland: flotante en todos los espacios
+
+Wails identifica la ventana en Linux con la clase `lazul`. En la configuración
+Lua nueva de Hyprland, añade esta regla para hacerla flotante, fijarla a todos
+los espacios, dejarla en `360 × 300` y colocarla abajo a la derecha:
+
+```lua
+hl.window_rule({
+  match = { class = "lazul" },
+  float = true,
+  pin = true,
+  size = { 360, 300 },             -- por comprobar con la versión instalada
+  move = { "100%-372", "100%-312" }, -- por comprobar con la versión instalada
+})
+```
+
+`float` y `pin` siguen la sintaxis Lua nueva indicada por Hyprland. Las claves
+`size` y `move`, y en particular las expresiones porcentuales, están **por
+comprobar** porque su representación Lua puede variar con la capa que carga la
+configuración. El margen propuesto es de 12 px. El fijado a todos los espacios
+depende de `pin`; `AlwaysOnTop` de Wails por sí solo no sustituye esta regla en
+Wayland.
 
 ## Emparejar los dos PCs (una sola vez)
 

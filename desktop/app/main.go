@@ -402,6 +402,7 @@ func correr(o opciones) error {
 		}
 	}
 	rutaReg := filepath.Join(dirEstado, desktop.NombreRegistro)
+	rutaVentana := filepath.Join(dirEstado, desktop.NombreEstadoVentana)
 	if o.resumen {
 		ls, err := desktop.LeerRegistroDe(rutaReg)
 		if err != nil {
@@ -478,15 +479,31 @@ func correr(o opciones) error {
 	}
 
 	sub, _ := fs.Sub(assets, "frontend")
+	ventana, errVentana := desktop.LeerEstadoVentana(rutaVentana)
+	if errVentana != nil {
+		decir("aviso: no se restauró la ventana: %v", errVentana)
+	}
+	guardarVentana := func(c context.Context) {
+		ancho, alto := wruntime.WindowGetSize(c)
+		x, y := wruntime.WindowGetPosition(c)
+		e := desktop.EstadoVentana{Ancho: ancho, Alto: alto, X: x, Y: y, TienePosicion: true}
+		if err := desktop.GuardarEstadoVentana(rutaVentana, e); err != nil {
+			decir("aviso: no se guardó la ventana: %v", err)
+		}
+	}
 	err = wails.Run(&options.App{
 		Title:       o.titulo,
-		Width:       1180,
-		Height:      760,
-		MinWidth:    640,
-		MinHeight:   480,
+		Width:       ventana.Ancho,
+		Height:      ventana.Alto,
+		MinWidth:    desktop.AnchoVentanaMinimo,
+		MinHeight:   desktop.AltoVentanaMinimo,
+		AlwaysOnTop: true,
 		AssetServer: &assetserver.Options{Assets: sub, Handler: manejador(app.cap)},
 		OnStartup: func(c context.Context) {
 			app.ctx = c
+			if ventana.TienePosicion {
+				wruntime.WindowSetPosition(c, ventana.X, ventana.Y)
+			}
 			if len(cs) > 0 {
 				go func() {
 					app.reproducir(ctx, cs)
@@ -498,6 +515,10 @@ func correr(o opciones) error {
 					wruntime.Quit(c)
 				}()
 			}
+		},
+		OnBeforeClose: func(c context.Context) bool {
+			guardarVentana(c)
+			return false
 		},
 		OnShutdown: func(context.Context) {
 			if app.cap != nil {
@@ -511,7 +532,7 @@ func correr(o opciones) error {
 		Bind:             []interface{}{app},
 		BackgroundColour: &options.RGBA{R: 16, G: 20, B: 40, A: 255},
 		// Sin esto Wails deja WebKitGTK sin aceleración y no hay WebGL: MediaPipe no corre.
-		Linux: &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand},
+		Linux: &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand, ProgramName: "lazul"},
 	})
 	return err
 }

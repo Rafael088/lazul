@@ -160,7 +160,10 @@ function pintarEstado(e) {
   $("equipos").innerHTML = filas.join("") || '<tr><td class="tenue">ninguno todavía</td></tr>';
   const p = e.permiso;
   $("permiso").className = p ? "ver" : "";
-  if (p) { texto("permnombre", "«" + p.nombre + "»"); texto("permhuella", p.huella); }
+  if (p) {
+    $("controles").open = true;
+    texto("permnombre", "«" + p.nombre + "»"); texto("permhuella", p.huella);
+  }
   $("prueba").textContent = e.prueba ? "Terminar prueba de trabajo normal" : "Empezar prueba de trabajo normal";
   $("prueba").dataset.on = e.prueba ? "1" : "";
   if (cfg.reproducir) mostrarVista(e.vista);
