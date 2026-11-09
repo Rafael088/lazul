@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <title>Lazul</title>
 <style>
-  :root { --fondo: #101428; --panel: #1a2040; --borde: #2c3566; --texto: #e8ecff; --tenue: #9aa3cc; --lapis: #4d7cff; --bien: #4fd18b; --mal: #ff6b6b; --ojo: #ffcc4d; }
+  :root { --fondo: #101428; --panel: #1a2040; --borde: #2c3566; --texto: #e8ecff; --tenue: #aeb6dc; --lapis: #315fdc; --bien: #4fd18b; --mal: #ff6b6b; --ojo: #ffcc4d; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.4 system-ui, sans-serif; }
-  main { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; align-items: flex-start; }
-  #izq { flex: 1 1 360px; max-width: 640px; }
-  #der { flex: 1 1 360px; display: flex; flex-direction: column; gap: 10px; }
+  html, body { min-height: 100%; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.4 system-ui, sans-serif; overflow: auto; }
+  main { display: grid; grid-template-columns: minmax(320px, 640px) minmax(360px, 1fr); gap: 12px; padding: 12px; align-items: start; }
+  #izq { min-width: 0; }
+  #der { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
   #escena { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; transform: scaleX(-1); border-radius: 6px; overflow: hidden; }
   #escena video, #escena canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   #sincamara { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--tenue); transform: scaleX(-1); text-align: center; padding: 20px; }
@@ -30,6 +31,25 @@
   #permiso.ver { display: block; }
   table { border-collapse: collapse; width: 100%; } td { padding: 2px 6px 2px 0; vertical-align: top; }
   pre { white-space: pre-wrap; margin: 6px 0 0; font: 12px ui-monospace, monospace; }
+  details#controles { min-width: 0; }
+  details#controles > summary { cursor: pointer; color: var(--tenue); padding: 7px 2px; user-select: none; }
+  .ayuda { margin: 2px 0 8px; }
+  @media (max-width: 760px) {
+    main { display: block; padding: 8px; }
+    #escena { height: min(52vh, 220px); aspect-ratio: auto; }
+    .grande { font-size: 17px; }
+    #estado-gesto { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin-top: 5px !important; }
+    #estado-gesto span:last-child { grid-column: 1 / -1; }
+    #camara-fila { margin-top: 3px !important; flex-wrap: nowrap; }
+    #camara-fila button { padding: 4px 8px; }
+    #fps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    details#controles > summary { padding: 4px 2px; }
+    #der { max-height: 65vh; overflow: auto; padding-right: 2px; }
+    section { padding: 8px; }
+  }
+  @media (max-height: 360px) and (max-width: 760px) {
+    #escena { height: 158px; }
+  }
 </style>
 </head>
 <body>
@@ -41,21 +61,22 @@
       <canvas id="puntos" width="640" height="480"></canvas>
       <div id="sincamara">arrancando…</div>
     </div>
-    <div class="fila" style="margin-top:8px">
+    <div id="estado-gesto" class="fila" style="margin-top:8px">
       <span>Pose <b id="pose" class="grande">-</b></span>
       <span>Modo <b id="modo" class="grande modo-reposo">-</b></span>
       <span>Último gesto <b id="ultimo" class="grande">-</b> <span id="ultimohora" class="tenue"></span></span>
     </div>
-    <div class="fila" style="margin-top:6px">
+    <div id="camara-fila" class="fila" style="margin-top:6px">
       <button id="camara" class="sec">Apagar cámara</button>
       <span id="fps" class="tenue"></span>
     </div>
-    <p class="tenue">La L (índice arriba, pulgar al lado) sostenida activa 5 s. Activo: puño = agarrar una captura de esta pantalla.
-      Agarrando: abrir la mano moviéndola a un lado = soltarla en el otro equipo. Activo: pinza y arrastrar = mandar la ventana activa.
-      Deja esta ventana a la vista (puede ser chica): oculta, la cámara se detiene.</p>
   </div>
 
-  <div id="der">
+  <details id="controles">
+    <summary>Equipos, emparejamiento y prueba</summary>
+    <p class="tenue ayuda">La L sostenida activa 5 s. Activo: puño = agarrar una captura; pinza y arrastrar = mandar la ventana activa.
+      Agarrando: abre la mano y muévela a un lado para soltar. Mantén esta ventana visible: si se oculta, la cámara puede detenerse.</p>
+    <div id="der">
     <section id="permiso">
       <h2>Alguien quiere emparejarse</h2>
       <div><b id="permnombre"></b> quiere mandarle cosas a este equipo.</div>
@@ -111,7 +132,8 @@
       <pre id="resumentexto"></pre>
       <div class="tenue">Registro (sin imágenes ni URL): <span id="registro" class="mono"></span></div>
     </section>
-  </div>
+    </div>
+  </details>
 </main>
 <script type="module" src="app.js"></script>
 </body>
