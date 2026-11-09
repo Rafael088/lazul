@@ -11,6 +11,11 @@
 #   ./dev gen                regenera los tipos de Go y TS desde proto/
 #   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`
 #   ./dev e2e win|linux [args]  de punta a punta entre este Linux y el PC Windows
+#   ./dev app [args]         la app de escritorio (prototipo) en este Linux
+#   ./dev app win [args]     la compila, la copia al PC Windows y la abre en su escritorio
+#   ./dev app resumen        activaciones de los últimos 30 min de uso (registro local)
+#   ./dev app compilar       compila la app para Linux y Windows (sin abrirla)
+#   ./dev app e2e win|linux  la app en los 2 PCs con grabaciones en vez de cámara
 set -uo pipefail
 cd "$(dirname "$0")"
 RAIZ=$PWD
@@ -273,7 +278,126 @@ cmd_e2e() {
 	esac
 }
 
-uso() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+# ---------- app de escritorio (desktop/app, módulo aparte: Wails y cgo) ----------
+APP=.dev/app
+APP_WIN='$HOME\Lazul'
+APP_TITULO_PRUEBA='Lazul prueba-agente'
+
+app_assets() { [ -f desktop/app/frontend/vendor/vision_bundle.mjs ] || desktop/app/traer-assets.sh; }
+app_linux() { app_assets && (cd desktop/app && go build -tags desktop,production,webkit2_41 -o ../../$APP/lazul .); }
+app_windows() { app_assets && (cd desktop/app && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags desktop,production -ldflags '-H windowsgui' -o ../../$APP/lazul.exe .); }
+
+# app_copiar_win: deja lazul.exe y los scripts en %USERPROFILE%\Lazul.
+app_copiar_win() {
+	ssh -o LogLevel=ERROR win "New-Item -Force -ItemType Directory \"$APP_WIN\" | Out-Null; Get-Process lazul -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0" || return 1
+	scp -q -o LogLevel=ERROR $APP/lazul.exe herramientas/win-escritorio.ps1 desktop/app/abrir-windows.ps1 win:Lazul/ || { echo "no pude copiar a win (¿ssh win?)"; return 1; }
+}
+
+# hypr_prueba: la ventana de prueba de los agentes (clase lazul-prueba: el
+# ejecutable se copia con ese nombre) va al espacio 66, en una pantalla
+# virtual lejos de las reales, sin foco: no molesta al dueño y sí recibe
+# fotogramas (en un espacio oculto la página se para). hypr_fin la quita.
+hypr_prueba() {
+	command -v hyprctl >/dev/null || return 0
+	cp $APP/lazul $APP/lazul-prueba
+	hyprctl eval 'hl.workspace_rule({ workspace = "66", monitor = "LAZULPRUEBA", default = true })' >/dev/null
+	hyprctl eval 'hl.window_rule({ match = { class = "lazul-prueba" }, workspace = "66 silent", no_initial_focus = true, focus_on_activate = false })' >/dev/null
+	if ! hyprctl monitors | grep -q "^Monitor LAZULPRUEBA"; then
+		hyprctl output create headless LAZULPRUEBA >/dev/null
+		sleep 1
+		hyprctl eval 'hl.monitor({ output = "LAZULPRUEBA", mode = "1280x800@60", position = "-9000x-9000", scale = 1 })' >/dev/null
+	fi
+}
+hypr_fin() { command -v hyprctl >/dev/null && hyprctl output remove LAZULPRUEBA >/dev/null 2>&1; return 0; }
+
+# app_e2e win|linux: la app de verdad en los 2 PCs, sin cámara: el
+# controlador pasa grabaciones reales (activar, agarrar, soltar) por el mismo
+# camino que la cámara y la captura de su pantalla tiene que llegar al otro.
+#   win    controla este Linux, recibe Windows (directo al puerto 53317)
+#   linux  controla Windows, recibe este Linux
+APP_RECORRIDO=activar-buena-002,agarrar-buena-003,soltar-buena-003
+app_e2e() {
+	local sentido=${1:-win} ipwin ipaqui r=0
+	ipwin=$(ssh -G win | awk '/^hostname /{print $2}')
+	ipaqui=$(ip -4 route get "$ipwin" | grep -oP 'src \K\S+')
+	paso app-linux app_linux || return 1
+	paso app-windows app_windows || return 1
+	app_copiar_win || return 1
+	local d=$APP/e2e; rm -rf $d; mkdir -p $d
+	hypr_prueba
+	case $sentido in
+	win)
+		local hc
+		hc=$($APP/lazul -solo-huella -estado $d/linux) || return 1
+		ssh -o LogLevel=ERROR win "\$d=\"$APP_WIN\\e2e\"; if (Test-Path \$d) { Remove-Item -Recurse -Force \$d }; exit 0"
+		ssh -o LogLevel=ERROR win "& \"$APP_WIN\\win-escritorio.ps1\" -exe \"$APP_WIN\\lazul.exe\" -argumentos '-estado e2e -camara no -mdns=false -mostrar-codigo -permitir $hc -abrir=false -duracion 60s -titulo \"$APP_TITULO_PRUEBA\" -salida e2e-salida.txt' -segundos 80" >$d/win-fin.log 2>&1 &
+		local i
+		for i in $(seq 40); do
+			sleep 1
+			ssh -o LogLevel=ERROR win "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Encoding UTF8 \"$APP_WIN\\e2e-salida.txt\" -ErrorAction SilentlyContinue" >$d/win.log 2>/dev/null
+			leer_receptor $d/win.log
+			[ -n "$COD" ] && break
+		done
+		[ -n "$COD" ] || { echo "la app de Windows no arrancó (¿sesión de escritorio abierta?)"; cat $d/win.log; return 1; }
+		echo "receptor: la app en Windows ($ipwin:53317, código en pantalla); controlador: la app aquí con $APP_RECORRIDO"
+		$APP/lazul-prueba -estado $d/linux -camara no -mdns=false -escucha 127.0.0.1:0 -reproducir $APP_RECORRIDO -emparejar-con "$ipwin:53317" -codigo "$COD" \
+			-duracion 25s -eco -titulo "$APP_TITULO_PRUEBA" >$d/linux.log 2>&1
+		wait
+		ssh -o LogLevel=ERROR win "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Encoding UTF8 \"$APP_WIN\\e2e-salida.txt\"" >$d/win.log 2>/dev/null
+		ssh -o LogLevel=ERROR win "Set-Location \"$APP_WIN\"; Remove-Item -Recurse -Force e2e, e2e-salida.txt, escritorio-salida.txt, escritorio-codigo.txt, escritorio.cmd -ErrorAction SilentlyContinue" >/dev/null 2>&1
+		;;
+	linux)
+		tar -czf $d/fixtures.tgz fixtures/gestos || return 1
+		scp -q -o LogLevel=ERROR $d/fixtures.tgz win:Lazul/ || return 1
+		local hc
+		hc=$(ssh -o LogLevel=ERROR win "Set-Location \"$APP_WIN\"; if (Test-Path e2e) { Remove-Item -Recurse -Force e2e }; Remove-Item huella.txt -ErrorAction SilentlyContinue; tar -xzf fixtures.tgz; .\\lazul.exe -solo-huella -estado e2e -salida huella.txt | Out-Null; Get-Content huella.txt" | tr -d '\r') || return 1
+		$APP/lazul-prueba -estado $d/linux -camara no -mdns=false -mostrar-codigo -permitir "$hc" -abrir=false -duracion 60s -titulo "$APP_TITULO_PRUEBA" >$d/linux.log 2>&1 &
+		local rec=$!
+		sleep 2
+		leer_receptor $d/linux.log
+		[ -n "$COD" ] || { echo "la app de Linux no arrancó"; cat $d/linux.log; kill $rec; return 1; }
+		echo "receptor: la app aquí ($ipaqui:53317); controlador: la app en Windows con $APP_RECORRIDO"
+		ssh -o LogLevel=ERROR win "& \"$APP_WIN\\win-escritorio.ps1\" -exe \"$APP_WIN\\lazul.exe\" -argumentos '-estado e2e -camara no -mdns=false -escucha 127.0.0.1:0 -reproducir $APP_RECORRIDO -emparejar-con $ipaqui:53317 -codigo $COD -duracion 25s -eco -titulo \"$APP_TITULO_PRUEBA\" -salida e2e-salida.txt' -segundos 60" >/dev/null 2>&1
+		ssh -o LogLevel=ERROR win "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Encoding UTF8 \"$APP_WIN\\e2e-salida.txt\"" | tr -d '\r' >$d/win.log 2>/dev/null
+		kill $rec 2>/dev/null; wait $rec 2>/dev/null
+		ssh -o LogLevel=ERROR win "Set-Location \"$APP_WIN\"; Remove-Item -Recurse -Force e2e, fixtures, fixtures.tgz, huella.txt, e2e-salida.txt, escritorio-salida.txt, escritorio-codigo.txt, escritorio.cmd -ErrorAction SilentlyContinue" >/dev/null 2>&1
+		;;
+	*) echo "uso: ./dev app e2e win|linux"; return 2 ;;
+	esac
+	local ctl=$d/linux.log rcp=$d/win.log
+	[ "$sentido" = linux ] && { ctl=$d/win.log; rcp=$d/linux.log; }
+	grep -a -E 'emparejado|gesto |"tipo":"accion"|"tipo":"activacion"' "$ctl" | sed 's/^/       ctl  /'
+	grep -a -E 'permiso|abriría|FALLA' "$rcp" | sed 's/^/       rcp  /'
+	if grep -a -q '"gesto":"SOLTAR".*"resultado":"ok"' "$ctl" && grep -a -q 'abriría el archivo recibido (.png' "$rcp"; then
+		echo "ok     app-e2e    la captura agarrada con la app en un PC llegó a la app del otro (registros: $d)"
+	else
+		echo "FALLA  app-e2e    (registros: $ctl, $rcp)"; r=1
+	fi
+	rm -rf $d/linux/recibidos
+	return $r
+}
+
+cmd_app() {
+	case ${1:-} in
+	compilar) paso app-linux app_linux && paso app-windows app_windows ;;
+	resumen) shift; go run ./desktop/cmd/resumen "$@" ;;
+	e2e) shift; app_e2e "$@"; local r=$?; hypr_fin; return $r ;;
+	win)
+		shift
+		paso app-windows app_windows || return 1
+		app_copiar_win || return 1
+		local args="$*"
+		ssh -o LogLevel=ERROR win "& \"$APP_WIN\\abrir-windows.ps1\" -argumentos '$args'" || return 1
+		echo "abierta en el escritorio de Windows: %USERPROFILE%\\Lazul\\lazul.exe (doble clic para volver a abrirla)"
+		;;
+	*)
+		paso app-linux app_linux || return 1
+		exec $APP/lazul "$@"
+		;;
+	esac
+}
+
+uso() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
 
 orden=${1:-}
 [ $# -gt 0 ] && shift
@@ -287,5 +411,6 @@ grabar) cmd_grabar "$@" ;;
 gen) cmd_gen ;;
 win) cmd_win "$@" ;;
 e2e) cmd_e2e "$@" ;;
+app) cmd_app "$@" ;;
 *) uso; [ -z "$orden" ] || [ "$orden" = ayuda ] || exit 2 ;;
 esac
