@@ -1,7 +1,7 @@
 ---
 id: arq-mgew
 temas: [arquitectura]
-actualizado: 2026-11-02
+actualizado: 2026-11-08
 ---
 # Arquitectura inicial
 
@@ -21,3 +21,9 @@ Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dí
 | conecta | Emparejamiento | Encuentra tus otros equipos en la red y los une con un código de 6 dígitos | mDNS + TLS | cotejo-1od1ta |
 | conecta | Órdenes entre equipos | Los mensajes cortos que van de un equipo a otro | WebSocket | cotejo-f09uwv, cotejo-sb2kdm |
 | conecta | Envío de archivos | Pasa capturas y archivos directo de un equipo al otro | LocalSend | cotejo-sb2kdm |
+
+## Cómo se abre
+
+- comando: `./dev app`
+- url:
+- qué esperar: se abre una ventana de escritorio de Lazul con la cámara y los puntos de tu mano, la pose, el modo y el último gesto; enciende la cámara mientras esté abierta y escucha en el puerto 53317 (en el PC con ventana a la vista; si se esconde, la cámara se detiene). Para el otro PC Windows: `./dev app win` desde este Linux.
