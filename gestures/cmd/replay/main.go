@@ -2,7 +2,7 @@
 // positivos. Por defecto mide las reales (fixtures/gestos) y las sintéticas
 // (gestures/testdata/sinteticas), cada una por su lado.
 //
-//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer]
+//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer] [-tactil]
 package main
 
 import (
@@ -17,11 +17,16 @@ import (
 )
 
 func main() {
-	dirs := flag.String("dir", "fixtures/gestos,gestures/testdata/sinteticas", "carpetas con grabaciones *.jsonl, separadas por comas")
+	const dirsPredeterminados = "fixtures/gestos,gestures/testdata/sinteticas"
+	dirs := flag.String("dir", dirsPredeterminados, "carpetas con grabaciones *.jsonl, separadas por comas")
 	detalle := flag.Bool("v", false, "una línea por grabación fallida")
+	tactil := flag.Bool("tactil", false, "mide modo táctil: L, scroll, zoom y barrido")
 	sostenerL := flag.Int64("sostener-l", gestures.AjustesPorDefecto.SostenerL, "ms que se sostiene la L para activar")
 	barrer := flag.Bool("barrer", false, "mide la L con varios tiempos de sostén (200 a 800 ms)")
 	flag.Parse()
+	if *tactil && *dirs == dirsPredeterminados {
+		*dirs += ",gestures/testdata/tactiles"
+	}
 	aj := gestures.AjustesPorDefecto
 	aj.SostenerL = *sostenerL
 	fallo := false
@@ -36,13 +41,67 @@ func main() {
 			fmt.Printf("%s: sin grabaciones (se graban con ./dev grabar, tarea cotejo-x2hyu0)\n", dir)
 			continue
 		}
-		informe(dir, gs, aj, *detalle)
-		if *barrer {
+		if *tactil {
+			informeTactil(dir, gs, *detalle)
+		} else {
+			informe(dir, gs, aj, *detalle)
+		}
+		if *barrer && !*tactil {
 			barrido(gs, aj)
 		}
 	}
 	if fallo {
 		os.Exit(1)
+	}
+}
+
+func informeTactil(dir string, gs []gestures.Grabacion, detalle bool) {
+	m, rs := gestures.MedirTactil(gs)
+	fmt.Printf("%s: %d grabaciones táctiles (%d con gesto, %d sin gesto)\n", dir, len(gs), m.Positivas, m.Negativas)
+	var partes []string
+	for a := gestures.TactilModo; a <= gestures.TactilBarrido; a++ {
+		if v, ok := m.PorAccion[a]; ok {
+			partes = append(partes, fmt.Sprintf("%s %d/%d", strings.ToUpper(a.String()), v[0], v[1]))
+		}
+	}
+	if len(partes) > 0 {
+		fmt.Printf("  aciertos: %s\n", strings.Join(partes, " · "))
+		fmt.Printf("  precisión: %.1f %%\n", 100*m.Precision())
+	}
+	fmt.Printf("  falsos positivos: %d en %d grabaciones sin gesto\n", m.FalsosPositivos, m.Negativas)
+
+	// Las tomas NINGUNO son negativas reales del modo. Se fuerzan activas
+	// para que la puerta de la L no esconda un scroll, zoom o barrido falso.
+	falsosActivos, negativasActivas := 0, 0
+	var duracionActiva int64
+	var fallasActivas []string
+	for _, g := range gs {
+		if !strings.EqualFold(g.Cabecera.Gesto, "NINGUNO") || g.Cabecera.Tactil != "" {
+			continue
+		}
+		negativasActivas++
+		duracionActiva += g.Duracion()
+		evs := gestures.ReproducirTactilDesde(g, true).Emitidos
+		falsosActivos += len(evs)
+		if len(evs) > 0 {
+			fallasActivas = append(fallasActivas, fmt.Sprintf("%s: %v", g.Archivo, evs))
+		}
+	}
+	if negativasActivas > 0 {
+		fmt.Printf("  grabaciones NINGUNO con modo forzado activo: %d falsos en %d grabaciones (%.1f min)\n",
+			falsosActivos, negativasActivas, float64(duracionActiva)/60000)
+		if detalle {
+			for _, falla := range fallasActivas {
+				fmt.Printf("    falso activo %s\n", falla)
+			}
+		}
+	}
+	if detalle {
+		for _, r := range rs {
+			if !r.Acierto() {
+				fmt.Printf("  falla %s: esperaba %s/%s, salió %v\n", r.Grabacion, r.Esperado, r.Direccion, r.Emitidos)
+			}
+		}
 	}
 }
 
