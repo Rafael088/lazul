@@ -16,12 +16,14 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 var actualizar = flag.Bool("actualizar", false, "reescribe gestures/testdata/sinteticas")
 
 const dirSinteticas = "testdata/sinteticas"
+const dirTactiles = "testdata/tactiles"
 
 type v3 struct{ u, v, z float64 } // coordenadas de la mano: u hacia el pulgar, v hacia los dedos, en palmas
 
@@ -376,6 +378,156 @@ func TestSinteticasAlDia(t *testing.T) {
 		if len(rutas) != len(ss) {
 			t.Errorf("%d archivos en %s y el modelo da %d", len(rutas), dirSinteticas, len(ss))
 		}
+	}
+}
+
+func sinteticasTactiles() []sintetica {
+	var out []sintetica
+	agregar := func(base string, n int, accion, direccion, negativo, inicio, estado, nota string, tramos func(i int) []tramo) {
+		for i := 0; i < n; i++ {
+			variante := len(out)
+			luz, rd := luzN(variante, uint64(500+variante))
+			out = append(out, sintetica{
+				nombre: fmt.Sprintf("%s-%s-%03d", base, luz, i+1),
+				cab: Cabecera{
+					Gesto: "NINGUNO", Luz: luz, Ancho: 640, Alto: 480,
+					Tactil: accion, DireccionTactil: direccion, Negativo: negativo,
+					InicioTactil: inicio, EstadoTactil: estado, Nota: "sintética táctil: " + nota,
+				},
+				col: colocacionN(variante), rd: rd, tramos: tramos(i),
+			})
+		}
+	}
+	lado := func(i int) float64 { return []float64{-1, 1}[i%2] }
+	direccionVertical := func(i int) string {
+		if i%2 == 0 {
+			return "ARRIBA"
+		}
+		return "ABAJO"
+	}
+	direccionHorizontal := func(i int) string {
+		if i%2 == 0 {
+			return "DERECHA"
+		}
+		return "IZQUIERDA"
+	}
+
+	agregar("modo-activar", 4, "MODO", "", "", "", "activo", "L sostenida enciende", func(i int) []tramo {
+		return []tramo{{f: formaRelajada(), ms: 400}, {f: formaL(), ms: 900, trans: 150}}
+	})
+	agregar("modo-desactivar", 4, "MODO", "", "", "activo", "inactivo", "L sostenida apaga", func(i int) []tramo {
+		return []tramo{{f: formaRelajada(), ms: 400}, {f: formaL(), ms: 900, trans: 150}}
+	})
+	for i := 0; i < 8; i++ {
+		dir := direccionVertical(i)
+		mov := 0.24
+		if dir == "ARRIBA" {
+			mov = -mov
+		}
+		agregar(fmt.Sprintf("scroll-%02d-%s", i+1, strings.ToLower(dir)), 1, "SCROLL", dir, "", "activo", "", "dos dedos en vertical", func(_ int) []tramo {
+			return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0, mov, 0}}}
+		})
+	}
+	for i := 0; i < 8; i++ {
+		abre := i%2 == 0
+		inicio, fin, dir := 1.10, 0.08, "CERRAR"
+		if abre {
+			inicio, fin, dir = 0.08, 1.10, "ABRIR"
+		}
+		agregar(fmt.Sprintf("zoom-%02d-%s", i+1, strings.ToLower(dir)), 1, "ZOOM", dir, "", "activo", "", "pellizco cambia su apertura", func(_ int) []tramo {
+			return []tramo{{f: formaZoom(inicio), ms: 250}, {f: formaZoom(fin), ms: 550, trans: 420}}
+		})
+	}
+	for i := 0; i < 8; i++ {
+		dir := direccionHorizontal(i)
+		mov := 0.34 * lado(i)
+		agregar(fmt.Sprintf("barrido-%02d-%s", i+1, strings.ToLower(dir)), 1, "BARRIDO", dir, "", "activo", "", "dos dedos en horizontal", func(_ int) []tramo {
+			return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{mov, 0, 0}}}
+		})
+	}
+
+	// Negativos expresamente alrededor de cada umbral.
+	agregar("scroll-corto", 4, "NINGUNO", "", "tactil-corto", "activo", "", "dos dedos no recorren el umbral", func(i int) []tramo {
+		return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0, 0.08 * lado(i), 0}}}
+	})
+	agregar("movimiento-diagonal", 4, "NINGUNO", "", "tactil-diagonal", "activo", "", "ningún eje domina", func(i int) []tramo {
+		return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0.28 * lado(i), 0.24, 0}}}
+	})
+	agregar("un-dedo", 4, "NINGUNO", "", "tactil-un-dedo", "activo", "", "señalar no hace scroll", func(i int) []tramo {
+		return []tramo{{f: formaSenalar(), ms: 250}, {f: formaSenalar(), ms: 500, mov: v3{0, 0.28 * lado(i), 0}}}
+	})
+	agregar("zoom-corto", 4, "NINGUNO", "", "tactil-zoom-corto", "activo", "", "apertura menor al umbral", func(i int) []tramo {
+		return []tramo{{f: formaZoom(0.20), ms: 250}, {f: formaZoom(0.65), ms: 550, trans: 420}}
+	})
+	agregar("pinza-trasladada", 4, "NINGUNO", "", "tactil-pinza-trasladada", "activo", "", "mover una pinza no es zoom", func(i int) []tramo {
+		return []tramo{{f: formaZoom(0.08), ms: 250}, {f: formaZoom(0.08), ms: 550, mov: v3{0.28 * lado(i), 0, 0}}}
+	})
+	agregar("saludo", 4, "NINGUNO", "", "tactil-palma", "activo", "", "palma abierta no es barrido", func(i int) []tramo {
+		return []tramo{{f: formaAbierta(), ms: 250}, {f: formaAbierta(), ms: 550, mov: v3{0.5 * lado(i), 0, 0}}}
+	})
+	return out
+}
+
+func TestTactilesSinteticasAlDia(t *testing.T) {
+	ss := sinteticasTactiles()
+	if *actualizar {
+		os.RemoveAll(dirTactiles)
+		if err := os.MkdirAll(dirTactiles, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, s := range ss {
+		var b bytes.Buffer
+		if err := EscribirGrabacion(&b, s.cab, s.generar()); err != nil {
+			t.Fatal(err)
+		}
+		ruta := filepath.Join(dirTactiles, s.nombre+".jsonl")
+		if *actualizar {
+			if err := os.WriteFile(ruta, b.Bytes(), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		f, err := os.Open(ruta)
+		if err != nil {
+			t.Fatalf("%v (go test ./gestures -run TestTactilesSinteticasAlDia -actualizar)", err)
+		}
+		hay, err := LeerGrabacion(s.nombre, f)
+		f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		quiere, _ := LeerGrabacion(s.nombre, &b)
+		if !parecidas(hay, quiere) {
+			t.Errorf("%s no coincide con el modelo", ruta)
+		}
+	}
+	if !*actualizar {
+		rutas, _ := filepath.Glob(filepath.Join(dirTactiles, "*.jsonl"))
+		if len(rutas) != len(ss) {
+			t.Errorf("%d archivos en %s y el modelo da %d", len(rutas), dirTactiles, len(ss))
+		}
+	}
+}
+
+func TestTactilesSinteticasMiden(t *testing.T) {
+	gs, err := LeerDirectorio(dirTactiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, rs := MedirTactil(gs)
+	for _, r := range rs {
+		if !r.Acierto() {
+			t.Errorf("%s: esperaba %v/%v, salió %+v", r.Grabacion, r.Esperado, r.Direccion, r.Emitidos)
+		}
+	}
+	for a := TactilModo; a <= TactilBarrido; a++ {
+		if m.PorAccion[a][1] == 0 {
+			t.Errorf("sin grabaciones de %v", a)
+		}
+	}
+	if m.Precision() != 1 || m.FalsosPositivos != 0 || m.Negativas < 20 {
+		t.Errorf("precisión %.2f, %d falsos en %d negativas", m.Precision(), m.FalsosPositivos, m.Negativas)
 	}
 }
 

@@ -1,5 +1,5 @@
 // Package gestures convierte los puntos de la mano (MediaPipe Hand
-// Landmarker, 21 puntos normalizados) en uno de los gestos 1 a 4.
+// Landmarker, 21 puntos normalizados) en gestos discretos.
 //
 // El clasificador es una función pura: mismo estado y mismo cuadro, mismo
 // resultado. Así se prueba con grabaciones (fixtures/gestos, ./dev replay)
@@ -7,8 +7,9 @@
 //
 //   - PoseDe (pose.go): qué forma tiene la mano en un cuadro (la L, puño,
 //     mano abierta, pinza, señalar u otra). Sin memoria.
-//   - Clasificar (clasificador.go): la máquina de estados que, cuadro a
-//     cuadro, decide cuándo una pose sostenida o un movimiento es un gesto.
+//   - Clasificar (clasificador.go): los gestos 1 a 4 de transferencia.
+//   - ClasificarTactil (tactil.go): la L alterna el modo táctil y, cuando
+//     está activo, reconoce scroll, zoom y barrido sin cursor ni clic.
 //
 // El formato de las grabaciones está en grabacion.go y la herramienta para
 // grabarlas en gestures/cmd/grabar (./dev grabar).

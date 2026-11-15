@@ -6,7 +6,7 @@
 #   ./dev test [paquetes]    pruebas de Go (por defecto ./...)
 #   ./dev contrato           contrato de platform contra el adaptador de este sistema
 #   ./dev sim [-receptores N] [-mdns]  controlador y N receptores: descubrir, emparejar, rechazar
-#   ./dev replay [-v] [-barrer]  mide el clasificador (grabaciones reales y sintéticas)
+#   ./dev replay [-v] [-barrer|-tactil]  mide los clasificadores con grabaciones
 #   ./dev grabar [-dir D]    página local para grabar gestos con la cámara
 #   ./dev gen                regenera los tipos de Go y TS desde proto/
 #   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`

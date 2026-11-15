@@ -41,6 +41,18 @@ func TestGestoDesconocidoEsError(t *testing.T) {
 	}
 }
 
+func TestTactilDesconocidoEsError(t *testing.T) {
+	for _, cabecera := range []string{
+		`{"gesto":"NINGUNO","tactil":"CLIC"}`,
+		`{"gesto":"NINGUNO","tactil":"SCROLL","direccion_tactil":"CENTRO"}`,
+		`{"gesto":"NINGUNO","inicio_tactil":"dormido"}`,
+	} {
+		if _, err := LeerGrabacion("x", strings.NewReader(cabecera)); err == nil {
+			t.Errorf("aceptó %s", cabecera)
+		}
+	}
+}
+
 func TestAcierto(t *testing.T) {
 	a := lazulv1.Gesto_GESTO_AGARRAR
 	casos := []struct {

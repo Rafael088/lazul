@@ -30,15 +30,21 @@ import (
 // "inicio" es el modo en que arranca el clasificador (reposo, activo,
 // agarrando). Si falta: AGARRAR y MANDAR_APP arrancan en activo (la L ya
 // se hizo), SOLTAR en agarrando (el puño ya se hizo) y el resto en reposo.
+// Las grabaciones táctiles añaden "tactil" (MODO, SCROLL, ZOOM, BARRIDO),
+// "direccion_tactil" y, cuando hace falta, "inicio_tactil"/"estado_tactil".
 // Así cada repetición se graba sola, sin hacer antes los gestos previos.
 type Cabecera struct {
-	Gesto    string `json:"gesto"`
-	Luz      string `json:"luz"`
-	Ancho    int    `json:"ancho,omitempty"`
-	Alto     int    `json:"alto,omitempty"`
-	Negativo string `json:"negativo,omitempty"`
-	Inicio   string `json:"inicio,omitempty"`
-	Nota     string `json:"nota,omitempty"`
+	Gesto           string `json:"gesto"`
+	Luz             string `json:"luz"`
+	Ancho           int    `json:"ancho,omitempty"`
+	Alto            int    `json:"alto,omitempty"`
+	Negativo        string `json:"negativo,omitempty"`
+	Inicio          string `json:"inicio,omitempty"`
+	Tactil          string `json:"tactil,omitempty"`
+	DireccionTactil string `json:"direccion_tactil,omitempty"`
+	InicioTactil    string `json:"inicio_tactil,omitempty"`
+	EstadoTactil    string `json:"estado_tactil,omitempty"`
+	Nota            string `json:"nota,omitempty"`
 }
 
 // ModoInicial es el modo en que arranca el clasificador para esta cabecera.
@@ -117,6 +123,9 @@ func LeerGrabacion(nombre string, r io.Reader) (Grabacion, error) {
 				return g, fmt.Errorf("%s:1: %w", nombre, err)
 			}
 			if g.Inicio, err = g.Cabecera.ModoInicial(); err != nil {
+				return g, fmt.Errorf("%s:1: %w", nombre, err)
+			}
+			if err = validarCabeceraTactil(g.Cabecera); err != nil {
 				return g, fmt.Errorf("%s:1: %w", nombre, err)
 			}
 			if g.Cabecera.Ancho > 0 && g.Cabecera.Alto > 0 {
