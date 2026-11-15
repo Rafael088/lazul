@@ -22,6 +22,9 @@ var (
 	ErrRefInvalida = errors.New("platform: referencia inválida")
 	// ErrSinVentana: no hay ninguna ventana con el foco.
 	ErrSinVentana = errors.New("platform: ninguna ventana tiene el foco")
+	// ErrAccionInvalida: una acción del sistema lleva una dirección o modo
+	// que esa capacidad no admite.
+	ErrAccionInvalida = errors.New("platform: acción inválida")
 )
 
 // Todas las llamadas reciben un context.Context. Si llega ya cancelado, la
@@ -79,11 +82,52 @@ type LaunchApp interface {
 	Launch(ctx context.Context, ref AppRef) error
 }
 
+// ScrollDirection expresa el sentido de una rueda vertical.
+type ScrollDirection uint8
+
+const (
+	ScrollUp ScrollDirection = iota + 1
+	ScrollDown
+)
+
+// ZoomDirection expresa el sentido del zoom de la ventana con foco.
+type ZoomDirection uint8
+
+const (
+	ZoomIn ZoomDirection = iota + 1
+	ZoomOut
+)
+
+// NavigationDirection expresa el sentido de una navegación horizontal.
+type NavigationDirection uint8
+
+const (
+	NavigateLeft NavigationDirection = iota + 1
+	NavigateRight
+)
+
+// NavigationMode elige entre flechas y teclas para diapositivas.
+type NavigationMode uint8
+
+const (
+	NavigationNormal NavigationMode = iota + 1
+	NavigationSlides
+)
+
+// TactileActions envía scroll, zoom o navegación a la ventana con foco. No
+// mueve el cursor, no hace clic y no cambia qué ventana tiene el foco.
+type TactileActions interface {
+	Scroll(ctx context.Context, direction ScrollDirection) error
+	Zoom(ctx context.Context, direction ZoomDirection) error
+	Navigate(ctx context.Context, direction NavigationDirection, mode NavigationMode) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
-	Screenshot Screenshot
-	Clipboard  Clipboard
-	ActiveApp  ActiveApp
-	LaunchApp  LaunchApp
+	Screenshot     Screenshot
+	Clipboard      Clipboard
+	ActiveApp      ActiveApp
+	LaunchApp      LaunchApp
+	TactileActions TactileActions
 }

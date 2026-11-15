@@ -31,9 +31,9 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `proto/go/lazulv1/` | tipos de Go generados | no editar a mano; `compat_test.go` fija los bytes |
 | `proto/ts/` | tipos de TS generados (`src/`) y prueba de compatibilidad con Go | no editar `src/` a mano |
 | `proto/testdata/sobre_v1.bin` | el mismo Sobre que leen y escriben Go y TS | regenerar con `go test ./proto/go/lazulv1 -actualizar` |
-| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp y errores | pequeñas; una por capacidad |
+| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions y errores | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
-| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | hoy devuelven `ErrNoImplementado`: terminados cuando `./dev contrato` / `./dev win contrato` pasan |
+| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles de Hyprland; terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
 | `platform/internal/documento/` | nivel 2: elige el documento abierto (nombre en el título, mismos tipos que `core/seguro.go`) | una prueba exige las mismas extensiones que el receptor |
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |

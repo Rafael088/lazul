@@ -11,5 +11,5 @@ import (
 
 func TestContrato(t *testing.T) {
 	contrato.Exigir(t)
-	contrato.Correr(t, linux.New(), contrato.Opciones{AppInofensiva: "omacalc"})
+	contrato.Correr(t, linux.New(), contrato.Opciones{AppInofensiva: "omacalc", TactileActions: true})
 }

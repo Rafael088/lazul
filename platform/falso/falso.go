@@ -43,7 +43,7 @@ func New(nombre string, instaladas ...string) *Falso {
 
 // Sistema devuelve f como platform.Sistema.
 func (f *Falso) Sistema() platform.Sistema {
-	return platform.Sistema{Screenshot: f, Clipboard: f, ActiveApp: f, LaunchApp: f}
+	return platform.Sistema{Screenshot: f, Clipboard: f, ActiveApp: f, LaunchApp: f, TactileActions: f}
 }
 
 // PonerApp cambia la ventana con el foco.
@@ -130,5 +130,38 @@ func (f *Falso) Launch(ctx context.Context, ref platform.AppRef) error {
 		return platform.ErrRefInvalida
 	}
 	f.abiertas = append(f.abiertas, ref)
+	return nil
+}
+
+func (f *Falso) Scroll(ctx context.Context, direction platform.ScrollDirection) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if direction != platform.ScrollUp && direction != platform.ScrollDown {
+		return platform.ErrAccionInvalida
+	}
+	return nil
+}
+
+func (f *Falso) Zoom(ctx context.Context, direction platform.ZoomDirection) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if direction != platform.ZoomIn && direction != platform.ZoomOut {
+		return platform.ErrAccionInvalida
+	}
+	return nil
+}
+
+func (f *Falso) Navigate(ctx context.Context, direction platform.NavigationDirection, mode platform.NavigationMode) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if direction != platform.NavigateLeft && direction != platform.NavigateRight {
+		return platform.ErrAccionInvalida
+	}
+	if mode != platform.NavigationNormal && mode != platform.NavigationSlides {
+		return platform.ErrAccionInvalida
+	}
 	return nil
 }
