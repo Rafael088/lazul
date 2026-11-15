@@ -11,7 +11,7 @@ import (
 	"github.com/Rafael088/lazul/platform/vacio"
 )
 
-var opciones = contrato.Opciones{AppInofensiva: "calculadora", Abrir: true}
+var opciones = contrato.Opciones{AppInofensiva: "calculadora", Abrir: true, TactileActions: true}
 
 // Una implementación vacía no puede pasar ninguna prueba: si alguna pasa,
 // esa prueba no está comprobando nada.

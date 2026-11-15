@@ -37,6 +37,9 @@ type Opciones struct {
 	// Abrir habilita las pruebas que abren ventanas de verdad. Correr lo
 	// prende con LAZUL_CONTRATO_ABRIR=1.
 	Abrir bool
+	// TactileActions indica que este sistema ofrece acciones táctiles. Se
+	// mantiene opcional mientras no todos los sistemas tengan adaptador.
+	TactileActions bool
 }
 
 // ErrOmitida marca una prueba que no aplica con estas Opciones.
@@ -88,6 +91,9 @@ func Pruebas(s platform.Sistema, op Opciones) []Prueba {
 	ps = append(ps, pruebasClipboard(s.Clipboard)...)
 	ps = append(ps, pruebasActiveApp(s.ActiveApp)...)
 	ps = append(ps, pruebasLaunchApp(s.LaunchApp, op)...)
+	if op.TactileActions {
+		ps = append(ps, pruebasTactileActions(s.TactileActions, op)...)
+	}
 	return ps
 }
 
@@ -276,6 +282,72 @@ func pruebasLaunchApp(la platform.LaunchApp, op Opciones) []Prueba {
 		}},
 		{"LaunchApp/contexto_cancelado", func(context.Context) error {
 			return exigirCancelado(la.Launch(cancelado(), platform.AppRef{ID: "x"}))
+		}},
+	}
+}
+
+func pruebasTactileActions(ta platform.TactileActions, op Opciones) []Prueba {
+	if ta == nil {
+		return falta("TactileActions")
+	}
+	return []Prueba{
+		{"TactileActions/acciones_invalidas", func(ctx context.Context) error {
+			casos := []struct {
+				nombre string
+				err    error
+			}{
+				{"Scroll", ta.Scroll(ctx, platform.ScrollDirection(0))},
+				{"Zoom", ta.Zoom(ctx, platform.ZoomDirection(0))},
+				{"Navigate/direccion", ta.Navigate(ctx, platform.NavigationDirection(0), platform.NavigationNormal)},
+				{"Navigate/modo", ta.Navigate(ctx, platform.NavigateLeft, platform.NavigationMode(0))},
+			}
+			for _, caso := range casos {
+				if !errors.Is(caso.err, platform.ErrAccionInvalida) {
+					return fmt.Errorf("%s inválida debe devolver ErrAccionInvalida; devolvió %v", caso.nombre, caso.err)
+				}
+			}
+			return nil
+		}},
+		{"TactileActions/contexto_cancelado", func(context.Context) error {
+			ctx := cancelado()
+			casos := []struct {
+				nombre string
+				err    error
+			}{
+				{"Scroll", ta.Scroll(ctx, platform.ScrollUp)},
+				{"Zoom", ta.Zoom(ctx, platform.ZoomIn)},
+				{"Navigate", ta.Navigate(ctx, platform.NavigateLeft, platform.NavigationNormal)},
+			}
+			for _, caso := range casos {
+				if err := exigirCancelado(caso.err); err != nil {
+					return fmt.Errorf("%s: %w", caso.nombre, err)
+				}
+			}
+			return nil
+		}},
+		{"TactileActions/acciones_validas", func(ctx context.Context) error {
+			if !op.Abrir {
+				return fmt.Errorf("%w: envía scroll y teclas; LAZUL_CONTRATO_ABRIR=1", ErrOmitida)
+			}
+			casos := []struct {
+				nombre string
+				correr func() error
+			}{
+				{"scroll arriba", func() error { return ta.Scroll(ctx, platform.ScrollUp) }},
+				{"scroll abajo", func() error { return ta.Scroll(ctx, platform.ScrollDown) }},
+				{"zoom acercar", func() error { return ta.Zoom(ctx, platform.ZoomIn) }},
+				{"zoom alejar", func() error { return ta.Zoom(ctx, platform.ZoomOut) }},
+				{"flecha izquierda", func() error { return ta.Navigate(ctx, platform.NavigateLeft, platform.NavigationNormal) }},
+				{"flecha derecha", func() error { return ta.Navigate(ctx, platform.NavigateRight, platform.NavigationNormal) }},
+				{"diapositiva anterior", func() error { return ta.Navigate(ctx, platform.NavigateLeft, platform.NavigationSlides) }},
+				{"diapositiva siguiente", func() error { return ta.Navigate(ctx, platform.NavigateRight, platform.NavigationSlides) }},
+			}
+			for _, caso := range casos {
+				if err := caso.correr(); err != nil {
+					return fmt.Errorf("%s: %w", caso.nombre, err)
+				}
+			}
+			return nil
 		}},
 	}
 }
