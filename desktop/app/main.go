@@ -1,8 +1,10 @@
-// Lazul (v0.2.0, cotejo-2iwx1x): el indicador de escritorio.
+// Lazul (v0.2.0): el indicador de escritorio.
 // Por defecto la ventana es una píldora pequeña en una esquina: muestra si
 // el modo táctil está activo y destella el gesto reconocido. La vista de la
 // cámara queda como opción para acomodarse (botón o Ctrl+Mayús+C) y la app
-// arranca con la cámara encendida aunque su vista esté apagada.
+// arranca con la cámara encendida aunque su vista esté apagada. En Linux abre
+// por defecto el modo táctil local (los gestos mueven la ventana con foco);
+// el modo de transferencia anterior sigue disponible con -modo transferencia.
 //
 // La webview abre la cámara (Windows: getUserMedia; Linux: ffmpeg en un
 // proceso aparte, dec-7tgj), corre MediaPipe Hand Landmarker y le pasa los
@@ -11,6 +13,7 @@
 // los enlaces con la página. Cómo usarla: desktop/README.md.
 //
 //	lazul [-nombre N] [-camara auto|webview|proceso|no] [-dispositivo /dev/video0]
+//	      [-modo auto|tactil|transferencia]
 //	      [-estado DIR] [-escucha :53317] [-abrir=false] [-mdns=false]
 //
 // Para medir sin nadie delante (./dev app e2e): -reproducir graba1,graba2 pasa
@@ -22,6 +25,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -66,6 +70,7 @@ type Config struct {
 	Reproducir bool   `json:"reproducir"`
 	SO         string `json:"so"`
 	Registro   string `json:"registro"`
+	Modo       string `json:"modo"` // tactil | transferencia
 }
 
 // Solicitud de emparejamiento esperando a la persona.
@@ -91,7 +96,7 @@ type App struct {
 	ctx    context.Context
 	cfg    Config
 	nucleo *desktop.Nucleo
-	vivo   *desktop.Vivo
+	flujo  flujoCamara
 	reg    *desktop.Registro
 	cap    *captura
 
@@ -110,6 +115,14 @@ type App struct {
 	posIndicadorX     int
 	posIndicadorY     int
 	tienePosIndicador bool
+}
+
+type flujoCamara interface {
+	Cuadro(gestures.Cuadro, time.Time) desktop.Vista
+	Parar(time.Time)
+	Prueba(bool, time.Time)
+	EnPrueba() bool
+	Marcar(bool, time.Time) (int, error)
 }
 
 func (a *App) Config() Config { return a.cfg }
@@ -149,16 +162,18 @@ func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
 
 func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	ahora := time.Now()
-	v := a.vivo.Cuadro(c, ahora)
+	v := a.flujo.Cuadro(c, ahora)
 
-	// El indicador se alimenta del clasificador táctil (scroll, zoom y
-	// barrido). Reconocer el gesto no dispara nada aquí: eso es la tarea del
-	// modo táctil; esta interfaz solo lo muestra.
-	a.mu.Lock()
+	// En modo táctil el indicador lo alimenta desktop.Tactil (AlEvento), que
+	// además ejecuta la acción. En modo transferencia el clasificador táctil
+	// corre aparte solo para mostrar el gesto: no dispara nada.
 	var evT gestures.EventoTactil
-	a.tactil, evT = gestures.ClasificarTactil(a.tactil, c)
-	a.mu.Unlock()
-	a.ind.Aplicar(evT, ahora)
+	if a.cfg.Modo != "tactil" {
+		a.mu.Lock()
+		a.tactil, evT = gestures.ClasificarTactil(a.tactil, c)
+		a.mu.Unlock()
+		a.ind.Aplicar(evT, ahora)
+	}
 	vi := a.ind.Vista(ahora)
 	v.Indicador = &vi
 
@@ -202,7 +217,7 @@ func (a *App) CamaraApagar() {
 	if a.cap != nil {
 		a.cap.apagar()
 	}
-	a.vivo.Parar(time.Now())
+	a.flujo.Parar(time.Now())
 	a.mu.Lock()
 	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
 	a.mu.Unlock()
@@ -224,7 +239,7 @@ func (a *App) Estado() Estado {
 	e := Estado{Vista: a.vista, Indicador: vi, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano, Camara: a.errCam}
 	a.mu.Unlock()
 	e.Red = a.nucleo.Estado()
-	e.Prueba = a.vivo.EnPrueba()
+	e.Prueba = a.flujo.EnPrueba()
 	return e
 }
 
@@ -344,10 +359,10 @@ func (a *App) ResponderPermiso(si bool) {
 	}
 }
 
-func (a *App) Prueba(on bool) { a.vivo.Prueba(on, time.Now()) }
+func (a *App) Prueba(on bool) { a.flujo.Prueba(on, time.Now()) }
 
 func (a *App) Marcar(falsa bool) string {
-	n, err := a.vivo.Marcar(falsa, time.Now())
+	n, err := a.flujo.Marcar(falsa, time.Now())
 	if err != nil {
 		return err.Error()
 	}
@@ -443,7 +458,7 @@ func (a *App) reproducir(ctx context.Context, cs []gestures.Cuadro) {
 		a.cuadro(c)
 	}
 	time.Sleep(time.Second)
-	a.vivo.Parar(time.Now())
+	a.flujo.Parar(time.Now())
 	decir("reproducción terminada (%d cuadros)", len(cs))
 }
 
@@ -452,6 +467,7 @@ func main() {
 	estado := flag.String("estado", "", "carpeta de identidad, equipos y registro (por defecto la de configuración y la de estado del usuario)")
 	escucha := flag.String("escucha", fmt.Sprintf(":%d", desktop.PuertoLazul), "dirección en que escucha el receptor")
 	camara := flag.String("camara", "auto", "auto | webview | proceso | no (auto: proceso en Linux, webview en Windows)")
+	modoApp := flag.String("modo", "auto", "auto | tactil | transferencia (auto: táctil en Linux)")
 	dispositivo := flag.String("dispositivo", "/dev/video0", "cámara para el modo proceso (ffmpeg -f v4l2)")
 	abrir := flag.Bool("abrir", true, "abrir de verdad lo que llega (false: solo anotarlo)")
 	usarMDNS := flag.Bool("mdns", true, "anunciar este equipo y buscar los demás por mDNS")
@@ -476,7 +492,7 @@ func main() {
 			defer f.Close()
 		}
 	}
-	if err := correr(opciones{*nombre, *estado, *escucha, *camara, *dispositivo, *abrir, *usarMDNS, *adelantar, *titulo, *reproducir,
+	if err := correr(opciones{*nombre, *estado, *escucha, *camara, *dispositivo, *modoApp, *abrir, *usarMDNS, *adelantar, *titulo, *reproducir,
 		*grabaciones, *permitir, *mostrarCodigo, *emparejarCon, *codigo, *duracion, *eco, *soloHuella, *resumen}); err != nil {
 		decir("error: %v", err)
 		os.Exit(1)
@@ -484,13 +500,13 @@ func main() {
 }
 
 type opciones struct {
-	nombre, estado, escucha, camara, dispositivo string
-	abrir, mdns, adelantar                       bool
-	titulo, reproducir, grabaciones, permitir    string
-	mostrarCodigo                                bool
-	emparejarCon, codigo                         string
-	duracion                                     time.Duration
-	eco, soloHuella, resumen                     bool
+	nombre, estado, escucha, camara, dispositivo, modo string
+	abrir, mdns, adelantar                             bool
+	titulo, reproducir, grabaciones, permitir          string
+	mostrarCodigo                                      bool
+	emparejarCon, codigo                               string
+	duracion                                           time.Duration
+	eco, soloHuella, resumen                           bool
 }
 
 func correr(o opciones) error {
@@ -540,8 +556,18 @@ func correr(o opciones) error {
 		cs = desktop.Encadenar(gs, 400)
 		modo = "no"
 	}
+	modoControl := o.modo
+	if modoControl == "auto" {
+		modoControl = "transferencia"
+		if runtime.GOOS == "linux" {
+			modoControl = "tactil"
+		}
+	}
+	if modoControl != "tactil" && modoControl != "transferencia" {
+		return fmt.Errorf("-modo: %q no es auto, tactil ni transferencia", o.modo)
+	}
 	app := &App{
-		cfg:    Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg},
+		cfg:    Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg, Modo: modoControl},
 		reg:    reg,
 		ind:    &desktop.Indicador{},
 		tactil: gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto),
@@ -562,7 +588,14 @@ func correr(o opciones) error {
 		fmt.Fprintln(salida, app.nucleo.Huella())
 		return nil
 	}
-	app.vivo = &desktop.Vivo{Reg: reg, AlGesto: app.nucleo.Disparar}
+	if modoControl == "tactil" {
+		if sis.TactileActions == nil {
+			return errors.New("el modo táctil solo está disponible en Linux")
+		}
+		app.flujo = &desktop.Tactil{Reg: reg, Acciones: sis.TactileActions, AlEvento: app.ind.Aplicar}
+	} else {
+		app.flujo = &desktop.Vivo{Reg: reg, AlGesto: app.nucleo.Disparar}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -570,7 +603,7 @@ func correr(o opciones) error {
 	go app.medir(ctx)
 	e := app.nucleo.Estado()
 	decir("huella %s", app.nucleo.Huella())
-	decir("este equipo: «%s» %s · escucha %v · cámara %s · registro %s", e.Nombre, e.Huella, e.Direcciones, modo, rutaReg)
+	decir("este equipo: «%s» %s · escucha %v · cámara %s · modo %s · registro %s", e.Nombre, e.Huella, e.Direcciones, modo, modoControl, rutaReg)
 	if e.Error != "" {
 		decir("aviso: %s", e.Error)
 	}
@@ -642,7 +675,7 @@ func correr(o opciones) error {
 			if app.cap != nil {
 				app.cap.apagar()
 			}
-			app.vivo.Parar(time.Now())
+			app.flujo.Parar(time.Now())
 			e := app.nucleo.Estado()
 			decir("fin · última acción: %s · último recibido: %s", e.Accion, e.Recibido)
 			cancel()

@@ -1,10 +1,10 @@
-// Package desktop es la lógica de la app de escritorio de Lazul (el
-// prototipo de factibilidad, cotejo-egtbal): todo lo que no necesita la
-// ventana, para probarlo sin Wails ni cámara.
+// Package desktop es la lógica de la app de escritorio de Lazul: todo lo que
+// no necesita la ventana, para probarlo sin Wails ni cámara.
 //
+//   - Tactil (tactil.go): cuadro a cuadro, reconoce los gestos táctiles,
+//     ejecuta la acción local, apaga el modo sin mano y registra el resultado.
 //   - Vivo (vivo.go): cuadro a cuadro, de los puntos de MediaPipe a la pose,
-//     el modo y los gestos (gestures.Clasificar), y sigue cada activación
-//     hasta saber en qué terminó.
+//     el modo de transferencia y sus gestos (gestures.Clasificar).
 //   - Indicador (indicador.go): el estado del modo táctil que pinta la píldora
 //     de la esquina (activo/inactivo y un destello breve por gesto).
 //   - Registro (registro.go): el archivo local de la prueba de factibilidad

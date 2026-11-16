@@ -17,7 +17,7 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev replay [-v] [-barrer]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L |
 | `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`) |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
-| `./dev app [args]` | la app de escritorio (prototipo de factibilidad) en este Linux; `./dev app win` la copia a `%USERPROFILE%\Lazul` y la abre en el escritorio de Windows; `./dev app resumen` dice las activaciones de los últimos 30 min de uso; `./dev app compilar`; `./dev app e2e win\|linux` la prueba en los 2 PCs con grabaciones en vez de cámara (ventana de Linux en el espacio 66 de una pantalla virtual) |
+| `./dev app [args]` | la app de escritorio; en Linux abre el modo táctil (scroll, zoom y diapositivas) y `-modo transferencia` conserva el recorrido entre PCs; `./dev app win` la copia a `%USERPROFILE%\Lazul`; `./dev app resumen` dice las activaciones de los últimos 30 min; `./dev app compilar`; `./dev app e2e win\|linux` prueba la transferencia con grabaciones |
 | `./dev win test\|check\|contrato` | copia el árbol al PC Windows (`ssh win`) y corre ahí; `contrato` corre en la sesión del escritorio |
 
 Salida breve: una línea por paso; el registro completo queda en `.dev/<paso>.log`.
@@ -51,7 +51,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` | las sintéticas van en `gestures/testdata/sinteticas` |
-| `desktop/` | lógica de la app de escritorio, con pruebas: `Vivo` (cuadro → pose, modo, gesto y cada activación), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Registro` y `Resumir` (prueba de activaciones falsas, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
+| `desktop/` | lógica de la app de escritorio, con pruebas: `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (prueba de activaciones falsas, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
 | `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); abre como indicador pequeño y la vista de cámara es opcional; cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
@@ -67,6 +67,15 @@ señalar (pulgar pegado, a medias o perdido) por el pulgar: lejos del índice,
 a unos 90° y con las puntas separadas. El puño exige el índice de verdad
 recogido (a medio doblar no lo es) y que el sostén de 150 ms sea al menos 70 %
 puño: dos cuadros sueltos unidos por la gracia no agarran.
+
+## Modo táctil (dec-gzgl)
+
+En Linux, `./dev app` pasa cada cuadro por `ClasificarTactil`: la L sostenida
+alterna el modo; dos dedos en vertical hacen scroll; una pinza que abre/cierra
+hace zoom; dos dedos en horizontal mandan Page Up/Page Down para las
+diapositivas. Las acciones se aplican localmente a la ventana con foco mediante
+`platform.TactileActions`. El modo se apaga tras 3 s sin mano. Cada gesto y su
+resultado se anota en `factibilidad.jsonl`, sin contenido de cámara o pantalla.
 
 ## Cómo se habla todo
 

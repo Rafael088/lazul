@@ -2,17 +2,20 @@
 
 La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
 Muestra si el modo táctil está **activo** o **inactivo** y destella un gesto
-cuando lo reconoce (scroll, zoom, izquierda/derecha), sin tapar la clase. La
-vista de la cámara queda como opción para acomodarse y está apagada por
-defecto. La app sigue escuchando en la red local para recibir y mandar.
+cuando lo reconoce, sin tapar la clase. En Linux, los gestos controlan la
+ventana que tenga el foco: desplazar, acercar o alejar y cambiar de
+diapositiva. Es la prueba de uso real de la 0.2.0 (dec-gzgl). La vista de la
+cámara queda como opción para acomodarse y está apagada por defecto.
 
-Esta interfaz reemplaza la ventana chica fija de la 0.1.0 (cotejo-luzcr0).
+Esta interfaz reemplaza la ventana chica fija de la 0.1.0 (cotejo-luzcr0). La
+transferencia entre dos PCs de la 0.1.0 sigue disponible con
+`./dev app -modo transferencia`; también es el modo predeterminado en Windows.
 
 ## Abrirla
 
 | Dónde | Cómo |
 | --- | --- |
-| Linux (Hyprland) | en la carpeta del repo: `./dev app` |
+| Linux (Hyprland, modo táctil) | en la carpeta del repo: `./dev app` |
 | Windows, desde el Linux | `./dev app win` (la copia a `%USERPROFILE%\Lazul\lazul.exe` y la abre en el escritorio de Windows) |
 | Windows, después | doble clic en `%USERPROFILE%\Lazul\lazul.exe` |
 
@@ -59,7 +62,11 @@ configuración. El margen propuesto es de 12 px. El fijado a todos los espacios
 depende de `pin`; `AlwaysOnTop` de Wails por sí solo no sustituye esta regla en
 Wayland.
 
-## Emparejar los dos PCs (una sola vez)
+## Emparejar los dos PCs (solo para transferencias)
+
+El modo táctil de Linux actúa en el mismo equipo y no necesita emparejar nada.
+Para usar el modo de transferencia anterior, abre la app con
+`./dev app -modo transferencia` y sigue estos pasos:
 
 En el PC que **recibe** (por ejemplo Windows):
 
@@ -84,21 +91,19 @@ otro también pueda mandarte, empareja al revés.
 ## Usarla
 
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
-  momento: el modo táctil pasa a **activo** y el indicador lo muestra; otra L
-  lo apaga.
-- **Dos dedos arriba/abajo**: scroll. **Pellizco que abre o cierra**: zoom.
-  **Barrido a un lado**: izquierda/derecha (o AvPág/RePág en diapositivas).
+  momento: enciende o apaga el modo táctil; el indicador lo muestra.
+- **Dos dedos arriba o abajo**: desplazan la ventana con foco.
+- **Pinza que se abre o se cierra**: acerca o aleja.
+- **Dos dedos hacia la izquierda o la derecha**: cambian de diapositiva.
+- Si la cámara deja de ver una mano durante 3 segundos, el modo se apaga solo.
 - Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
   que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
-- Por ahora el indicador reconoce y muestra los gestos; enviarlos a la ventana
-  con foco es la tarea del modo táctil (cotejo-mks5xb). El prototipo 0.1.0 de
-  agarrar y soltar sigue disponible en la vista de cámara: **puño** para
-  agarrar una captura, **abrir la mano moviéndola a un lado** para soltarla en
-  el otro PC, y **pinza arrastrada** para mandar la ventana activa.
 
-La vista de cámara (a demanda) muestra la cámara con los puntos de la mano, la
-pose, el modo y el último gesto con su hora. Lo que llega al otro PC queda
-también en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
+Los gestos se aplican a la ventana que tenga el foco; la app no mueve el
+cursor ni hace clic. La vista de cámara (a demanda) muestra la cámara con los
+puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás cuando no ve
+la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
+transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
 `%APPDATA%\lazul\recibidos`).
 
 ## La prueba de las activaciones falsas (30 min)
@@ -107,8 +112,8 @@ La meta: menos de 1 activación sin querer en 30 min de trabajo normal.
 
 1. Con la cámara encendida, pulsa **Empezar prueba de trabajo normal**.
 2. Trabaja 30 min como siempre (escribir, tomar café, hablar con las manos)
-   **sin** hacer gestos a propósito. Mientras dure, no se manda nada a
-   ningún equipo y toda activación cuenta como falsa.
+   **sin** hacer gestos a propósito. Mientras dure, Lazul reconoce y registra
+   los gestos, pero no manda teclas, y toda activación cuenta como falsa.
 3. Pulsa **Terminar prueba** y **Resumen**: dice PASA o NO PASA.
 
 Fuera de la prueba también se cuenta: si se activa sola, pulsa **La última
@@ -116,9 +121,10 @@ activación fue sin querer**; si la activaste tú y no hiciste nada después,
 **Fue a propósito**. Desde el Linux también: `./dev app resumen`.
 
 Todo queda en un archivo de este PC (`factibilidad.jsonl` en
-`~/.local/state/lazul` o `%LOCALAPPDATA%\lazul`): la hora, la pose, los gestos,
-las activaciones y en qué terminaron. **Nunca** guarda imágenes de la cámara ni
-de la pantalla, ni direcciones web, ni nombres de archivos o ventanas.
+`~/.local/state/lazul` o `%LOCALAPPDATA%\lazul`): la hora, cada gesto táctil,
+su dirección, confianza, resultado y la activación a la que pertenece.
+**Nunca** guarda imágenes de la cámara ni de la pantalla, ni direcciones web,
+ni nombres de archivos o ventanas.
 
 ## Si algo no va
 
@@ -134,7 +140,8 @@ de la pantalla, ni direcciones web, ni nombres de archivos o ventanas.
 
 ## Para quien programa
 
-- La lógica (clasificar, registro, resumen, emparejar, mandar) está en el
+- La lógica (clasificar, ejecutar acciones táctiles, registro, resumen,
+  emparejar y mandar) está en el
   paquete `desktop` del módulo raíz, con pruebas (`./dev test ./desktop/`).
 - La ventana (Wails) es `desktop/app`, módulo aparte como
   `prototipos/camara`: necesita cgo y WebKitGTK en Linux, así que no entra en

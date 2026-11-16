@@ -78,11 +78,17 @@ function pintar(manos) {
 function mostrarVista(v) {
   if (!v) return;
   $("pose").textContent = v.pose || "-";
-  $("modo").textContent = v.modo || "-";
+  $("modo").textContent = (v.modo || "-").toUpperCase();
   $("modo").className = "grande modo-" + (v.modo || "reposo");
   $("ultimo").textContent = v.ultimo || "-";
   $("ultimohora").textContent = v.ultimo_hora ? "a las " + v.ultimo_hora : "";
   mostrarIndicador(v.indicador);
+  if (cfg && cfg.modo === "tactil") {
+    let aviso = "Haz la L para activar";
+    if (v.modo === "activo") aviso = v.sin_mano ? `sin mano · se apaga en ${Math.max(1, Math.ceil((v.apaga_en_ms || 0) / 1000))} s` : "mano detectada";
+    texto("apagatactil", aviso);
+    texto("errtactil", v.error ? "No se pudo ejecutar: " + v.error : "");
+  }
 }
 
 function procesar(fuente, w, h) {
@@ -250,6 +256,10 @@ async function main() {
   }
   cfg = await go().Config();
   texto("registro", cfg.registro);
+  const tactil = cfg.modo === "tactil";
+  texto("modoetiqueta", tactil ? "Modo táctil" : "Modo");
+  $("ayudatactil").style.display = tactil ? "block" : "none";
+  $("ayudatransferencia").style.display = tactil ? "none" : "block";
   $("abrircodigo").onclick = () => go().AbrirCodigo();
   $("emparejar").onclick = async () => {
     $("emparejar").disabled = true;

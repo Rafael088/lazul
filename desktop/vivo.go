@@ -24,6 +24,9 @@ type Vista struct {
 	UltimoHora string `json:"ultimo_hora"` // hh:mm:ss
 	Activacion int    `json:"activacion"`  // número de la última activación
 	Prueba     bool   `json:"prueba"`
+	ApagaEnMs  int64  `json:"apaga_en_ms,omitempty"` // modo táctil: tiempo sin mano que queda
+	SinMano    bool   `json:"sin_mano,omitempty"`
+	Error      string `json:"error,omitempty"`
 
 	// Indicador lo rellena la app con el modo táctil; Vivo solo no lo toca.
 	Indicador *VistaIndicador `json:"indicador,omitempty"`
