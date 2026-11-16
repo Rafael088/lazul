@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rafael088/lazul/platform"
@@ -32,22 +33,22 @@ func TestAccionesTactilesEnviaAtajosALaVentanaConFoco(t *testing.T) {
 		llamar func(platform.TactileActions) error
 		codigo string
 	}{
-		{"scroll arriba", func(a platform.TactileActions) error { return a.Scroll(context.Background(), platform.ScrollUp) }, `hl.send_shortcut({ mods = "", key = "mouse_up" })`},
-		{"scroll abajo", func(a platform.TactileActions) error { return a.Scroll(context.Background(), platform.ScrollDown) }, `hl.send_shortcut({ mods = "", key = "mouse_down" })`},
-		{"zoom acercar", func(a platform.TactileActions) error { return a.Zoom(context.Background(), platform.ZoomIn) }, `hl.send_shortcut({ mods = "CTRL", key = "mouse_up" })`},
-		{"zoom alejar", func(a platform.TactileActions) error { return a.Zoom(context.Background(), platform.ZoomOut) }, `hl.send_shortcut({ mods = "CTRL", key = "mouse_down" })`},
+		{"scroll arriba", func(a platform.TactileActions) error { return a.Scroll(context.Background(), platform.ScrollUp) }, codigoTeclas("", "Up", ScrollPulsaciones)},
+		{"scroll abajo", func(a platform.TactileActions) error { return a.Scroll(context.Background(), platform.ScrollDown) }, codigoTeclas("", "Down", ScrollPulsaciones)},
+		{"zoom acercar", func(a platform.TactileActions) error { return a.Zoom(context.Background(), platform.ZoomIn) }, codigoTeclas("CTRL", "plus", 1)},
+		{"zoom alejar", func(a platform.TactileActions) error { return a.Zoom(context.Background(), platform.ZoomOut) }, codigoTeclas("CTRL", "minus", 1)},
 		{"navegar izquierda", func(a platform.TactileActions) error {
 			return a.Navigate(context.Background(), platform.NavigateLeft, platform.NavigationNormal)
-		}, `hl.send_shortcut({ mods = "", key = "Left" })`},
+		}, codigoTeclas("", "Left", 1)},
 		{"navegar derecha", func(a platform.TactileActions) error {
 			return a.Navigate(context.Background(), platform.NavigateRight, platform.NavigationNormal)
-		}, `hl.send_shortcut({ mods = "", key = "Right" })`},
+		}, codigoTeclas("", "Right", 1)},
 		{"diapositiva anterior", func(a platform.TactileActions) error {
 			return a.Navigate(context.Background(), platform.NavigateLeft, platform.NavigationSlides)
-		}, `hl.send_shortcut({ mods = "", key = "Page_Up" })`},
+		}, codigoTeclas("", "Page_Up", 1)},
 		{"diapositiva siguiente", func(a platform.TactileActions) error {
 			return a.Navigate(context.Background(), platform.NavigateRight, platform.NavigationSlides)
-		}, `hl.send_shortcut({ mods = "", key = "Page_Down" })`},
+		}, codigoTeclas("", "Page_Down", 1)},
 	}
 
 	for _, caso := range casos {
@@ -62,6 +63,27 @@ func TestAccionesTactilesEnviaAtajosALaVentanaConFoco(t *testing.T) {
 				t.Fatalf("llamadas %+v, quiere %+v", ejecutor.llamadas, quiere)
 			}
 		})
+	}
+}
+
+func TestCodigoTeclasUsaLaAPIDeHyprland057(t *testing.T) {
+	c := codigoTeclas("CTRL", "plus", 2)
+	for _, quiere := range []string{"hl.dispatch(hl.dsp.send_key_state(", `state = "down"`, `state = "up"`, `"CTRL", "plus", 2`} {
+		if !strings.Contains(c, quiere) {
+			t.Errorf("falta %q en:\n%s", quiere, c)
+		}
+	}
+	if strings.Contains(c, "hl.send_shortcut") || strings.Contains(c, "mouse_") {
+		t.Errorf("usa una API que no existe en Hyprland 0.57 o una rueda que no se puede inyectar:\n%s", c)
+	}
+}
+
+func TestAccionesTactilesFallaSiHyprlandDevuelveError(t *testing.T) {
+	adaptador := accionesTactiles{ejecutar: func(context.Context, string, ...string) ([]byte, error) {
+		return []byte("error: attempt to call a nil value"), nil
+	}}
+	if err := adaptador.Scroll(context.Background(), platform.ScrollUp); err == nil {
+		t.Fatal("un «error:» de hyprctl con código 0 debe contar como falla")
 	}
 }
 
