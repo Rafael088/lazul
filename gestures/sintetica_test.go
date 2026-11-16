@@ -86,6 +86,17 @@ func formaL() forma {
 }
 func formaPuno() forma    { return conPulgar(dedos([4]float64{1, 1, 1, 1}), v3{0.05, 0.72, -0.15}) }
 func formaAbierta() forma { return conPulgar(dedos([4]float64{0, 0, 0, 0}), v3{0.95, 0.72, 0}) }
+
+// formaAgarre: pulgar, índice y medio con las puntas juntas, como pellizcar
+// algo para agarrarlo.
+func formaAgarre() forma {
+	f := dedos([4]float64{0.45, 0.45, 1, 1})
+	f.phi[0], f.phi[1] = -4, 6 // índice y medio se juntan
+	p := f.puntos()
+	a, b := p[IndicePunta], p[MedioPunta]
+	f.pulgar = pulgarHacia(v3{(a.u + b.u) / 2, (a.v + b.v) / 2, (a.z + b.z) / 2})
+	return f
+}
 func formaRelajada() forma {
 	return conPulgar(dedos([4]float64{0.3, 0.35, 0.4, 0.45}), v3{0.6, 0.55, -0.05})
 }
@@ -424,8 +435,8 @@ func sinteticasTactiles() []sintetica {
 		if dir == "ARRIBA" {
 			mov = -mov
 		}
-		agregar(fmt.Sprintf("scroll-%02d-%s", i+1, strings.ToLower(dir)), 1, "SCROLL", dir, "", "activo", "", "dos dedos en vertical", func(_ int) []tramo {
-			return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0, mov, 0}}}
+		agregar(fmt.Sprintf("scroll-%02d-%s", i+1, strings.ToLower(dir)), 1, "SCROLL", dir, "", "activo", "", "agarre (pulgar, índice y medio) en vertical", func(_ int) []tramo {
+			return []tramo{{f: formaAgarre(), ms: 250}, {f: formaAgarre(), ms: 500, mov: v3{0, mov, 0}}}
 		})
 	}
 	for i := 0; i < 8; i++ {
@@ -447,8 +458,8 @@ func sinteticasTactiles() []sintetica {
 	}
 
 	// Negativos expresamente alrededor de cada umbral.
-	agregar("scroll-corto", 4, "NINGUNO", "", "tactil-corto", "activo", "", "dos dedos no recorren el umbral", func(i int) []tramo {
-		return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0, 0.08 * lado(i), 0}}}
+	agregar("scroll-corto", 4, "NINGUNO", "", "tactil-corto", "activo", "", "el agarre no recorre el umbral", func(i int) []tramo {
+		return []tramo{{f: formaAgarre(), ms: 250}, {f: formaAgarre(), ms: 500, mov: v3{0, 0.08 * lado(i), 0}}}
 	})
 	agregar("movimiento-diagonal", 4, "NINGUNO", "", "tactil-diagonal", "activo", "", "ningún eje domina", func(i int) []tramo {
 		return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0.28 * lado(i), 0.24, 0}}}
@@ -464,6 +475,12 @@ func sinteticasTactiles() []sintetica {
 	})
 	agregar("saludo", 4, "NINGUNO", "", "tactil-palma", "activo", "", "palma abierta no es barrido", func(i int) []tramo {
 		return []tramo{{f: formaAbierta(), ms: 250}, {f: formaAbierta(), ms: 550, mov: v3{0.5 * lado(i), 0, 0}}}
+	})
+	agregar("dos-dedos-vertical", 4, "NINGUNO", "", "tactil-dos-dedos-vertical", "activo", "", "dos dedos estirados ya no hacen scroll", func(i int) []tramo {
+		return []tramo{{f: formaDosDedos(), ms: 250}, {f: formaDosDedos(), ms: 500, mov: v3{0, 0.24 * lado(i), 0}}}
+	})
+	agregar("puno-vertical", 4, "NINGUNO", "", "tactil-puno-vertical", "activo", "", "un puño no es el agarre", func(i int) []tramo {
+		return []tramo{{f: formaPuno(), ms: 250}, {f: formaPuno(), ms: 500, mov: v3{0, 0.24 * lado(i), 0}}}
 	})
 	return out
 }

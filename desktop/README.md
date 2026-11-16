@@ -92,14 +92,16 @@ otro también pueda mandarte, empareja al revés.
 
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
-- **Scroll como el clic central**: junta índice y medio estirados y quédate
-  quieto un instante (agarras). Aleja la mano hacia abajo o hacia arriba: el
+- **Scroll como el clic central**: junta las puntas del pulgar, el índice y
+  el medio, como si pellizcaras algo para agarrarlo (anular y meñique
+  recogidos), y quédate quieto un instante. Aleja la mano hacia abajo o hacia arriba: el
   contenido se desplaza mientras sostengas la pose, más rápido cuanto más
   la alejes. Vuelve la mano al punto donde agarraste y se detiene; suelta los
   dedos y termina. Va por una rueda de ratón virtual, así que actúa sobre la
   ventana que está **bajo el puntero**.
 - **Pinza que se abre o se cierra**: acerca o aleja.
-- **Dos dedos hacia la izquierda o la derecha**: cambian de diapositiva.
+- **Dos dedos estirados hacia la izquierda o la derecha**: cambian de
+  diapositiva. Los dos dedos ya no hacen scroll.
 - Si la cámara deja de ver una mano durante 3 segundos, el modo se apaga solo.
 - Si sueltas y vuelves a agarrar en la dirección contraria antes de 2,5 s, se
   ignora (es la mano que vuelve); para corregir, mueve la mano sin soltar.

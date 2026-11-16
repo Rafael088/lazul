@@ -115,6 +115,21 @@ const (
 	formaTactilNinguna formaTactil = iota
 	formaTactilDosDedos
 	formaTactilZoom
+	formaTactilAgarre // pulgar, índice y medio con las puntas juntas
+)
+
+// Umbrales del agarre (en palmas). Las puntas del índice y del medio tocan
+// la del pulgar; los dos dedos quedan por delante de sus nudillos, que es lo
+// que separa el agarre de un puño (en el puño las puntas vuelven a la palma).
+const (
+	agarrePuntasMax = 0.45
+	agarreMedioMax  = 0.55
+	agarreDedoMin   = 0.05
+	agarreDedoMax   = 0.90 // índice y medio doblados hacia el pulgar, no rectos
+	// Índice y medio por delante del anular y el meñique (recogidos): una
+	// mano relajada también junta las puntas, pero con los cuatro dedos
+	// parejos. Medido con las negativas reales de fixtures/gestos.
+	agarreSeparacion = 0.15
 )
 
 type seguimientoTactil struct {
@@ -168,6 +183,10 @@ func (e EstadoTactil) ajustes() AjustesTactiles {
 func formaTactilDe(r rasgos) formaTactil {
 	idx, med, anu, men := r.ext[0], r.ext[1], r.ext[2], r.ext[3]
 	switch {
+	case r.puntas < agarrePuntasMax && r.medio < agarreMedioMax && idx > agarreDedoMin && med > agarreDedoMin &&
+		idx < agarreDedoMax && med < agarreDedoMax &&
+		math.Min(idx, med)-math.Max(anu, men) > agarreSeparacion:
+		return formaTactilAgarre
 	case idx > dedoEstirado && med > dedoEstirado && anu < dedoRecogido && men < dedoRecogido:
 		return formaTactilDosDedos
 	case idx > 0.10 && r.recto > 25 && med < dedoRecogido && anu < dedoRecogido && men < dedoRecogido && r.puntas > 0.04 && r.puntas < 1.35:
@@ -288,7 +307,7 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 	if e.observarNeutral(f, t, aj) {
 		return e, EventoTactil{}
 	}
-	if e.palancaActiva && f != formaTactilDosDedos {
+	if e.palancaActiva && f != formaTactilAgarre {
 		// La pose parpadea a menudo en pleno scroll: se sostiene la última
 		// palanca un momento antes de soltar.
 		if t-e.seguimiento.ultimo <= aj.GraciaPalanca {
@@ -306,7 +325,7 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 
 	var ev EventoTactil
 	switch s.forma {
-	case formaTactilDosDedos:
+	case formaTactilAgarre:
 		switch {
 		case aj.UmbralPalanca > 0 && (e.palancaActiva || (math.Abs(dy) >= aj.UmbralPalanca && math.Abs(dy) >= aj.DominioDireccion*math.Abs(dx))):
 			p := math.Max(0, math.Abs(dy)-aj.ZonaMuertaPalanca)
@@ -339,6 +358,10 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 				dir = TactilArriba
 			}
 			ev = EventoTactil{Accion: TactilScroll, Direccion: dir, Confianza: confianzaMovimiento(s, math.Abs(dy), aj.UmbralScroll), Activo: true, CuadroMs: t}
+		}
+	case formaTactilDosDedos:
+		// Dos dedos estirados solo hacen el barrido; el scroll es el agarre.
+		switch {
 		case math.Abs(dx) >= aj.UmbralBarrido && math.Abs(dx) >= aj.DominioDireccion*math.Abs(dy):
 			dir := TactilIzquierda
 			if dx < 0 { // imagen sin espejar: es la derecha de la persona

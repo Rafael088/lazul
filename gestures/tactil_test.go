@@ -35,6 +35,31 @@ func correrTactil(activo bool, tramos ...tramo) []EventoTactil {
 	return eventos
 }
 
+func formaTactilDeSintetica(f forma) (formaTactil, rasgos) {
+	r := luzBuena
+	r.semilla = 91
+	cs := sintetizar(colocacionN(0), r, []tramo{{f: f, ms: 200}})
+	c := cs[len(cs)-1]
+	rs := medir(c.Manos[0], c.Aspecto)
+	return formaTactilDe(rs), rs
+}
+
+func TestTactilAgarreSeDistingue(t *testing.T) {
+	if f, r := formaTactilDeSintetica(formaAgarre()); f != formaTactilAgarre {
+		t.Fatalf("el agarre no se reconoce: forma %v, puntas %.2f, medio %.2f, ext %.2f", f, r.puntas, r.medio, r.ext)
+	}
+	otras := map[string]forma{
+		"puño": formaPuno(), "dos dedos": formaDosDedos(), "pellizco cerrado del zoom": formaZoom(0.08),
+		"pellizco abierto del zoom": formaZoom(1.10), "mano abierta": formaAbierta(), "relajada": formaRelajada(),
+		"L": formaL(), "señalar": formaSenalar(),
+	}
+	for nombre, f := range otras {
+		if g, r := formaTactilDeSintetica(f); g == formaTactilAgarre {
+			t.Errorf("%s se confunde con el agarre (puntas %.2f, medio %.2f, ext %.2f)", nombre, r.puntas, r.medio, r.ext)
+		}
+	}
+}
+
 // palancas devuelve la palanca de cada cuadro y los eventos.
 func palancas(tramos ...tramo) ([]float64, []EventoTactil) {
 	r := luzBuena
@@ -54,11 +79,11 @@ func palancas(tramos ...tramo) ([]float64, []EventoTactil) {
 }
 
 func TestTactilPalancaSigueLaManoMientrasSeSostiene(t *testing.T) {
-	agarra := tramo{f: formaDosDedos(), ms: 300}
-	baja := tramo{f: formaDosDedos(), ms: 300, mov: v3{0, 0.24, 0}}
-	sostiene := tramo{f: formaDosDedos(), ms: 2000} // más que VentanaMovimiento
-	vuelve := tramo{f: formaDosDedos(), ms: 400, mov: v3{0, -0.24, 0}}
-	quieta := tramo{f: formaDosDedos(), ms: 300}
+	agarra := tramo{f: formaAgarre(), ms: 300}
+	baja := tramo{f: formaAgarre(), ms: 300, mov: v3{0, 0.24, 0}}
+	sostiene := tramo{f: formaAgarre(), ms: 2000} // más que VentanaMovimiento
+	vuelve := tramo{f: formaAgarre(), ms: 400, mov: v3{0, -0.24, 0}}
+	quieta := tramo{f: formaAgarre(), ms: 300}
 	suelta := tramo{f: formaRelajada(), ms: 600, trans: 100}
 
 	ps, ev := palancas(agarra, baja, sostiene, vuelve, quieta, suelta)
@@ -79,13 +104,13 @@ func TestTactilPalancaSigueLaManoMientrasSeSostiene(t *testing.T) {
 		t.Errorf("al soltar la pose la palanca debe ser 0: %.2f", p)
 	}
 
-	ps, ev = palancas(agarra, tramo{f: formaDosDedos(), ms: 600, mov: v3{0, -0.24, 0}})
+	ps, ev = palancas(agarra, tramo{f: formaAgarre(), ms: 600, mov: v3{0, -0.24, 0}})
 	quiereTactiles(t, "hacia arriba", ev, TactilScroll)
 	if p := ps[len(ps)-1]; p >= 0 {
 		t.Errorf("mano arriba: palanca %.2f, quiere negativa", p)
 	}
 
-	ps, _ = palancas(agarra, tramo{f: formaDosDedos(), ms: 600, mov: v3{0, 0.04, 0}})
+	ps, _ = palancas(agarra, tramo{f: formaAgarre(), ms: 600, mov: v3{0, 0.04, 0}})
 	for _, p := range ps {
 		if p != 0 {
 			t.Fatalf("un temblor no puede mover la palanca: %.2f", p)
@@ -131,8 +156,8 @@ func TestTactilLAlternaModo(t *testing.T) {
 	quiereTactiles(t, "L sostenida no repite", correrTactil(false, tramo{f: formaL(), ms: 3000}), TactilModo)
 }
 
-func TestTactilScrollDosDedos(t *testing.T) {
-	base := tramo{f: formaDosDedos(), ms: 250}
+func TestTactilScrollAgarre(t *testing.T) {
+	base := tramo{f: formaAgarre(), ms: 250}
 	casos := []struct {
 		nombre string
 		mov    v3
@@ -142,7 +167,7 @@ func TestTactilScrollDosDedos(t *testing.T) {
 		{"abajo", v3{0, 0.22, 0}, TactilAbajo},
 	}
 	for _, caso := range casos {
-		eventos := correrTactil(true, base, tramo{f: formaDosDedos(), ms: 450, mov: caso.mov})
+		eventos := correrTactil(true, base, tramo{f: formaAgarre(), ms: 450, mov: caso.mov})
 		quiereTactiles(t, caso.nombre, eventos, TactilScroll)
 		if len(eventos) == 1 && eventos[0].Direccion != caso.dir {
 			t.Errorf("%s: dirección %v", caso.nombre, eventos[0].Direccion)
@@ -151,7 +176,7 @@ func TestTactilScrollDosDedos(t *testing.T) {
 	quiereTactiles(t, "un dedo", correrTactil(true,
 		tramo{f: formaSenalar(), ms: 250}, tramo{f: formaSenalar(), ms: 450, mov: v3{0, -0.3, 0}}))
 	quiereTactiles(t, "movimiento corto", correrTactil(true,
-		base, tramo{f: formaDosDedos(), ms: 450, mov: v3{0, -0.08, 0}}))
+		base, tramo{f: formaAgarre(), ms: 450, mov: v3{0, -0.08, 0}}))
 }
 
 func TestTactilZoomAbreYCierra(t *testing.T) {
@@ -204,18 +229,18 @@ func TestTactilBarridoHorizontal(t *testing.T) {
 }
 
 func TestTactilSoloRespondeActivoYSeRearma(t *testing.T) {
-	dos := tramo{f: formaDosDedos(), ms: 250}
-	mov := tramo{f: formaDosDedos(), ms: 450, mov: v3{0, -0.24, 0}}
+	dos := tramo{f: formaAgarre(), ms: 250}
+	mov := tramo{f: formaAgarre(), ms: 450, mov: v3{0, -0.24, 0}}
 	quiereTactiles(t, "scroll apagado", correrTactil(false, dos, mov))
-	quiereTactiles(t, "una pose no repite", correrTactil(true, dos, mov, tramo{f: formaDosDedos(), ms: 2000}), TactilScroll)
+	quiereTactiles(t, "una pose no repite", correrTactil(true, dos, mov, tramo{f: formaAgarre(), ms: 2000}), TactilScroll)
 	quiereTactiles(t, "rearma tras neutral", correrTactil(true,
 		dos, mov, tramo{f: formaRelajada(), ms: 500, trans: 100}, dos, mov), TactilScroll, TactilScroll)
 }
 
 func TestTactilIgnoraElRegresoDeLaMano(t *testing.T) {
-	dos := tramo{f: formaDosDedos(), ms: 250}
-	baja := tramo{f: formaDosDedos(), ms: 450, mov: v3{0, 0.24, 0}}
-	sube := tramo{f: formaDosDedos(), ms: 450, mov: v3{0, -0.24, 0}}
+	dos := tramo{f: formaAgarre(), ms: 250}
+	baja := tramo{f: formaAgarre(), ms: 450, mov: v3{0, 0.24, 0}}
+	sube := tramo{f: formaAgarre(), ms: 450, mov: v3{0, -0.24, 0}}
 	suelta := tramo{f: formaRelajada(), ms: 500, trans: 100}
 
 	// Bajar, volver arriba y bajar otra vez: dos scrolls abajo, ningún arriba.

@@ -87,6 +87,7 @@ type rasgos struct {
 	pulgar   float64    // punta del pulgar a nudillo del índice, en palmas
 	angulo   float64    // pulgar (1→4) contra índice (5→8), en grados
 	puntas   float64    // punta del pulgar a punta del índice, en palmas
+	medio    float64    // punta del pulgar a punta del medio, en palmas
 	centro   vec        // centro de la palma
 	pinza    vec        // punto medio entre las puntas del pulgar y el índice
 	pose     Pose
@@ -125,6 +126,7 @@ func medir(m Mano, aspecto float32) rasgos {
 	r.pulgar = dist(p[PulgarPunta], p[IndiceMCP]) / r.palma
 	r.angulo = gradosEntre(p[PulgarPunta].menos(p[PulgarBase]), indice)
 	r.puntas = dist(p[PulgarPunta], p[IndicePunta]) / r.palma
+	r.medio = dist(p[PulgarPunta], p[MedioPunta]) / r.palma
 	for _, i := range [5]int{Muneca, IndiceMCP, MedioMCP, AnularMCP, MeniqueMCP} {
 		r.centro = r.centro.mas(p[i].por(0.2))
 	}

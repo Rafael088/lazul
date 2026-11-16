@@ -71,7 +71,9 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 ## Modo táctil (dec-gzgl)
 
 En Linux, `./dev app` pasa cada cuadro por `ClasificarTactil`: la L sostenida
-alterna el modo; dos dedos en vertical hacen scroll; una pinza que abre/cierra
+alterna el modo; el agarre (pulgar, índice y medio con las puntas juntas)
+hace scroll continuo con la rueda virtual mientras se sostiene, según cuánto
+se aleje la mano del punto de agarre; una pinza que abre/cierra
 hace zoom; dos dedos en horizontal mandan Page Up/Page Down para las
 diapositivas. Las acciones se aplican localmente a la ventana con foco mediante
 `platform.TactileActions`. El modo se apaga tras 3 s sin mano. Cada gesto y su
