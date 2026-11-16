@@ -81,9 +81,9 @@ func (a accionesTactiles) enviarVeces(ctx context.Context, mods, tecla string, v
 func (a accionesTactiles) Scroll(ctx context.Context, direction platform.ScrollDirection) error {
 	switch direction {
 	case platform.ScrollUp:
-		return a.enviarVeces(ctx, "", "Up", ScrollPulsaciones, "scroll arriba")
+		return a.enviarVeces(ctx, "", "Up", a.perfil(ctx).scrollVeces, "scroll arriba")
 	case platform.ScrollDown:
-		return a.enviarVeces(ctx, "", "Down", ScrollPulsaciones, "scroll abajo")
+		return a.enviarVeces(ctx, "", "Down", a.perfil(ctx).scrollVeces, "scroll abajo")
 	default:
 		if err := ctx.Err(); err != nil {
 			return err
@@ -110,7 +110,22 @@ func (a accionesTactiles) Navigate(ctx context.Context, direction platform.Navig
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if mode != platform.NavigationNormal && mode != platform.NavigationSlides {
+		return platform.ErrAccionInvalida
+	}
 	var tecla, accion string
+	if p := a.perfil(ctx); p.navAtras != "" {
+		switch direction {
+		case platform.NavigateLeft:
+			tecla, accion = p.navAtras, "atrás ("+p.nombre+")"
+		case platform.NavigateRight:
+			tecla, accion = p.navAdelante, "adelante ("+p.nombre+")"
+		}
+		if tecla == "" {
+			return platform.ErrAccionInvalida
+		}
+		return a.enviar(ctx, "", tecla, accion)
+	}
 	switch mode {
 	case platform.NavigationNormal:
 		switch direction {

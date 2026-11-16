@@ -67,13 +67,17 @@ type AjustesTactiles struct {
 	VentanaMovimiento  int64
 	GraciaMovimiento   int64
 	Rearmar            int64
-	UmbralScroll       float64
-	UmbralBarrido      float64
-	DominioDireccion   float64
-	UmbralZoom         float64
-	ZoomCerradoMax     float64
-	ZoomAbiertoMin     float64
-	ZoomCentroMax      float64
+	// IgnorarRegreso: tras un scroll, barrido o zoom, durante estos ms se
+	// ignora el mismo gesto en la dirección contraria. Es la mano que vuelve
+	// a su sitio para repetir; sin esto, 5 scrolls abajo dejaban 1 neto.
+	IgnorarRegreso   int64
+	UmbralScroll     float64
+	UmbralBarrido    float64
+	DominioDireccion float64
+	UmbralZoom       float64
+	ZoomCerradoMax   float64
+	ZoomAbiertoMin   float64
+	ZoomCentroMax    float64
 }
 
 var AjustesTactilesPorDefecto = AjustesTactiles{
@@ -84,6 +88,7 @@ var AjustesTactilesPorDefecto = AjustesTactiles{
 	VentanaMovimiento:  1000,
 	GraciaMovimiento:   120,
 	Rearmar:            250,
+	IgnorarRegreso:     2500,
 	UmbralScroll:       0.70,
 	UmbralBarrido:      1.20,
 	DominioDireccion:   1.50,
@@ -127,6 +132,9 @@ type EstadoTactil struct {
 	seguimiento   seguimientoTactil
 	esperaNeutral bool
 	desdeNeutral  int64
+	ultAccion     AccionTactil
+	ultDir        DireccionTactil
+	ultMs         int64
 }
 
 // NuevoEstadoTactil crea el clasificador apagado o activo. El arranque activo
@@ -298,6 +306,39 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 	}
 	if ev.Accion != TactilNinguno {
 		e.bloquearHastaNeutral()
+		if e.esRegreso(ev, aj) {
+			return e, EventoTactil{}
+		}
+		e.ultAccion, e.ultDir, e.ultMs = ev.Accion, ev.Direccion, t
 	}
 	return e, ev
+}
+
+// esRegreso dice si ev es la mano volviendo después del último gesto: el
+// mismo gesto en la dirección contraria antes de IgnorarRegreso. El regreso
+// ignorado no renueva el plazo, así que cambiar de dirección a propósito solo
+// pide una pausa corta.
+func (e EstadoTactil) esRegreso(ev EventoTactil, aj AjustesTactiles) bool {
+	if aj.IgnorarRegreso <= 0 || e.ultAccion != ev.Accion || ev.CuadroMs-e.ultMs >= aj.IgnorarRegreso {
+		return false
+	}
+	return ev.Direccion == contraria(e.ultDir)
+}
+
+func contraria(d DireccionTactil) DireccionTactil {
+	switch d {
+	case TactilArriba:
+		return TactilAbajo
+	case TactilAbajo:
+		return TactilArriba
+	case TactilIzquierda:
+		return TactilDerecha
+	case TactilDerecha:
+		return TactilIzquierda
+	case TactilAbrir:
+		return TactilCerrar
+	case TactilCerrar:
+		return TactilAbrir
+	}
+	return TactilSinDireccion
 }

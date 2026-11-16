@@ -96,6 +96,9 @@ otro también pueda mandarte, empareja al revés.
 - **Pinza que se abre o se cierra**: acerca o aleja.
 - **Dos dedos hacia la izquierda o la derecha**: cambian de diapositiva.
 - Si la cámara deja de ver una mano durante 3 segundos, el modo se apaga solo.
+- **Repetir el scroll**: baja, sube la mano y vuelve a bajar. El regreso de la
+  mano no cuenta durante 2,5 s después de cada gesto; para cambiar de
+  dirección, haz una pausa corta.
 - Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
   que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
 
@@ -105,6 +108,20 @@ puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás cuando no ve
 la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
 transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
 `%APPDATA%\lazul\recibidos`).
+
+### Según la app con foco (Linux)
+
+Cada gesto se traduce según la ventana con foco (`platform/linux/perfiles_tactiles.go`):
+
+| App | Scroll | Barrido |
+| --- | --- | --- |
+| Navegador (Zen, Firefox, Chrome…) | 8 flechas | ← / → (Google Slides, Canva, reveal.js) |
+| PDF (Evince, Papers, Okular, Zathura…) | 3 flechas | RePág / AvPág |
+| Diapositivas (LibreOffice, OnlyOffice…) | 1 flecha | RePág / AvPág |
+| Cualquier otra | 3 flechas | RePág / AvPág |
+
+El zoom es siempre `Ctrl` + `+` / `-`. Hyprland no puede inyectar la rueda del
+ratón, por eso el scroll son flechas.
 
 ## La prueba de las activaciones falsas (30 min)
 

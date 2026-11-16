@@ -69,7 +69,11 @@ func TestTactilConectaGestosConAccionesDeLinux(t *testing.T) {
 		t.Fatal(err)
 	}
 	acciones := &accionesTactilesPrueba{}
-	v := &Tactil{Reg: reg, Acciones: acciones}
+	// Las grabaciones van pegadas, así que se apaga IgnorarRegreso: si no,
+	// el scroll abajo justo después del arriba contaría como regreso.
+	aj := gestures.AjustesTactilesPorDefecto
+	aj.IgnorarRegreso = -1
+	v := &Tactil{Reg: reg, Acciones: acciones, Ajustes: aj}
 	cs := recorridoTactil(t, "modo-activar-buena-001,scroll-07-arriba-buena-001,scroll-08-abajo-mala-001,zoom-07-abrir-buena-001,zoom-08-cerrar-mala-001,barrido-07-derecha-buena-001,barrido-08-izquierda-mala-001")
 	vista := pasarTactil(t, v, cs, time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC))
 	v.Parar(time.Now())

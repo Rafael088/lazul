@@ -154,6 +154,30 @@ func TestTactilSoloRespondeActivoYSeRearma(t *testing.T) {
 		dos, mov, tramo{f: formaRelajada(), ms: 500, trans: 100}, dos, mov), TactilScroll, TactilScroll)
 }
 
+func TestTactilIgnoraElRegresoDeLaMano(t *testing.T) {
+	dos := tramo{f: formaDosDedos(), ms: 250}
+	baja := tramo{f: formaDosDedos(), ms: 450, mov: v3{0, 0.24, 0}}
+	sube := tramo{f: formaDosDedos(), ms: 450, mov: v3{0, -0.24, 0}}
+	suelta := tramo{f: formaRelajada(), ms: 500, trans: 100}
+
+	// Bajar, volver arriba y bajar otra vez: dos scrolls abajo, ningún arriba.
+	ev := correrTactil(true, dos, baja, suelta, dos, sube, suelta, dos, baja)
+	quiereTactiles(t, "bombeo hacia abajo", ev, TactilScroll, TactilScroll)
+	for _, e := range ev {
+		if e.Direccion != TactilAbajo {
+			t.Fatalf("el regreso de la mano contó como scroll: %+v", ev)
+		}
+	}
+
+	// Tras una pausa más larga que IgnorarRegreso, cambiar de dirección vale.
+	pausa := tramo{f: formaRelajada(), ms: AjustesTactilesPorDefecto.IgnorarRegreso + 200, trans: 100}
+	ev = correrTactil(true, dos, baja, pausa, dos, sube)
+	quiereTactiles(t, "cambio de dirección con pausa", ev, TactilScroll, TactilScroll)
+	if len(ev) == 2 && ev[1].Direccion != TactilArriba {
+		t.Fatalf("después de la pausa: %+v", ev)
+	}
+}
+
 func TestTactilEsPuro(t *testing.T) {
 	cs := sintetizar(colocacionN(0), luzBuena, []tramo{{f: formaL(), ms: 700}})
 	e := NuevoEstadoTactil(false, AjustesTactilesPorDefecto)
