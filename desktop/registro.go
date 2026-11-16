@@ -30,6 +30,7 @@ const (
 const (
 	ActCaptura    = "captura"           // agarró y soltó
 	ActGesto4     = "gesto4"            // mandó la ventana activa
+	ActTactil     = "tactil"            // usó al menos una acción táctil
 	ActSinGesto   = "sin_gesto"         // venció el modo activo sin ningún gesto
 	ActCancelada  = "agarrar_cancelado" // agarró pero no soltó hacia un lado
 	ActInterrumpe = "interrumpida"      // la cámara se apagó en medio

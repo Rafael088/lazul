@@ -1,7 +1,7 @@
 ---
 id: arq-mgew
 temas: [arquitectura]
-actualizado: 2026-11-08
+actualizado: 2026-11-16
 ---
 # Arquitectura inicial
 
@@ -26,4 +26,4 @@ Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dí
 
 - comando: `./dev app`
 - url:
-- qué esperar: se abre una ventana de escritorio de Lazul con la cámara y los puntos de tu mano, la pose, el modo y el último gesto; enciende la cámara mientras esté abierta y escucha en el puerto 53317 (en el PC con ventana a la vista; si se esconde, la cámara se detiene). Para el otro PC Windows: `./dev app win` desde este Linux.
+- qué esperar: en Linux se abre una ventana de Lazul con la cámara, los puntos de la mano, un indicador ACTIVO/INACTIVO, la cuenta atrás sin mano y el último gesto; la L alterna el modo táctil y los gestos controlan scroll, zoom y diapositivas en la ventana con foco. En Windows conserva el modo de transferencia. La cámara permanece encendida mientras la ventana esté abierta y la app escucha en el puerto 53317. Para el otro PC Windows: `./dev app win` desde este Linux.

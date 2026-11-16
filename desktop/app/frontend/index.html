@@ -16,7 +16,11 @@
   #sincamara { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--tenue); transform: scaleX(-1); text-align: center; padding: 20px; }
   .fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .grande { font-size: 22px; font-weight: 600; }
-  .modo-reposo { color: var(--tenue); } .modo-activo { color: var(--ojo); } .modo-agarrando { color: var(--bien); }
+  #modo { display: inline-block; min-width: 104px; padding: 2px 8px; border: 1px solid var(--borde); border-radius: 999px; text-align: center; }
+  .modo-reposo, .modo-inactivo { color: var(--tenue); background: #262d50; }
+  .modo-activo { color: #101428; background: var(--ojo); border-color: var(--ojo) !important; }
+  .modo-agarrando { color: var(--bien); }
+  #apagatactil { font-size: 12px; margin-left: 4px; }
   section { background: var(--panel); border: 1px solid var(--borde); border-radius: 6px; padding: 10px; }
   h2 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--tenue); }
   button { background: var(--lapis); color: white; border: 0; border-radius: 4px; padding: 6px 10px; font: inherit; cursor: pointer; }
@@ -63,9 +67,10 @@
     </div>
     <div id="estado-gesto" class="fila" style="margin-top:8px">
       <span>Pose <b id="pose" class="grande">-</b></span>
-      <span>Modo <b id="modo" class="grande modo-reposo">-</b></span>
+      <span><span id="modoetiqueta">Modo táctil</span> <b id="modo" class="grande modo-inactivo">INACTIVO</b> <span id="apagatactil" class="tenue">Haz la L para activar</span></span>
       <span>Último gesto <b id="ultimo" class="grande">-</b> <span id="ultimohora" class="tenue"></span></span>
     </div>
+    <div id="errtactil" class="mal"></div>
     <div id="camara-fila" class="fila" style="margin-top:6px">
       <button id="camara" class="sec">Apagar cámara</button>
       <span id="fps" class="tenue"></span>
@@ -74,7 +79,8 @@
 
   <details id="controles">
     <summary>Equipos, emparejamiento y prueba</summary>
-    <p class="tenue ayuda">La L sostenida activa 5 s. Activo: puño = agarrar una captura; pinza y arrastrar = mandar la ventana activa.
+    <p id="ayudatactil" class="tenue ayuda">La L sostenida enciende o apaga el modo táctil. Activo: dos dedos arriba/abajo desplazan; una pinza abre/cierra el zoom; dos dedos a un lado cambian de diapositiva. Se apaga solo tras 3 s sin mano.</p>
+    <p id="ayudatransferencia" class="tenue ayuda" style="display:none">La L sostenida activa 5 s. Activo: puño = agarrar una captura; pinza y arrastrar = mandar la ventana activa.
       Agarrando: abre la mano y muévela a un lado para soltar. Mantén esta ventana visible: si se oculta, la cámara puede detenerse.</p>
     <div id="der">
     <section id="permiso">
