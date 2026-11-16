@@ -1,9 +1,14 @@
-// Lazul (prototipo de factibilidad, cotejo-egtbal): la ventana de escritorio.
+// Lazul (v0.2.0, cotejo-2iwx1x): el indicador de escritorio.
+// Por defecto la ventana es una píldora pequeña en una esquina: muestra si
+// el modo táctil está activo y destella el gesto reconocido. La vista de la
+// cámara queda como opción para acomodarse (botón o Ctrl+Mayús+C) y la app
+// arranca con la cámara encendida aunque su vista esté apagada.
+//
 // La webview abre la cámara (Windows: getUserMedia; Linux: ffmpeg en un
 // proceso aparte, dec-7tgj), corre MediaPipe Hand Landmarker y le pasa los
-// puntos a Go: gestures.Clasificar, el Enrutador y las Órdenes al equipo
-// emparejado. La lógica está en el paquete desktop (con pruebas); esto es
-// solo la ventana y los enlaces con la página. Cómo usarla: desktop/README.md.
+// puntos a Go: gestures.Clasificar (modo táctil) y el Enrutador (0.1.0). La
+// lógica está en el paquete desktop (con pruebas); esto es solo la ventana y
+// los enlaces con la página. Cómo usarla: desktop/README.md.
 //
 //	lazul [-nombre N] [-camara auto|webview|proceso|no] [-dispositivo /dev/video0]
 //	      [-estado DIR] [-escucha :53317] [-abrir=false] [-mdns=false]
@@ -36,6 +41,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -71,13 +77,14 @@ type Solicitud struct {
 
 // Estado es lo que la página pinta cada medio segundo.
 type Estado struct {
-	Red     desktop.EstadoRed `json:"red"`
-	Vista   desktop.Vista     `json:"vista"`
-	Permiso *Solicitud        `json:"permiso"`
-	Prueba  bool              `json:"prueba"`
-	FPS     float64           `json:"fps"`
-	ConMano float64           `json:"con_mano"` // fracción de cuadros con mano (últimos 5 s)
-	Camara  string            `json:"camara"`   // error de la cámara, si hay
+	Red       desktop.EstadoRed      `json:"red"`
+	Vista     desktop.Vista          `json:"vista"`
+	Indicador desktop.VistaIndicador `json:"indicador"`
+	Permiso   *Solicitud             `json:"permiso"`
+	Prueba    bool                   `json:"prueba"`
+	FPS       float64                `json:"fps"`
+	ConMano   float64                `json:"con_mano"` // fracción de cuadros con mano (últimos 5 s)
+	Camara    string                 `json:"camara"`   // error de la cámara, si hay
 }
 
 type App struct {
@@ -96,6 +103,13 @@ type App struct {
 	fps      float64
 	fracMano float64
 	errCam   string
+	tactil   gestures.EstadoTactil
+	ind      *desktop.Indicador
+
+	vistaCamara       bool
+	posIndicadorX     int
+	posIndicadorY     int
+	tienePosIndicador bool
 }
 
 func (a *App) Config() Config { return a.cfg }
@@ -134,7 +148,20 @@ func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
 }
 
 func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
-	v := a.vivo.Cuadro(c, time.Now())
+	ahora := time.Now()
+	v := a.vivo.Cuadro(c, ahora)
+
+	// El indicador se alimenta del clasificador táctil (scroll, zoom y
+	// barrido). Reconocer el gesto no dispara nada aquí: eso es la tarea del
+	// modo táctil; esta interfaz solo lo muestra.
+	a.mu.Lock()
+	var evT gestures.EventoTactil
+	a.tactil, evT = gestures.ClasificarTactil(a.tactil, c)
+	a.mu.Unlock()
+	a.ind.Aplicar(evT, ahora)
+	vi := a.ind.Vista(ahora)
+	v.Indicador = &vi
+
 	a.mu.Lock()
 	a.vista = v
 	a.cuadros++
@@ -144,6 +171,9 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	a.mu.Unlock()
 	if v.Gesto != "" {
 		decir("gesto %s %s (pose %s, modo %s, activación %d)", v.Gesto, v.Direccion, v.Pose, v.Modo, v.Activacion)
+	}
+	if evT.Accion != gestures.TactilNinguno {
+		decir("táctil %s %s (activo %v)", evT.Accion, evT.Direccion, evT.Activo)
 	}
 	return v
 }
@@ -166,12 +196,17 @@ func (a *App) CamaraEncender() string {
 	return ""
 }
 
-// CamaraApagar cierra la sesión de uso y, en Linux, ffmpeg.
+// CamaraApagar cierra la sesión de uso y, en Linux, ffmpeg. El indicador
+// vuelve a inactivo.
 func (a *App) CamaraApagar() {
 	if a.cap != nil {
 		a.cap.apagar()
 	}
 	a.vivo.Parar(time.Now())
+	a.mu.Lock()
+	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
+	a.mu.Unlock()
+	a.ind.Apagar()
 	decir("cámara apagada")
 }
 
@@ -184,12 +219,81 @@ func (a *App) CamaraError(s string) {
 }
 
 func (a *App) Estado() Estado {
+	vi := a.ind.Vista(time.Now())
 	a.mu.Lock()
-	e := Estado{Vista: a.vista, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano, Camara: a.errCam}
+	e := Estado{Vista: a.vista, Indicador: vi, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano, Camara: a.errCam}
 	a.mu.Unlock()
 	e.Red = a.nucleo.Estado()
 	e.Prueba = a.vivo.EnPrueba()
 	return e
+}
+
+// VistaCamara abre o cierra la vista de la cámara para acomodarse. Al
+// abrirla, guarda dónde estaba el indicador y centra la ventana grande; al
+// cerrarla, vuelve al tamaño del indicador y a su esquina.
+func (a *App) VistaCamara(on bool) string {
+	a.mu.Lock()
+	if a.vistaCamara == on {
+		a.mu.Unlock()
+		return ""
+	}
+	a.vistaCamara = on
+	a.mu.Unlock()
+	if a.ctx == nil {
+		return ""
+	}
+	if on {
+		x, y := wruntime.WindowGetPosition(a.ctx)
+		a.mu.Lock()
+		a.posIndicadorX, a.posIndicadorY, a.tienePosIndicador = x, y, true
+		a.mu.Unlock()
+		wruntime.WindowSetSize(a.ctx, desktop.AnchoAjuste, desktop.AltoAjuste)
+		if ancho, alto, ok := pantallaActual(a.ctx); ok {
+			wruntime.WindowSetPosition(a.ctx, max(0, (ancho-desktop.AnchoAjuste)/2), max(0, (alto-desktop.AltoAjuste)/2))
+		}
+	} else {
+		wruntime.WindowSetSize(a.ctx, desktop.AnchoIndicador, desktop.AltoIndicador)
+		a.mu.Lock()
+		x, y, ok := a.posIndicadorX, a.posIndicadorY, a.tienePosIndicador
+		a.mu.Unlock()
+		if ok {
+			wruntime.WindowSetPosition(a.ctx, x, y)
+		}
+	}
+	decir("vista de cámara %v", on)
+	return ""
+}
+
+// Salir cierra la app desde la vista de cámara.
+func (a *App) Salir() {
+	if a.ctx != nil {
+		wruntime.Quit(a.ctx)
+	}
+}
+
+// pantallaActual devuelve el tamaño lógico de la pantalla donde está la
+// ventana (o de la principal) para centrar la vista de cámara.
+func pantallaActual(ctx context.Context) (int, int, bool) {
+	pantallas, err := wruntime.ScreenGetAll(ctx)
+	if err != nil {
+		return 0, 0, false
+	}
+	for _, p := range pantallas {
+		if p.IsCurrent && p.Size.Width > 0 && p.Size.Height > 0 {
+			return p.Size.Width, p.Size.Height, true
+		}
+	}
+	for _, p := range pantallas {
+		if p.IsPrimary && p.Size.Width > 0 && p.Size.Height > 0 {
+			return p.Size.Width, p.Size.Height, true
+		}
+	}
+	for _, p := range pantallas {
+		if p.Size.Width > 0 && p.Size.Height > 0 {
+			return p.Size.Width, p.Size.Height, true
+		}
+	}
+	return 0, 0, false
 }
 
 func (a *App) AbrirCodigo() string {
@@ -436,7 +540,12 @@ func correr(o opciones) error {
 		cs = desktop.Encadenar(gs, 400)
 		modo = "no"
 	}
-	app := &App{cfg: Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg}, reg: reg}
+	app := &App{
+		cfg:    Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg},
+		reg:    reg,
+		ind:    &desktop.Indicador{},
+		tactil: gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto),
+	}
 	if modo == "proceso" {
 		app.cap = nuevaCaptura(o.dispositivo)
 	}
@@ -484,25 +593,34 @@ func correr(o opciones) error {
 		decir("aviso: no se restauró la ventana: %v", errVentana)
 	}
 	guardarVentana := func(c context.Context) {
-		ancho, alto := wruntime.WindowGetSize(c)
-		x, y := wruntime.WindowGetPosition(c)
-		e := desktop.EstadoVentana{Ancho: ancho, Alto: alto, X: x, Y: y, TienePosicion: true}
+		app.mu.Lock()
+		x, y, ok := app.posIndicadorX, app.posIndicadorY, app.tienePosIndicador
+		enAjuste := app.vistaCamara
+		app.mu.Unlock()
+		if !enAjuste || !ok {
+			x, y = wruntime.WindowGetPosition(c)
+		}
+		e := desktop.EstadoVentana{Ancho: desktop.AnchoIndicador, Alto: desktop.AltoIndicador, X: x, Y: y, TienePosicion: true}
 		if err := desktop.GuardarEstadoVentana(rutaVentana, e); err != nil {
 			decir("aviso: no se guardó la ventana: %v", err)
 		}
 	}
 	err = wails.Run(&options.App{
 		Title:       o.titulo,
-		Width:       ventana.Ancho,
-		Height:      ventana.Alto,
+		Width:       desktop.AnchoIndicador,
+		Height:      desktop.AltoIndicador,
 		MinWidth:    desktop.AnchoVentanaMinimo,
 		MinHeight:   desktop.AltoVentanaMinimo,
+		Frameless:   true,
 		AlwaysOnTop: true,
 		AssetServer: &assetserver.Options{Assets: sub, Handler: manejador(app.cap)},
 		OnStartup: func(c context.Context) {
 			app.ctx = c
 			if ventana.TienePosicion {
 				wruntime.WindowSetPosition(c, ventana.X, ventana.Y)
+			} else if ancho, alto, ok := pantallaActual(c); ok {
+				x, y := desktop.PosicionEnEsquina(desktop.AnchoIndicador, desktop.AltoIndicador, ancho, alto, desktop.MargenIndicador)
+				wruntime.WindowSetPosition(c, x, y)
 			}
 			if len(cs) > 0 {
 				go func() {
@@ -530,9 +648,14 @@ func correr(o opciones) error {
 			cancel()
 		},
 		Bind:             []interface{}{app},
-		BackgroundColour: &options.RGBA{R: 16, G: 20, B: 40, A: 255},
+		BackgroundColour: &options.RGBA{R: 16, G: 20, B: 40, A: 0},
+		Windows: &windows.Options{
+			WebviewIsTransparent:              true,
+			WindowIsTranslucent:               true,
+			DisableFramelessWindowDecorations: true,
+		},
 		// Sin esto Wails deja WebKitGTK sin aceleración y no hay WebGL: MediaPipe no corre.
-		Linux: &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand, ProgramName: "lazul"},
+		Linux: &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand, ProgramName: "lazul", WindowIsTranslucent: true},
 	})
 	return err
 }

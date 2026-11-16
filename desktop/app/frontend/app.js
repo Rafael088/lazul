@@ -1,21 +1,70 @@
-// Ventana de Lazul: la cámara y MediaPipe aquí; todo lo demás (clasificar,
+// Indicador de Lazul: la cámara y MediaPipe aquí; todo lo demás (clasificar,
 // emparejar, mandar) en Go. Los cuadros no salen de esta página: a Go solo
-// le llegan los 21 puntos de la mano.
+// le llegan los 21 puntos de la mano. Por defecto solo se ve el indicador;
+// la vista de cámara se abre para acomodarse y se cierra al terminar.
 const $ = (id) => document.getElementById(id);
+const hayGo = () => !!(window.go && window.go.main);
 const go = () => window.go.main.App;
-const log = (s) => { try { go().Log(String(s)); } catch {} };
+const log = (s) => { try { if (hayGo()) go().Log(String(s)); } catch {} };
 
 const CONEXIONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
 
 async function esperarWails() {
-  for (let i = 0; i < 400 && !(window.go && window.go.main); i++) await new Promise((r) => setTimeout(r, 25));
+  for (let i = 0; i < 200 && !hayGo(); i++) await new Promise((r) => setTimeout(r, 25));
+}
+
+// ---------- indicador pequeño ----------
+let vistaCamara = false, ultimaSecuencia = 0;
+
+const FLECHAS = { arriba: "↑", abajo: "↓", izquierda: "←", derecha: "→", abrir: "+", cerrar: "−" };
+
+function etiquetaGesto(ind) {
+  if (!ind || !ind.gesto) return "";
+  const f = FLECHAS[ind.direccion] || "";
+  if (ind.gesto === "scroll") return "scroll " + f;
+  if (ind.gesto === "zoom") return "zoom " + f;
+  if (ind.gesto === "barrido") return f || "barrido";
+  return ind.gesto;
+}
+
+function mostrarIndicador(ind) {
+  const pill = $("indicador");
+  if (!pill) return;
+  const activo = !!(ind && ind.activo);
+  pill.classList.toggle("activo", activo);
+  $("indicador-estado").textContent = activo ? "activo" : "inactivo";
+  if (!ind || !ind.destello) {
+    $("indicador-gesto").textContent = "";
+    pill.classList.remove("destello");
+    return;
+  }
+  $("indicador-gesto").textContent = etiquetaGesto(ind);
+  // Cada gesto tiene una secuencia nueva: así la animación se reinicia
+  // aunque dos gestos caigan dentro del mismo destello.
+  if (ind.secuencia !== ultimaSecuencia) {
+    ultimaSecuencia = ind.secuencia;
+    pill.classList.remove("destello");
+    void pill.offsetWidth;
+    pill.classList.add("destello");
+  }
+}
+
+async function alternarAjuste(on = !vistaCamara) {
+  if (on === vistaCamara) return;
+  vistaCamara = on;
+  document.body.classList.toggle("camara", vistaCamara);
+  $("ajuste").setAttribute("aria-hidden", vistaCamara ? "false" : "true");
+  if (hayGo()) {
+    try { await go().VistaCamara(vistaCamara); } catch (e) { log("vista de cámara: " + e); }
+  }
+  if (vistaCamara) $("escena").scrollIntoView({ block: "nearest" });
 }
 
 // ---------- cámara + MediaPipe ----------
 let cfg, lm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
 const puntos = () => $("puntos").getContext("2d");
 
-function pintar(manos, w, h) {
+function pintar(manos) {
   const c = puntos();
   c.clearRect(0, 0, 640, 480);
   for (const m of manos) {
@@ -33,6 +82,7 @@ function mostrarVista(v) {
   $("modo").className = "grande modo-" + (v.modo || "reposo");
   $("ultimo").textContent = v.ultimo || "-";
   $("ultimohora").textContent = v.ultimo_hora ? "a las " + v.ultimo_hora : "";
+  mostrarIndicador(v.indicador);
 }
 
 function procesar(fuente, w, h) {
@@ -42,7 +92,7 @@ function procesar(fuente, w, h) {
     const hd = (r.handedness || r.handednesses || [])[i];
     return { derecha: !!(hd && hd[0] && hd[0].categoryName === "Right"), p: pts.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]) };
   });
-  pintar(manos, w, h);
+  if (vistaCamara) pintar(manos);
   const cuadro = { t: Math.round(ts - t0), manos, ancho: w, alto: h };
   // En orden y sin amontonar: si Go se atrasa, se salta el cuadro.
   if (pendientes > 4) return;
@@ -95,7 +145,7 @@ async function apagar() {
   puntos().clearRect(0, 0, 640, 480);
   $("sincamara").textContent = "cámara apagada";
   $("sincamara").style.display = "flex";
-  await go().CamaraApagar();
+  if (hayGo()) await go().CamaraApagar();
 }
 
 // Linux: los cuadros los da ffmpeg (otro proceso) como JPEG por el AssetServer.
@@ -116,7 +166,9 @@ async function bucleProceso(gen) {
   }
 }
 
-// Windows: la webview abre la cámara.
+// Windows: la webview abre la cámara. Se usa un temporizador, no
+// requestVideoFrameCallback, para que siga dando cuadros con el indicador
+// solo (la vista de cámara oculta no debe parar los gestos).
 async function bucleWebview(gen) {
   const video = $("video");
   $("imagen").style.display = "none";
@@ -125,23 +177,23 @@ async function bucleWebview(gen) {
   video.srcObject = st;
   await video.play();
   $("sincamara").style.display = "none";
-  const cb = () => {
+  let ultimo = -1;
+  const paso = () => {
     if (gen !== generacion) return;
-    procesar(video, video.videoWidth || 640, video.videoHeight || 480);
-    video.requestVideoFrameCallback(cb);
+    if (video.currentTime !== ultimo && video.readyState >= 2) {
+      ultimo = video.currentTime;
+      procesar(video, video.videoWidth || 640, video.videoHeight || 480);
+    }
+    setTimeout(paso, 33);
   };
-  if ("requestVideoFrameCallback" in HTMLVideoElement.prototype) video.requestVideoFrameCallback(cb);
-  else {
-    let tv = -1;
-    const bucle = () => { if (gen !== generacion) return; if (video.currentTime !== tv) { tv = video.currentTime; procesar(video, video.videoWidth || 640, video.videoHeight || 480); } requestAnimationFrame(bucle); };
-    requestAnimationFrame(bucle);
-  }
+  paso();
 }
 
 // ---------- el resto de la ventana ----------
-function texto(id, t) { $(id).textContent = t; }
+function texto(id, t) { const el = $(id); if (el) el.textContent = t; }
 
 function pintarEstado(e) {
+  mostrarIndicador(e.indicador);
   const r = e.red;
   texto("nombre", r.nombre); texto("huella", r.huella);
   texto("dirs", (r.direcciones || []).join("  ·  ") || (r.escuchando ? "(sin red local)" : "-"));
@@ -166,15 +218,36 @@ function pintarEstado(e) {
   }
   $("prueba").textContent = e.prueba ? "Terminar prueba de trabajo normal" : "Empezar prueba de trabajo normal";
   $("prueba").dataset.on = e.prueba ? "1" : "";
-  if (cfg.reproducir) mostrarVista(e.vista);
+  if (cfg && cfg.reproducir) mostrarVista(e.vista);
   const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano en ${(100 * e.con_mano).toFixed(0)} %` : "";
   texto("fps", (e.camara ? "Cámara: " + e.camara + " " : "") + fps);
 }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
 
+function enlazarIndicador() {
+  $("abrir-ajuste").onclick = (ev) => { ev.stopPropagation(); alternarAjuste(true); };
+  $("cerrar-ajuste").onclick = () => alternarAjuste(false);
+  $("salir").onclick = () => { if (hayGo()) go().Salir(); };
+  document.addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && (ev.key === "c" || ev.key === "C")) {
+      ev.preventDefault(); alternarAjuste();
+    } else if (ev.key === "Escape" && vistaCamara) {
+      ev.preventDefault(); alternarAjuste(false);
+    }
+  });
+}
+
 async function main() {
+  enlazarIndicador();
   await esperarWails();
+  if (!hayGo()) {
+    // Vista previa del indicador (sin Wails, por ejemplo al abrir el HTML
+    // suelto): se puede abrir y cerrar la vista de cámara para ver el diseño.
+    texto("sincamara", "vista previa: aquí se vería la cámara");
+    $("camara").disabled = true;
+    return;
+  }
   cfg = await go().Config();
   texto("registro", cfg.registro);
   $("abrircodigo").onclick = () => go().AbrirCodigo();

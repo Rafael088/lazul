@@ -65,3 +65,17 @@ func TestGuardarEstadoVentanaRechazaTamanoInvalido(t *testing.T) {
 		t.Fatalf("el archivo no debía existir: %v", err)
 	}
 }
+
+func TestPosicionEnEsquinaPegaAbajoADerecha(t *testing.T) {
+	x, y := PosicionEnEsquina(AnchoIndicador, AltoIndicador, 1280, 800, MargenIndicador)
+	if x != 1280-AnchoIndicador-MargenIndicador || y != 800-AltoIndicador-MargenIndicador {
+		t.Fatalf("posición = %d,%d", x, y)
+	}
+}
+
+func TestPosicionEnEsquinaNoSaleDeUnaPantallaChica(t *testing.T) {
+	x, y := PosicionEnEsquina(AnchoIndicador, AltoIndicador, 200, 50, MargenIndicador)
+	if x != 0 || y != 0 {
+		t.Fatalf("posición = %d,%d; quería 0,0", x, y)
+	}
+}

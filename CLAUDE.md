@@ -51,8 +51,8 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` | las sintéticas van en `gestures/testdata/sinteticas` |
-| `desktop/` | lógica de la app de escritorio, con pruebas: `Vivo` (cuadro → pose, modo, gesto y cada activación), `Registro` y `Resumir` (prueba de activaciones falsas, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
-| `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
+| `desktop/` | lógica de la app de escritorio, con pruebas: `Vivo` (cuadro → pose, modo, gesto y cada activación), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Registro` y `Resumir` (prueba de activaciones falsas, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
+| `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); abre como indicador pequeño y la vista de cámara es opcional; cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
 | `.cotejo/` | tareas, decisiones, arquitectura (Cotejo) | se escribe con el CLI `cotejo`, no a mano |

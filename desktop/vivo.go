@@ -24,6 +24,9 @@ type Vista struct {
 	UltimoHora string `json:"ultimo_hora"` // hh:mm:ss
 	Activacion int    `json:"activacion"`  // número de la última activación
 	Prueba     bool   `json:"prueba"`
+
+	// Indicador lo rellena la app con el modo táctil; Vivo solo no lo toca.
+	Indicador *VistaIndicador `json:"indicador,omitempty"`
 }
 
 // Disparo es un gesto que el núcleo tiene que convertir en Órdenes.
