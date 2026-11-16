@@ -122,6 +122,14 @@ type TactileActions interface {
 	Navigate(ctx context.Context, direction NavigationDirection, mode NavigationMode) error
 }
 
+// ContinuousScroller desplaza como la rueda del ratón, de forma continua:
+// unidades de alta resolución (120 = un paso de rueda), positivas hacia
+// abajo. Como la rueda física, actúa sobre la ventana que está bajo el
+// puntero. Es opcional: quien no la tenga usa TactileActions.Scroll.
+type ContinuousScroller interface {
+	ScrollContinuo(ctx context.Context, unidades int) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {

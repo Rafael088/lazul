@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -186,5 +187,78 @@ func TestTactilAlimentaElIndicador(t *testing.T) {
 	reg.Cerrar()
 	if ind.Vista(time.Now()).Activo {
 		t.Fatal("el indicador sigue activo después de apagarse el modo sin mano")
+	}
+}
+
+// ruedaPrueba suma lo que la app manda por la rueda virtual.
+type ruedaPrueba struct {
+	accionesTactilesPrueba
+	unidades  int
+	llamadas  int
+	errRueda  error
+	preparada bool
+}
+
+func (r *ruedaPrueba) ScrollContinuo(ctx context.Context, n int) error {
+	r.llamadas++
+	if r.errRueda != nil {
+		return r.errRueda
+	}
+	r.unidades += n
+	return nil
+}
+
+func (r *ruedaPrueba) Preparar() error { r.preparada = true; return nil }
+
+// sosteniendo repite el último cuadro durante ms, como una mano quieta.
+func sosteniendo(cs []gestures.Cuadro, ms int64) []gestures.Cuadro {
+	ult := cs[len(cs)-1]
+	for d := int64(33); d <= ms; d += 33 {
+		c := ult
+		c.TMs = ult.TMs + d
+		cs = append(cs, c)
+	}
+	return cs
+}
+
+func TestTactilScrollContinuoPorLaRueda(t *testing.T) {
+	reg, _ := AbrirRegistro(filepath.Join(t.TempDir(), "r.jsonl"))
+	r := &ruedaPrueba{}
+	v := &Tactil{Reg: reg, Acciones: r}
+	abajo := sosteniendo(recorridoTactil(t, "modo-activar-buena-001,scroll-02-abajo-mala-001"), 1000)
+	pasarTactil(t, v, abajo, time.Now())
+	v.Parar(time.Now())
+	reg.Cerrar()
+	if !r.preparada {
+		t.Error("la rueda no se preparó al empezar")
+	}
+	if r.unidades <= 120 {
+		t.Fatalf("sosteniendo la mano abajo 1 s la rueda debía bajar más de un paso: %d unidades", r.unidades)
+	}
+	if len(r.hechas) != 0 {
+		t.Fatalf("con rueda no se mandan flechas: %v", r.hechas)
+	}
+}
+
+func TestTactilSinRuedaVuelveAlScrollPorPasos(t *testing.T) {
+	reg, _ := AbrirRegistro(filepath.Join(t.TempDir(), "r.jsonl"))
+	r := &ruedaPrueba{errRueda: errors.New("sin /dev/uinput")}
+	v := &Tactil{Reg: reg, Acciones: r}
+	cs := sosteniendo(recorridoTactil(t, "modo-activar-buena-001,scroll-02-abajo-mala-001"), 500)
+	vista := pasarTactil(t, v, cs, time.Now())
+	if r.llamadas != 1 || !strings.Contains(vista.Error, "rueda virtual") {
+		t.Fatalf("la falla de la rueda debe verse una vez: llamadas %d, error %q", r.llamadas, vista.Error)
+	}
+	// Soltar, esperar más que IgnorarRegreso y volver a bajar: ya va por flechas.
+	mas := sosteniendo(recorridoTactil(t, "scroll-04-abajo-mala-001"), 300)
+	base := cs[len(cs)-1].TMs + 3000
+	for i := range mas {
+		mas[i].TMs += base
+	}
+	pasarTactil(t, v, mas, time.Now())
+	v.Parar(time.Now())
+	reg.Cerrar()
+	if len(r.hechas) == 0 || r.hechas[len(r.hechas)-1] != "scroll-abajo" {
+		t.Fatalf("sin rueda debía volver a las flechas: %v", r.hechas)
 	}
 }

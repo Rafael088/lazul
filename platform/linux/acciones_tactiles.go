@@ -25,6 +25,23 @@ type ejecutarTactil func(context.Context, string, ...string) ([]byte, error)
 // LibreOffice.
 type accionesTactiles struct {
 	ejecutar ejecutarTactil
+	rueda    *ruedaVirtual // scroll continuo; nil = no disponible
+}
+
+// ScrollContinuo mueve la rueda virtual (ver rueda.go).
+func (a accionesTactiles) ScrollContinuo(ctx context.Context, unidades int) error {
+	if a.rueda == nil {
+		return platform.ErrNoImplementado
+	}
+	return a.rueda.ScrollContinuo(ctx, unidades)
+}
+
+// Preparar crea la rueda virtual antes del primer scroll.
+func (a accionesTactiles) Preparar() error {
+	if a.rueda == nil {
+		return platform.ErrNoImplementado
+	}
+	return a.rueda.Preparar()
 }
 
 var _ platform.TactileActions = accionesTactiles{}

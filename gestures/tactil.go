@@ -70,14 +70,22 @@ type AjustesTactiles struct {
 	// IgnorarRegreso: tras un scroll, barrido o zoom, durante estos ms se
 	// ignora el mismo gesto en la dirección contraria. Es la mano que vuelve
 	// a su sitio para repetir; sin esto, 5 scrolls abajo dejaban 1 neto.
-	IgnorarRegreso   int64
-	UmbralScroll     float64
-	UmbralBarrido    float64
-	DominioDireccion float64
-	UmbralZoom       float64
-	ZoomCerradoMax   float64
-	ZoomAbiertoMin   float64
-	ZoomCentroMax    float64
+	IgnorarRegreso int64
+	// Palanca (scroll continuo): con dos dedos quietos se «agarra»; al
+	// alejar la mano en vertical UmbralPalanca palmas empieza el scroll y,
+	// mientras se sostiene la pose, Palanca() da cuánto pasa de ZonaMuerta.
+	// GraciaPalanca tolera cuadros en que la pose parpadea. 0 = apagada
+	// (vuelve el scroll por gesto de UmbralScroll).
+	UmbralPalanca     float64
+	ZonaMuertaPalanca float64
+	GraciaPalanca     int64
+	UmbralScroll      float64
+	UmbralBarrido     float64
+	DominioDireccion  float64
+	UmbralZoom        float64
+	ZoomCerradoMax    float64
+	ZoomAbiertoMin    float64
+	ZoomCentroMax     float64
 }
 
 var AjustesTactilesPorDefecto = AjustesTactiles{
@@ -89,6 +97,9 @@ var AjustesTactilesPorDefecto = AjustesTactiles{
 	GraciaMovimiento:   120,
 	Rearmar:            250,
 	IgnorarRegreso:     2500,
+	UmbralPalanca:      0.60,
+	ZonaMuertaPalanca:  0.25,
+	GraciaPalanca:      300,
 	UmbralScroll:       0.70,
 	UmbralBarrido:      1.20,
 	DominioDireccion:   1.50,
@@ -132,6 +143,8 @@ type EstadoTactil struct {
 	seguimiento   seguimientoTactil
 	esperaNeutral bool
 	desdeNeutral  int64
+	palancaActiva bool
+	palanca       float64
 	ultAccion     AccionTactil
 	ultDir        DireccionTactil
 	ultMs         int64
@@ -166,7 +179,13 @@ func formaTactilDe(r rasgos) formaTactil {
 
 func (e *EstadoTactil) reiniciarMovimiento() {
 	e.seguimiento = seguimientoTactil{}
+	e.palancaActiva, e.palanca = false, 0
 }
+
+// Palanca es el scroll continuo de este momento, en palmas más allá de la
+// zona muerta: positiva hacia abajo, negativa hacia arriba, 0 sin agarrar o
+// con la mano de vuelta en su sitio.
+func (e EstadoTactil) Palanca() float64 { return e.palanca }
 
 func (e *EstadoTactil) bloquearHastaNeutral() {
 	e.reiniciarMovimiento()
@@ -205,7 +224,7 @@ func (e *EstadoTactil) seguir(f formaTactil, r rasgos, t int64, aj AjustesTactil
 		}
 		return
 	}
-	if s.forma != f || t-s.desde > aj.VentanaMovimiento {
+	if s.forma != f || (t-s.desde > aj.VentanaMovimiento && !e.palancaActiva) {
 		*s = seguimientoTactil{
 			forma: f, desde: t, ultimo: t, anclaCentro: r.centro,
 			anclaApertura: r.puntas, palma: r.palma, cuadros: 1, cuadrosDeForma: 1,
@@ -269,6 +288,14 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 	if e.observarNeutral(f, t, aj) {
 		return e, EventoTactil{}
 	}
+	if e.palancaActiva && f != formaTactilDosDedos {
+		// La pose parpadea a menudo en pleno scroll: se sostiene la última
+		// palanca un momento antes de soltar.
+		if t-e.seguimiento.ultimo <= aj.GraciaPalanca {
+			return e, EventoTactil{}
+		}
+		e.reiniciarMovimiento()
+	}
 	e.seguir(f, r, t, aj)
 	s := e.seguimiento
 	if s.forma == formaTactilNinguna || t-s.desde < aj.PrepararMovimiento || s.palma <= 0 {
@@ -281,7 +308,32 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 	switch s.forma {
 	case formaTactilDosDedos:
 		switch {
-		case math.Abs(dy) >= aj.UmbralScroll && math.Abs(dy) >= aj.DominioDireccion*math.Abs(dx):
+		case aj.UmbralPalanca > 0 && (e.palancaActiva || (math.Abs(dy) >= aj.UmbralPalanca && math.Abs(dy) >= aj.DominioDireccion*math.Abs(dx))):
+			p := math.Max(0, math.Abs(dy)-aj.ZonaMuertaPalanca)
+			if dy < 0 {
+				p = -p
+			}
+			dir := TactilAbajo
+			if dy < 0 {
+				dir = TactilArriba
+			}
+			if !e.palancaActiva {
+				ev = EventoTactil{Accion: TactilScroll, Direccion: dir, Confianza: confianzaMovimiento(s, math.Abs(dy), aj.UmbralPalanca), Activo: true, CuadroMs: t}
+				if e.esRegreso(ev, aj) {
+					// Soltó y la mano vuelve con los dedos aún en pose: no
+					// es un scroll al revés. Hay que soltar la pose.
+					e.bloquearHastaNeutral()
+					return e, EventoTactil{}
+				}
+				e.palancaActiva = true
+			}
+			e.palanca = p
+			if p != 0 {
+				// El plazo del regreso cuenta desde el último instante de
+				// scroll, no desde que se agarró.
+				e.ultAccion, e.ultDir, e.ultMs = TactilScroll, dir, t
+			}
+		case aj.UmbralPalanca <= 0 && math.Abs(dy) >= aj.UmbralScroll && math.Abs(dy) >= aj.DominioDireccion*math.Abs(dx):
 			dir := TactilAbajo
 			if dy < 0 {
 				dir = TactilArriba
@@ -303,6 +355,10 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 		case s.anclaApertura >= aj.ZoomAbiertoMin && -delta >= aj.UmbralZoom && centro <= aj.ZoomCentroMax:
 			ev = EventoTactil{Accion: TactilZoom, Direccion: TactilCerrar, Confianza: confianzaMovimiento(s, -delta, aj.UmbralZoom), Activo: true, CuadroMs: t}
 		}
+	}
+	if ev.Accion == TactilScroll && e.palancaActiva {
+		// Empieza el scroll continuo: se sigue la mano, no se bloquea.
+		return e, ev
 	}
 	if ev.Accion != TactilNinguno {
 		e.bloquearHastaNeutral()

@@ -3,6 +3,8 @@ package desktop
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +49,60 @@ type Tactil struct {
 	ultimo        string
 	ultimoT       time.Time
 	ultimoError   string
+
+	// Scroll continuo (palanca): pasos de rueda acumulados que aún no suman
+	// una unidad, el último cuadro visto y si la rueda virtual falló.
+	ruedaAcum  float64
+	ruedaMs    int64
+	ruedaFalla bool
+}
+
+// VelocidadRueda: pasos de rueda por segundo para una palanca de p palmas
+// más allá de la zona muerta. Crece más rápido que lineal: cerca del punto
+// de agarre es lento y preciso (0,25 → 2 pasos/s), lejos es rápido
+// (1 palma → 20 pasos/s). Tope de 30.
+func VelocidadRueda(p float64) float64 {
+	p = math.Abs(p)
+	return math.Min(30, 4*p+16*p*p)
+}
+
+// continuo devuelve la rueda si este sistema la tiene y no ha fallado.
+func (t *Tactil) continuo() platform.ContinuousScroller {
+	if t.ruedaFalla || t.Acciones == nil {
+		return nil
+	}
+	sc, _ := t.Acciones.(platform.ContinuousScroller)
+	return sc
+}
+
+// moverRueda convierte la palanca de este cuadro en unidades de rueda.
+func (t *Tactil) moverRueda(c gestures.Cuadro) {
+	dt := c.TMs - t.ruedaMs
+	t.ruedaMs = c.TMs
+	p := t.est.Palanca()
+	sc := t.continuo()
+	if p == 0 || sc == nil || t.prueba || dt <= 0 {
+		t.ruedaAcum = 0
+		return
+	}
+	dt = min(dt, 100) // un cuadro perdido no debe dar un salto
+	signo := 1.0
+	if p < 0 {
+		signo = -1
+	}
+	t.ruedaAcum += signo * VelocidadRueda(p) * float64(dt) / 1000 * 120
+	n := int(t.ruedaAcum)
+	if n == 0 {
+		return
+	}
+	t.ruedaAcum -= float64(n)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if err := sc.ScrollContinuo(ctx, n); err != nil {
+		// Sin rueda se vuelve al scroll por pasos (flechas) del próximo gesto.
+		t.ruedaFalla = true
+		t.ultimoError = fmt.Sprintf("rueda virtual: %v (vuelvo al scroll por pasos)", err)
+	}
 }
 
 func (t *Tactil) ajustes() gestures.AjustesTactiles {
@@ -78,6 +134,14 @@ func (t *Tactil) empezar(ahora time.Time) {
 	t.hayUltimaMano = false
 	t.latido, t.cuadros, t.conMano = ahora, 0, 0
 	t.Reg.Anotar(Linea{T: ahora, Tipo: TipoInicio, Sesion: t.sesion, Prueba: t.prueba})
+	// La rueda virtual se crea al empezar: el compositor tarda un momento
+	// en reconocerla y el primer scroll no debe perderse.
+	if p, ok := t.Acciones.(interface{ Preparar() error }); ok && !t.ruedaFalla {
+		if err := p.Preparar(); err != nil {
+			t.ruedaFalla = true
+			t.ultimoError = fmt.Sprintf("rueda virtual: %v (uso scroll por pasos)", err)
+		}
+	}
 }
 
 func nombreAccionTactil(a gestures.AccionTactil) string {
@@ -114,6 +178,9 @@ func (t *Tactil) ejecutar(ev gestures.EventoTactil) error {
 	defer cancel()
 	switch ev.Accion {
 	case gestures.TactilScroll:
+		if t.continuo() != nil {
+			return nil // empieza el scroll continuo: lo mueve moverRueda
+		}
 		switch ev.Direccion {
 		case gestures.TactilArriba:
 			return t.Acciones.Scroll(ctx, platform.ScrollUp)
@@ -251,6 +318,7 @@ func (t *Tactil) Cuadro(c gestures.Cuadro, ahora time.Time) Vista {
 			t.hayUltimaMano = false
 		}
 	}
+	t.moverRueda(c)
 	t.latir(ahora)
 	v := t.vista(c, pose)
 	if ev.Accion != gestures.TactilNinguno {

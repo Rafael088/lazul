@@ -11,6 +11,6 @@ func New() platform.Sistema {
 		Clipboard:      portapapeles{},
 		ActiveApp:      appActiva{},
 		LaunchApp:      abrirApp{},
-		TactileActions: accionesTactiles{},
+		TactileActions: accionesTactiles{rueda: &ruedaVirtual{}},
 	}
 }

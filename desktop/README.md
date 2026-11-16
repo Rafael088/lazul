@@ -92,13 +92,17 @@ otro también pueda mandarte, empareja al revés.
 
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
-- **Dos dedos arriba o abajo**: desplazan la ventana con foco.
+- **Scroll como el clic central**: junta índice y medio estirados y quédate
+  quieto un instante (agarras). Aleja la mano hacia abajo o hacia arriba: el
+  contenido se desplaza mientras sostengas la pose, más rápido cuanto más
+  la alejes. Vuelve la mano al punto donde agarraste y se detiene; suelta los
+  dedos y termina. Va por una rueda de ratón virtual, así que actúa sobre la
+  ventana que está **bajo el puntero**.
 - **Pinza que se abre o se cierra**: acerca o aleja.
 - **Dos dedos hacia la izquierda o la derecha**: cambian de diapositiva.
 - Si la cámara deja de ver una mano durante 3 segundos, el modo se apaga solo.
-- **Repetir el scroll**: baja, sube la mano y vuelve a bajar. El regreso de la
-  mano no cuenta durante 2,5 s después de cada gesto; para cambiar de
-  dirección, haz una pausa corta.
+- Si sueltas y vuelves a agarrar en la dirección contraria antes de 2,5 s, se
+  ignora (es la mano que vuelve); para corregir, mueve la mano sin soltar.
 - Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
   que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
 
@@ -113,15 +117,17 @@ transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
 
 Cada gesto se traduce según la ventana con foco (`platform/linux/perfiles_tactiles.go`):
 
-| App | Scroll | Barrido |
+| App | Scroll sin rueda virtual | Barrido |
 | --- | --- | --- |
 | Navegador (Zen, Firefox, Chrome…) | 8 flechas | ← / → (Google Slides, Canva, reveal.js) |
 | PDF (Evince, Papers, Okular, Zathura…) | 3 flechas | RePág / AvPág |
 | Diapositivas (LibreOffice, OnlyOffice…) | 1 flecha | RePág / AvPág |
 | Cualquier otra | 3 flechas | RePág / AvPág |
 
-El zoom es siempre `Ctrl` + `+` / `-`. Hyprland no puede inyectar la rueda del
-ratón, por eso el scroll son flechas.
+El scroll normal es continuo por la rueda virtual (`platform/linux/rueda.go`,
+`/dev/uinput`, que el usuario de la sesión puede escribir); las flechas solo
+se usan si no se puede crear. La velocidad está en `desktop.VelocidadRueda`.
+El zoom es siempre `Ctrl` + `+` / `-`.
 
 ## La prueba de las activaciones falsas (30 min)
 

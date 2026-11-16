@@ -35,6 +35,64 @@ func correrTactil(activo bool, tramos ...tramo) []EventoTactil {
 	return eventos
 }
 
+// palancas devuelve la palanca de cada cuadro y los eventos.
+func palancas(tramos ...tramo) ([]float64, []EventoTactil) {
+	r := luzBuena
+	r.semilla = 91
+	e := NuevoEstadoTactil(true, AjustesTactilesPorDefecto)
+	var ps []float64
+	var eventos []EventoTactil
+	for _, c := range sintetizar(colocacionN(0), r, tramos) {
+		var ev EventoTactil
+		e, ev = ClasificarTactil(e, c)
+		if ev.Accion != TactilNinguno {
+			eventos = append(eventos, ev)
+		}
+		ps = append(ps, e.Palanca())
+	}
+	return ps, eventos
+}
+
+func TestTactilPalancaSigueLaManoMientrasSeSostiene(t *testing.T) {
+	agarra := tramo{f: formaDosDedos(), ms: 300}
+	baja := tramo{f: formaDosDedos(), ms: 300, mov: v3{0, 0.24, 0}}
+	sostiene := tramo{f: formaDosDedos(), ms: 2000} // más que VentanaMovimiento
+	vuelve := tramo{f: formaDosDedos(), ms: 400, mov: v3{0, -0.24, 0}}
+	quieta := tramo{f: formaDosDedos(), ms: 300}
+	suelta := tramo{f: formaRelajada(), ms: 600, trans: 100}
+
+	ps, ev := palancas(agarra, baja, sostiene, vuelve, quieta, suelta)
+	quiereTactiles(t, "un solo evento al empezar", ev, TactilScroll)
+	if len(ev) == 1 && ev[0].Direccion != TactilAbajo {
+		t.Errorf("dirección %v", ev[0].Direccion)
+	}
+	// cuadros a ~30 fps: el final de «sostiene» está ~2,5 s después del inicio.
+	finSostiene := (300 + 300 + 2000) * 30 / 1000
+	if p := ps[finSostiene-3]; p <= 0.3 {
+		t.Errorf("sosteniendo la mano abajo la palanca debe seguir firme hacia abajo: %.2f", p)
+	}
+	finQuieta := (300 + 300 + 2000 + 400 + 300) * 30 / 1000
+	if p := ps[finQuieta-3]; p != 0 {
+		t.Errorf("con la mano de vuelta donde agarró la palanca debe ser 0: %.2f", p)
+	}
+	if p := ps[len(ps)-1]; p != 0 {
+		t.Errorf("al soltar la pose la palanca debe ser 0: %.2f", p)
+	}
+
+	ps, ev = palancas(agarra, tramo{f: formaDosDedos(), ms: 600, mov: v3{0, -0.24, 0}})
+	quiereTactiles(t, "hacia arriba", ev, TactilScroll)
+	if p := ps[len(ps)-1]; p >= 0 {
+		t.Errorf("mano arriba: palanca %.2f, quiere negativa", p)
+	}
+
+	ps, _ = palancas(agarra, tramo{f: formaDosDedos(), ms: 600, mov: v3{0, 0.04, 0}})
+	for _, p := range ps {
+		if p != 0 {
+			t.Fatalf("un temblor no puede mover la palanca: %.2f", p)
+		}
+	}
+}
+
 func accionesTactiles(eventos []EventoTactil) []AccionTactil {
 	acciones := make([]AccionTactil, 0, len(eventos))
 	for _, ev := range eventos {
