@@ -10,14 +10,22 @@ import (
 
 const (
 	NombreEstadoVentana = "ventana.json"
-	AnchoVentanaInicial = 360
-	AltoVentanaInicial  = 300
-	AnchoVentanaMinimo  = 340
-	AltoVentanaMinimo   = 280
+
+	// La app abre como un indicador pequeño en una esquina. La vista de la
+	// cámara es una opción para acomodarse y se abre a demanda.
+	AnchoIndicador  = 236
+	AltoIndicador   = 64
+	AnchoAjuste     = 920
+	AltoAjuste      = 660
+	MargenIndicador = 16
+
+	AnchoVentanaMinimo = AnchoIndicador
+	AltoVentanaMinimo  = AltoIndicador
 )
 
-// EstadoVentana conserva el tamaño y, cuando el sistema lo permite, la
-// posición de la ventana entre arranques.
+// EstadoVentana conserva, cuando el sistema lo permite, la posición del
+// indicador entre arranques. El tamaño ya no se restaura: la app siempre
+// abre pequeña y la vista de cámara se pide a propósito.
 type EstadoVentana struct {
 	Ancho         int  `json:"ancho"`
 	Alto          int  `json:"alto"`
@@ -27,7 +35,22 @@ type EstadoVentana struct {
 }
 
 func VentanaInicial() EstadoVentana {
-	return EstadoVentana{Ancho: AnchoVentanaInicial, Alto: AltoVentanaInicial}
+	return EstadoVentana{Ancho: AnchoIndicador, Alto: AltoIndicador}
+}
+
+// PosicionEnEsquina deja una ventana en la esquina inferior derecha de la
+// pantalla, con un margen que la separa del borde. Si la pantalla es más
+// pequeña que la ventana, la pega a la esquina superior izquierda.
+func PosicionEnEsquina(anchoVentana, altoVentana, anchoPantalla, altoPantalla, margen int) (int, int) {
+	x := anchoPantalla - anchoVentana - margen
+	y := altoPantalla - altoVentana - margen
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	return x, y
 }
 
 // LeerEstadoVentana devuelve los valores iniciales si el archivo todavía no

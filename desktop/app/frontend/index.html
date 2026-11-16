@@ -6,8 +6,52 @@
 <style>
   :root { --fondo: #101428; --panel: #1a2040; --borde: #2c3566; --texto: #e8ecff; --tenue: #aeb6dc; --lapis: #315fdc; --bien: #4fd18b; --mal: #ff6b6b; --ojo: #ffcc4d; }
   * { box-sizing: border-box; }
-  html, body { min-height: 100%; }
-  body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.4 system-ui, sans-serif; overflow: auto; }
+  html, body { height: 100%; }
+  body { margin: 0; background: transparent; color: var(--texto); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  body.camara { background: var(--fondo); }
+
+  /* ---------- indicador pequeño (por defecto) ---------- */
+  #indicador {
+    position: fixed; right: 6px; bottom: 6px; width: 224px; height: 52px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 8px 0 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(16, 20, 40, .92); border: 1px solid rgba(120, 140, 220, .38);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .35); cursor: default;
+    --wails-draggable: drag;
+  }
+  #indicador .punto { width: 10px; height: 10px; border-radius: 50%; background: #69719a; box-shadow: 0 0 0 3px rgba(105, 113, 154, .16); flex: none; transition: background .15s; }
+  #indicador.activo .punto { background: var(--bien); box-shadow: 0 0 0 3px rgba(79, 209, 139, .18); }
+  #indicador .estado { font-weight: 650; font-size: 13px; letter-spacing: .01em; white-space: nowrap; }
+  #indicador:not(.activo) .estado { color: var(--tenue); }
+  #indicador.activo .estado { color: var(--texto); }
+  #indicador .gesto { font: 650 12px ui-monospace, monospace; color: var(--bien); white-space: nowrap; min-width: 0; }
+  #indicador .icono {
+    margin-left: auto; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; background: transparent; color: var(--tenue); cursor: pointer;
+    --wails-draggable: no-drag;
+  }
+  #indicador .icono:hover, #indicador .icono:focus-visible { background: rgba(127, 168, 255, .16); color: var(--texto); outline: none; }
+  @keyframes destello {
+    0% { border-color: rgba(79, 209, 139, .95); box-shadow: 0 0 0 0 rgba(79, 209, 139, .5), 0 6px 20px rgba(0, 0, 0, .35); }
+    100% { border-color: rgba(120, 140, 220, .38); box-shadow: 0 0 0 10px rgba(79, 209, 139, 0), 0 6px 20px rgba(0, 0, 0, .35); }
+  }
+  #indicador.destello { animation: destello .55s ease-out; }
+  #indicador.destello .punto { background: var(--ojo); box-shadow: 0 0 0 3px rgba(255, 204, 77, .22); }
+  @media (prefers-reduced-motion: reduce) { #indicador.destello { animation: none; border-color: var(--bien); } }
+
+  /* ---------- vista de cámara (a demanda) ---------- */
+  #ajuste { display: none; height: 100%; }
+  body.camara #ajuste { display: flex; flex-direction: column; background: var(--fondo); }
+  body.camara #indicador { display: none; }
+  #barra-ajuste {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 12px; border-bottom: 1px solid var(--borde); background: var(--panel);
+    --wails-draggable: drag;
+  }
+  #barra-ajuste .titulo { font-weight: 650; }
+  #barra-ajuste button { --wails-draggable: no-drag; }
+  #ajuste > main { flex: 1; overflow: auto; }
+
   main { display: grid; grid-template-columns: minmax(320px, 640px) minmax(360px, 1fr); gap: 12px; padding: 12px; align-items: start; }
   #izq { min-width: 0; }
   #der { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
@@ -35,6 +79,8 @@
   details#controles > summary { cursor: pointer; color: var(--tenue); padding: 7px 2px; user-select: none; }
   .ayuda { margin: 2px 0 8px; }
   @media (max-width: 760px) {
+    #barra-ajuste { padding: 6px 8px; }
+    #barra-ajuste .titulo { font-size: 13px; }
     main { display: block; padding: 8px; }
     #escena { height: min(52vh, 220px); aspect-ratio: auto; }
     .grande { font-size: 17px; }
@@ -53,88 +99,119 @@
 </style>
 </head>
 <body>
-<main>
-  <div id="izq">
-    <div id="escena">
-      <video id="video" playsinline muted></video>
-      <canvas id="imagen" width="640" height="480"></canvas>
-      <canvas id="puntos" width="640" height="480"></canvas>
-      <div id="sincamara">arrancando…</div>
+<aside id="indicador" aria-live="polite" title="Lazul · modo táctil (L para activar o apagar)">
+  <span class="punto" aria-hidden="true"></span>
+  <span class="estado" id="indicador-estado">inactivo</span>
+  <span class="gesto" id="indicador-gesto" aria-hidden="true"></span>
+  <button id="abrir-ajuste" class="icono" title="Acomodar la cámara (Ctrl+Mayús+C)" aria-label="Acomodar la cámara">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/>
+      <circle cx="12" cy="13" r="3.2"/>
+    </svg>
+  </button>
+</aside>
+
+<div id="ajuste" aria-hidden="true">
+  <header id="barra-ajuste">
+    <div class="titulo">Lazul <span class="tenue">· acomodar la cámara</span></div>
+    <div class="fila">
+      <button id="cerrar-ajuste" class="sec">Volver al indicador</button>
+      <button id="salir" class="sec">Salir</button>
     </div>
-    <div id="estado-gesto" class="fila" style="margin-top:8px">
-      <span>Pose <b id="pose" class="grande">-</b></span>
-      <span>Modo <b id="modo" class="grande modo-reposo">-</b></span>
-      <span>Último gesto <b id="ultimo" class="grande">-</b> <span id="ultimohora" class="tenue"></span></span>
-    </div>
-    <div id="camara-fila" class="fila" style="margin-top:6px">
-      <button id="camara" class="sec">Apagar cámara</button>
-      <span id="fps" class="tenue"></span>
-    </div>
-  </div>
-
-  <details id="controles">
-    <summary>Equipos, emparejamiento y prueba</summary>
-    <p class="tenue ayuda">La L sostenida activa 5 s. Activo: puño = agarrar una captura; pinza y arrastrar = mandar la ventana activa.
-      Agarrando: abre la mano y muévela a un lado para soltar. Mantén esta ventana visible: si se oculta, la cámara puede detenerse.</p>
-    <div id="der">
-    <section id="permiso">
-      <h2>Alguien quiere emparejarse</h2>
-      <div><b id="permnombre"></b> quiere mandarle cosas a este equipo.</div>
-      <div>Huella de ese equipo: <b id="permhuella" class="mono"></b> — tiene que ser la misma que muestra su pantalla.</div>
-      <div class="fila" style="margin-top:8px"><button id="permitir">Permitir</button><button id="rechazar" class="sec">No</button></div>
-    </section>
-
-    <section>
-      <h2>Este equipo</h2>
-      <div><b id="nombre"></b> · huella <span id="huella" class="mono"></span></div>
-      <div>Dirección para el otro equipo: <b id="dirs" class="mono"></b></div>
-      <div id="errred" class="mal"></div>
-    </section>
-
-    <section>
-      <h2>Recibir: dejar que otro equipo me mande</h2>
-      <div class="fila"><button id="abrircodigo">Mostrar código</button><span id="codigo"></span><span id="vence" class="tenue"></span></div>
-      <div class="tenue">Escribe este código en el equipo que tiene la cámara. Dura 2 minutos y sirve una vez.</div>
-    </section>
-
-    <section>
-      <h2>Mandar: emparejar con el otro equipo</h2>
-      <div class="fila">
-        <input id="dir" placeholder="dirección del otro (ej. 192.168.1.20)" size="26">
-        <input id="cod" placeholder="código" size="8" maxlength="7">
-        <button id="emparejar">Emparejar</button>
-        <button id="buscar" class="sec">Buscar en la red</button>
+  </header>
+  <main>
+    <div id="izq">
+      <div id="escena">
+        <video id="video" playsinline muted></video>
+        <canvas id="imagen" width="640" height="480"></canvas>
+        <canvas id="puntos" width="640" height="480"></canvas>
+        <div id="sincamara">arrancando…</div>
       </div>
-      <div id="emparejarres" class="tenue"></div>
-      <div style="margin-top:6px">Mando a: <b id="destino">nadie</b> <span id="conexion"></span></div>
-    </section>
-
-    <section>
-      <h2>Equipos</h2>
-      <table id="equipos"></table>
-    </section>
-
-    <section>
-      <h2>Lo último</h2>
-      <div>Hecho aquí: <span id="accion" class="tenue">-</span></div>
-      <div>Llegó aquí: <span id="recibido" class="tenue">-</span></div>
-    </section>
-
-    <section>
-      <h2>Prueba de activaciones falsas (30 min)</h2>
-      <div class="fila">
-        <button id="prueba">Empezar prueba de trabajo normal</button>
-        <button id="falsa" class="sec">La última activación fue sin querer</button>
-        <button id="buscada" class="sec">Fue a propósito</button>
-        <button id="resumen" class="sec">Resumen</button>
+      <div id="estado-gesto" class="fila" style="margin-top:8px">
+        <span>Pose <b id="pose" class="grande">-</b></span>
+        <span>Modo <b id="modo" class="grande modo-reposo">-</b></span>
+        <span>Último gesto <b id="ultimo" class="grande">-</b> <span id="ultimohora" class="tenue"></span></span>
       </div>
-      <div id="pruebaestado" class="tenue">Durante la prueba trabaja normal (escribir, café, hablar con las manos) sin hacer gestos: toda activación cuenta como falsa y no se manda nada.</div>
-      <pre id="resumentexto"></pre>
-      <div class="tenue">Registro (sin imágenes ni URL): <span id="registro" class="mono"></span></div>
-    </section>
+      <div id="camara-fila" class="fila" style="margin-top:6px">
+        <button id="camara" class="sec">Apagar cámara</button>
+        <span id="fps" class="tenue"></span>
+      </div>
     </div>
-  </details>
-</main>
+
+    <details id="controles">
+      <summary>Equipos, emparejamiento y prueba</summary>
+      <p class="tenue ayuda">La L sostenida enciende o apaga el modo táctil. Con el modo activo: dos dedos arriba/abajo = scroll;
+        pellizco que abre o cierra = zoom; barrido a un lado = izquierda/derecha. Mantén la ventana visible (aunque sea el
+        indicador): si se oculta, la cámara puede detenerse.</p>
+      <div id="der">
+      <section id="permiso">
+        <h2>Alguien quiere emparejarse</h2>
+        <div><b id="permnombre"></b> quiere mandarle cosas a este equipo.</div>
+        <div>Huella de ese equipo: <b id="permhuella" class="mono"></b> — tiene que ser la misma que muestra su pantalla.</div>
+        <div class="fila" style="margin-top:8px"><button id="permitir">Permitir</button><button id="rechazar" class="sec">No</button></div>
+      </section>
+
+      <section>
+        <h2>Este equipo</h2>
+        <div><b id="nombre"></b> · huella <span id="huella" class="mono"></span></div>
+        <div>Dirección para el otro equipo: <b id="dirs" class="mono"></b></div>
+        <div id="errred" class="mal"></div>
+      </section>
+
+      <section>
+        <h2>Recibir: dejar que otro equipo me mande</h2>
+        <div class="fila"><button id="abrircodigo">Mostrar código</button><span id="codigo"></span><span id="vence" class="tenue"></span></div>
+        <div class="tenue">Escribe este código en el equipo que tiene la cámara. Dura 2 minutos y sirve una vez.</div>
+      </section>
+
+      <section>
+        <h2>Mandar: emparejar con el otro equipo</h2>
+        <div class="fila">
+          <input id="dir" placeholder="dirección del otro (ej. 192.168.1.20)" size="26">
+          <input id="cod" placeholder="código" size="8" maxlength="7">
+          <button id="emparejar">Emparejar</button>
+          <button id="buscar" class="sec">Buscar en la red</button>
+        </div>
+        <div id="emparejarres" class="tenue"></div>
+        <div style="margin-top:6px">Mando a: <b id="destino">nadie</b> <span id="conexion"></span></div>
+      </section>
+
+      <section>
+        <h2>Equipos</h2>
+        <table id="equipos"></table>
+      </section>
+
+      <section>
+        <h2>Lo último</h2>
+        <div>Hecho aquí: <span id="accion" class="tenue">-</span></div>
+        <div>Llegó aquí: <span id="recibido" class="tenue">-</span></div>
+      </section>
+
+      <section>
+        <h2>Prueba de activaciones falsas (30 min)</h2>
+        <div class="fila">
+          <button id="prueba">Empezar prueba de trabajo normal</button>
+          <button id="falsa" class="sec">La última activación fue sin querer</button>
+          <button id="buscada" class="sec">Fue a propósito</button>
+          <button id="resumen" class="sec">Resumen</button>
+        </div>
+        <div id="pruebaestado" class="tenue">Durante la prueba trabaja normal (escribir, café, hablar con las manos) sin hacer gestos: toda activación cuenta como falsa y no se manda nada.</div>
+        <pre id="resumentexto"></pre>
+        <div class="tenue">Registro (sin imágenes ni URL): <span id="registro" class="mono"></span></div>
+      </section>
+      </div>
+    </details>
+  </main>
+</div>
+<script>
+  // Vista previa estática (al abrir el HTML suelto, sin Wails): deja el
+  // indicador con un destello de ejemplo. La app real lo pinta con cada gesto.
+  if (location.protocol === "file:") {
+    document.getElementById("indicador").classList.add("activo", "destello");
+    document.getElementById("indicador-estado").textContent = "activo";
+    document.getElementById("indicador-gesto").textContent = "scroll ↑";
+  }
+</script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

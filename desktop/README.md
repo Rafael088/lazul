@@ -1,11 +1,12 @@
-# Lazul en el escritorio (prototipo feo)
+# Lazul en el escritorio (v0.2.0)
 
-Una ventana que mira tu mano por la cámara y, con gestos, agarra una captura
-de la pantalla de este PC y la suelta en el otro. Sirve para comprobar si la
-idea funciona de verdad (dec-q1p7), no para usar todos los días.
+La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
+Muestra si el modo táctil está **activo** o **inactivo** y destella un gesto
+cuando lo reconoce (scroll, zoom, izquierda/derecha), sin tapar la clase. La
+vista de la cámara queda como opción para acomodarse y está apagada por
+defecto. La app sigue escuchando en la red local para recibir y mandar.
 
-La misma app va en los dos PCs. Cada uno puede **recibir** (escucha en la red
-local) y **mandar** (si tiene cámara).
+Esta interfaz reemplaza la ventana chica fija de la 0.1.0 (cotejo-luzcr0).
 
 ## Abrirla
 
@@ -18,13 +19,20 @@ local) y **mandar** (si tiene cámara).
 La primera vez se baja MediaPipe (unos 37 MB) y queda dentro del programa.
 En Linux la cámara la abre `ffmpeg` (tiene que estar instalado).
 
-La ventana arranca pequeña, permanece sobre las demás y recuerda su tamaño y
-posición. Estos datos se guardan en `ventana.json`, junto al estado de la app
+La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
+(con 16 px de margen), permanece sobre las demás y recuerda dónde la dejaste.
+Esa posición se guarda en `ventana.json`, junto al estado de la app
 (`~/.local/state/lazul` en Linux o `%LOCALAPPDATA%\lazul` en Windows). En
-Wayland Wails no garantiza que el compositor acepte restaurar la posición; el
-tamaño sí se conserva.
+Wayland Wails no garantiza que el compositor acepte restaurar la posición.
 
-Deja la ventana **a la vista** (puede ser chica, en una esquina): si queda
+**Acomodar la cámara:** pulsa el botón de cámara del indicador o
+`Ctrl+Mayús+C`. La ventana se agranda (`920 × 660`) y muestra la cámara con
+los puntos de la mano y todos los controles. `Esc`, **Volver al indicador** o
+el mismo atajo la devuelven a su esquina. La cámara sigue encendida aunque la
+vista esté apagada: encenderla o apagarla es el botón **Apagar cámara** de la
+vista de cámara.
+
+Deja la app **a la vista** (basta el indicador en una esquina): si queda
 escondida en otro espacio o minimizada, el sistema deja de darle cuadros y la
 cámara se detiene.
 
@@ -32,15 +40,15 @@ cámara se detiene.
 
 Wails identifica la ventana en Linux con la clase `lazul`. En la configuración
 Lua nueva de Hyprland, añade esta regla para hacerla flotante, fijarla a todos
-los espacios, dejarla en `360 × 300` y colocarla abajo a la derecha:
+los espacios, dejarla en `236 × 64` y colocarla abajo a la derecha:
 
 ```lua
 hl.window_rule({
   match = { class = "lazul" },
   float = true,
   pin = true,
-  size = { 360, 300 },             -- por comprobar con la versión instalada
-  move = { "100%-372", "100%-312" }, -- por comprobar con la versión instalada
+  size = { 236, 64 },              -- por comprobar con la versión instalada
+  move = { "100%-252", "100%-80" }, -- por comprobar con la versión instalada
 })
 ```
 
@@ -76,17 +84,22 @@ otro también pueda mandarte, empareja al revés.
 ## Usarla
 
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
-  momento: el modo pasa a **activo** durante 5 s.
-- **Puño** (en activo): agarra una captura de esta pantalla. El modo pasa a
-  **agarrando**.
-- **Abrir la mano moviéndola a un lado** (agarrando): suelta la captura en el
-  otro PC, que la abre en pantalla. «Lo último» dice cuánto tardó.
-- **Pinza y arrastrar** (en activo): manda la ventana activa (la página web,
-  el documento o la app) al otro PC.
+  momento: el modo táctil pasa a **activo** y el indicador lo muestra; otra L
+  lo apaga.
+- **Dos dedos arriba/abajo**: scroll. **Pellizco que abre o cierra**: zoom.
+  **Barrido a un lado**: izquierda/derecha (o AvPág/RePág en diapositivas).
+- Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
+  que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
+- Por ahora el indicador reconoce y muestra los gestos; enviarlos a la ventana
+  con foco es la tarea del modo táctil (cotejo-mks5xb). El prototipo 0.1.0 de
+  agarrar y soltar sigue disponible en la vista de cámara: **puño** para
+  agarrar una captura, **abrir la mano moviéndola a un lado** para soltarla en
+  el otro PC, y **pinza arrastrada** para mandar la ventana activa.
 
-La ventana muestra la cámara con los puntos de la mano, la pose, el modo y el
-último gesto con su hora. Lo que llega al otro PC queda también en la carpeta
-`recibidos` (`~/.config/lazul/recibidos` o `%APPDATA%\lazul\recibidos`).
+La vista de cámara (a demanda) muestra la cámara con los puntos de la mano, la
+pose, el modo y el último gesto con su hora. Lo que llega al otro PC queda
+también en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
+`%APPDATA%\lazul\recibidos`).
 
 ## La prueba de las activaciones falsas (30 min)
 
