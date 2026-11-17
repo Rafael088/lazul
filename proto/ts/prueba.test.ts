@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { SobreSchema, Version, Gesto, EventoGestoSchema } from "./src/lazul/v1/lazul_pb.ts";
+import { SobreSchema, Version, Gesto, EventoGestoSchema } from "./src/lazul/v1/lazul_pb.js";
 
 const golden = new Uint8Array(readFileSync(new URL("../testdata/sobre_v1.bin", import.meta.url)));
 

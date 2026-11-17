@@ -4,11 +4,11 @@
   "type": "module",
   "description": "Tipos de TypeScript generados desde proto/lazul/v1/lazul.proto",
   "exports": {
-    "./v1": "./src/lazul/v1/lazul_pb.ts"
+    "./v1": "./src/lazul/v1/lazul_pb.js"
   },
   "scripts": {
     "tipos": "tsc --noEmit -p .",
-    "test": "node --test --experimental-transform-types prueba.test.ts"
+    "test": "node --test prueba.test.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.17.0"

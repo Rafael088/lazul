@@ -70,7 +70,7 @@ generar() {
 	mkdir -p "$dst/go" "$dst/ts"
 	protoc -I proto \
 		--plugin=protoc-gen-go=.dev/bin/protoc-gen-go --go_out="$dst/go" --go_opt=module=$MOD/proto/go \
-		--plugin=protoc-gen-es=proto/ts/node_modules/.bin/protoc-gen-es --es_out="$dst/ts" --es_opt=target=ts,import_extension=ts \
+		--plugin=protoc-gen-es=proto/ts/node_modules/.bin/protoc-gen-es --es_out="$dst/ts" --es_opt=target=js+dts,import_extension=js \
 		lazul/v1/lazul.proto
 }
 
@@ -82,7 +82,7 @@ proto_al_dia() {
 	rm -rf "$tmp"
 	generar "$tmp" || return 1
 	local f d=0
-	for f in go/lazulv1/lazul.pb.go ts/lazul/v1/lazul_pb.ts; do
+	for f in go/lazulv1/lazul.pb.go ts/lazul/v1/lazul_pb.js ts/lazul/v1/lazul_pb.d.ts; do
 		local destino=proto/${f/ts\//ts/src/}
 		if ! diff -u <(sin_version "$destino") <(sin_version "$tmp/$f") >/dev/null 2>&1; then
 			echo "$destino no coincide con proto/lazul/v1/lazul.proto: corre ./dev gen"
@@ -98,12 +98,12 @@ cmd_gen() {
 	paso gen generar "$tmp" || return 1
 	cp "$tmp/go/lazulv1/lazul.pb.go" proto/go/lazulv1/
 	mkdir -p proto/ts/src/lazul/v1
-	cp "$tmp/ts/lazul/v1/lazul_pb.ts" proto/ts/src/lazul/v1/
+	cp "$tmp/ts/lazul/v1/lazul_pb.js" "$tmp/ts/lazul/v1/lazul_pb.d.ts" proto/ts/src/lazul/v1/
 	echo "listo: proto/go/lazulv1 y proto/ts/src"
 }
 
 ts_check() {
-	(cd proto/ts && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npx --no-install tsc --noEmit -p . && node --experimental-transform-types --no-warnings --test --test-reporter=dot prueba.test.ts)
+	(cd proto/ts && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npx --no-install tsc --noEmit -p . && node --no-warnings --test --test-reporter=dot prueba.test.ts)
 }
 
 cmd_check() {
