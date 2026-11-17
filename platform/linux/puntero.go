@@ -129,6 +129,39 @@ func eventosPuntero(x, y float64) ([]byte, error) {
 	return b, nil
 }
 
+// eventosBoton arma los input_event de BTN_LEFT. El botón es el embrague del
+// pellizco: se pulsa al agarrar y se suelta al soltar.
+func eventosBoton(down bool) []byte {
+	valor := int32(0)
+	if down {
+		valor = 1
+	}
+	e := make([]byte, 24)
+	binary.LittleEndian.PutUint16(e[16:], evKey)
+	binary.LittleEndian.PutUint16(e[18:], btnLeft)
+	binary.LittleEndian.PutUint32(e[20:], uint32(valor))
+	syn := make([]byte, 24)
+	binary.LittleEndian.PutUint16(syn[16:], evSyn)
+	binary.LittleEndian.PutUint16(syn[18:], synReport)
+	return append(e, syn...)
+}
+
+// Button pulsa o suelta el botón principal del puntero virtual.
+func (p *punteroVirtual) Button(ctx context.Context, down bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := p.Prepare(ctx); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if _, err := p.f.Write(eventosBoton(down)); err != nil {
+		return fmt.Errorf("puntero virtual: botón: %w", err)
+	}
+	return nil
+}
+
 func (p *punteroVirtual) MoveAbsolute(ctx context.Context, x, y float64) error {
 	if err := ctx.Err(); err != nil {
 		return err

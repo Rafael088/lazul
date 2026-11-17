@@ -127,6 +127,12 @@ otro también pueda mandarte, empareja al revés.
   tamaño aparente de la mano compensa cuánto te acercas a la cámara y un filtro
   One Euro suaviza el temblor. Fuera del panel o claramente por delante/detrás,
   no mueve nada.
+- **Pellizco pulgar-índice = botón del ratón**: agarras mientras lo mantienes
+  cerrado y sueltas al abrirlo, así el regreso de la mano no cuenta como parte
+  del arrastre. Solo cuenta si el pellizco empieza dentro del panel; uno que
+  empieza fuera se ignora hasta soltarlo. Para que el parpadeo del pellizco no
+  corte un arrastre, al soltar se exigen unos cuadros y 200 ms abierto. Dos
+  manos pellizcando y separándose o juntándose hacen zoom.
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
 - **Scroll como el clic central**: junta las puntas del pulgar, el índice y
@@ -146,8 +152,8 @@ otro también pueda mandarte, empareja al revés.
   un halo suave sigue la mano; al agarrar (pellizco) se enciende. La píldora
   sigue mostrando el último gesto reconocido, sin tapar la pantalla.
 
-Los gestos se aplican a la ventana que tenga el foco; el panel sí mueve el
-cursor, pero todavía no hace clic. La vista de cámara (a demanda) muestra la
+Los gestos se aplican a la ventana que tenga el foco; el panel mueve el
+cursor y el pellizco hace de botón (pulsar, arrastrar y soltar). La vista de cámara (a demanda) muestra la
 cámara con los puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás
 cuando no ve la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
 transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o

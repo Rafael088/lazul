@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,7 @@ import (
 type punteroPanelPrueba struct {
 	preparado bool
 	puntos    []gestures.PuntoPanel
+	botones   []bool
 }
 
 func (p *punteroPanelPrueba) Prepare(context.Context) error { p.preparado = true; return nil }
@@ -19,9 +21,88 @@ func (p *punteroPanelPrueba) MoveAbsolute(_ context.Context, x, y float64) error
 	p.puntos = append(p.puntos, gestures.PuntoPanel{X: x, Y: y})
 	return nil
 }
+func (p *punteroPanelPrueba) Button(_ context.Context, down bool) error {
+	p.botones = append(p.botones, down)
+	return nil
+}
 
 func muestraPanelPrueba(x, y, tamano float64) gestures.MuestraPanel {
 	return gestures.MuestraPanel{X: x * tamano, Y: y * tamano, Tamano: tamano}
+}
+
+// manoPanelPrueba construye una mano cuyo MuestraPanelDe da (x,y) en el panel
+// de prueba [-1,1]² y el tamaño pedido, con el pellizco abierto o cerrado.
+func manoPanelPrueba(x, y, tam float64, cerrado bool) gestures.Mano {
+	var m gestures.Mano
+	medio := tam / math.Sqrt2 / 2
+	cx, cy := x*tam+0.5, y*tam+0.5
+	m.Puntos[gestures.Muneca] = gestures.Punto{X: float32(cx), Y: float32(cy - medio)}
+	m.Puntos[gestures.IndiceMCP] = gestures.Punto{X: float32(cx - medio), Y: float32(cy)}
+	m.Puntos[gestures.MedioMCP] = gestures.Punto{X: float32(cx), Y: float32(cy + medio)}
+	m.Puntos[gestures.AnularMCP] = gestures.Punto{X: float32(cx), Y: float32(cy)}
+	m.Puntos[gestures.MeniqueMCP] = gestures.Punto{X: float32(cx + medio), Y: float32(cy)}
+	apertura := 0.80
+	if cerrado {
+		apertura = 0.10
+	}
+	m.Puntos[gestures.PulgarPunta] = gestures.Punto{X: float32(cx), Y: float32(cy)}
+	m.Puntos[gestures.IndicePunta] = gestures.Punto{X: float32(cx + apertura*tam/math.Sqrt2), Y: float32(cy)}
+	return m
+}
+
+func cuadroPanelPrueba(t int64, manos ...gestures.Mano) gestures.Cuadro {
+	return gestures.Cuadro{TMs: t, Aspecto: 1, Manos: manos}
+}
+
+func TestPanelPellizcoPulsaYSueltaElBoton(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	c, err := gestures.NuevaCalibracionPanel(muestraPanelPrueba(-1, -1, .2), muestraPanelPrueba(1, 1, .2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := GuardarCalibracionPanel(ruta, c); err != nil {
+		t.Fatal(err)
+	}
+	puntero := &punteroPanelPrueba{}
+	p, err := NuevoPanel(ruta, puntero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Agarra dentro y arrastra a la derecha.
+	for i := 0; i < 5; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(i)*67, manoPanelPrueba(-0.5, 0, .2, true)), true)
+	}
+	if e := p.Estado(); e.Fase != "agarrando" || e.ManosArmadas != 1 {
+		t.Fatalf("estado al agarrar: %+v", e)
+	}
+	if len(puntero.botones) != 1 || !puntero.botones[0] {
+		t.Fatalf("no pulsó el botón: %+v", puntero.botones)
+	}
+	for i := 1; i <= 8; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(5+i)*67, manoPanelPrueba(-0.5+float64(i)*0.1, 0, .2, true)), true)
+	}
+	// Abre y suelta: el arrastre termina una sola vez, a la derecha.
+	for i := 0; i < 5; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(15+i)*67, manoPanelPrueba(0.3, 0, .2, false)), true)
+	}
+	e := p.Estado()
+	if e.Fase != "dentro" || e.Arrastre != "derecha" {
+		t.Fatalf("estado al soltar: %+v", e)
+	}
+	if len(puntero.botones) != 2 || puntero.botones[1] {
+		t.Fatalf("no soltó el botón: %+v", puntero.botones)
+	}
+	if len(puntero.puntos) == 0 {
+		t.Fatal("el puntero no se movió")
+	}
+	// Parar con el botón pulsado no lo deja pulsado.
+	for i := 0; i < 5; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(20+i)*67, manoPanelPrueba(0, 0, .2, true)), true)
+	}
+	p.Parar()
+	if ultimo := puntero.botones[len(puntero.botones)-1]; ultimo {
+		t.Fatalf("Parar dejó el botón pulsado: %+v", puntero.botones)
+	}
 }
 
 func alimentarEsquina(p *Panel, m gestures.MuestraPanel, desde int64) {

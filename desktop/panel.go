@@ -21,7 +21,9 @@ const (
 	maxMuestrasEsquina     = 15
 )
 
-// EstadoPanel es la parte del panel calibrado que pinta la ventana.
+// EstadoPanel es la parte del panel calibrado que pinta la ventana y lee el
+// aura. Fase es fuera, dentro o agarrando; mientras está agarrando, el botón
+// virtual del ratón está pulsado y el pellizco actúa de embrague.
 type EstadoPanel struct {
 	Calibrado     bool    `json:"calibrado"`
 	Calibrando    bool    `json:"calibrando"`
@@ -29,18 +31,25 @@ type EstadoPanel struct {
 	ListoCapturar bool    `json:"listo_capturar"`
 	Instruccion   string  `json:"instruccion"`
 	Dentro        bool    `json:"dentro"`
+	Fase          string  `json:"fase"` // fuera | dentro | agarrando
+	ManosArmadas  int     `json:"manos_armadas,omitempty"`
+	Arrastre      string  `json:"arrastre,omitempty"`
+	Zoom          string  `json:"zoom,omitempty"`
 	X             float64 `json:"x,omitempty"`
 	Y             float64 `json:"y,omitempty"`
 	Error         string  `json:"error,omitempty"`
 }
 
-// Panel toma las muestras de la mano, guía la calibración y mueve el puntero
-// absoluto. El archivo solo guarda las dos muestras agregadas, nunca cuadros
-// ni puntos de MediaPipe.
+// Panel toma las muestras de la mano, guía la calibración, mueve el puntero
+// absoluto y traduce el pellizco en el botón del ratón (el embrague). El
+// archivo solo guarda las dos muestras agregadas, nunca cuadros ni puntos de
+// MediaPipe.
 type Panel struct {
 	mu      sync.Mutex
 	Puntero platform.AbsolutePointer
 	ruta    string
+	// Acciones ejecuta el zoom de dos manos (Ctrl+ más/menos). Es opcional.
+	Acciones platform.TactileActions
 
 	calibracion gestures.CalibracionPanel
 	calibrado   bool
@@ -49,7 +58,13 @@ type Panel struct {
 	primera     gestures.MuestraPanel
 	muestras    []gestures.MuestraPanel
 	filtro      gestures.FiltroOneEuroPanel
+	embrague    *gestures.MedidorEmbrague
 	dentro      bool
+	fase        gestures.FaseEmbrague
+	armadas     int
+	arrastre    string
+	zoom        string
+	presionado  bool
 	x, y        float64
 	err         string
 }
@@ -66,6 +81,7 @@ func NuevoPanel(ruta string, puntero platform.AbsolutePointer) (*Panel, error) {
 	}
 	if c.Version != 0 {
 		p.calibracion, p.calibrado = c, true
+		p.embrague = gestures.NuevoMedidorEmbrague(c)
 	}
 	return p, nil
 }
@@ -116,11 +132,15 @@ func GuardarCalibracionPanel(ruta string, c gestures.CalibracionPanel) error {
 func (p *Panel) EmpezarCalibracion() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.soltarBoton()
 	p.calibrando, p.paso = true, 1
 	p.muestras = nil
 	p.dentro = false
+	p.fase = gestures.EmbragueFuera
+	p.armadas = 0
 	p.err = ""
 	p.filtro.Reiniciar()
+	p.embrague = nil
 }
 
 func (p *Panel) muestraEstable() (gestures.MuestraPanel, error) {
@@ -173,6 +193,7 @@ func (p *Panel) CapturarEsquina() error {
 		return err
 	}
 	p.calibracion, p.calibrado = c, true
+	p.embrague = gestures.NuevoMedidorEmbrague(c)
 	p.calibrando, p.paso, p.muestras, p.err = false, 0, nil, ""
 	p.filtro.Reiniciar()
 	return nil
@@ -210,24 +231,122 @@ func (p *Panel) observarMuestra(m gestures.MuestraPanel, tMs int64, mover bool) 
 	}
 }
 
-// Cuadro mide la primera mano. mover permite a la prueba de trabajo normal
-// observar el panel sin tocar el puntero real.
+// Cuadro pasa el cuadro por el embrague: mueve el puntero, pulsa o suelta el
+// botón y ejecuta el zoom. mover permite a la prueba de trabajo normal
+// observar el panel sin tocar el ratón real.
 func (p *Panel) Cuadro(c gestures.Cuadro, mover bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if len(c.Manos) == 0 {
-		p.muestras = nil
-		p.dentro = false
-		p.filtro.Reiniciar()
+	if p.calibrando {
+		if len(c.Manos) == 0 {
+			p.muestras = nil
+			return
+		}
+		if m, ok := gestures.MuestraPanelDe(c.Manos[0], c.Aspecto); ok {
+			p.observarMuestra(m, c.TMs, false)
+		}
 		return
 	}
-	m, ok := gestures.MuestraPanelDe(c.Manos[0], c.Aspecto)
-	if !ok {
-		p.dentro = false
-		p.filtro.Reiniciar()
+	if !p.calibrado {
 		return
 	}
-	p.observarMuestra(m, c.TMs, mover)
+	if p.embrague == nil {
+		p.embrague = gestures.NuevoMedidorEmbrague(p.calibracion)
+	}
+	p.aplicar(p.embrague.Cuadro(c), c.TMs, mover)
+}
+
+// aplicar traduce el resultado del embrague a los efectos reales del sistema.
+// Se llama con p.mu tomado.
+func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
+	p.fase, p.armadas, p.dentro = r.Fase, r.ManosArmadas, r.Dentro
+	if r.Arrastre != nil {
+		p.arrastre = string(r.Arrastre.Direccion)
+	}
+	if r.TienePos {
+		entrada := gestures.PuntoPanel{X: r.X, Y: r.Y}
+		if !r.Dentro && r.Fase == gestures.EmbragueAgarrando {
+			// Fuera del panel pero agarrando, la palma puede proyectarse muy
+			// lejos: se limita antes del filtro para no arrastrar ese salto.
+			entrada.X, entrada.Y = limitar01(entrada.X), limitar01(entrada.Y)
+		}
+		pos := p.filtro.Filtrar(tMs, entrada)
+		if r.Dentro {
+			p.x, p.y = pos.X, pos.Y
+		}
+		// Con el pellizco agarrado el puntero sigue aunque la palma se salga
+		// del rectángulo; se limita al borde de la pantalla.
+		if mover && p.Puntero != nil && (r.Dentro || r.Fase == gestures.EmbragueAgarrando) {
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			err := p.Puntero.MoveAbsolute(ctx, limitar01(pos.X), limitar01(pos.Y))
+			cancel()
+			if err != nil {
+				p.err = err.Error()
+			} else {
+				p.err = ""
+			}
+		}
+	} else {
+		p.filtro.Reiniciar()
+	}
+	if !r.Dentro && r.Fase != gestures.EmbragueAgarrando {
+		p.filtro.Reiniciar()
+	}
+
+	// Dos manos pellizcando son zoom; una sola pulsa el botón. Nunca las dos
+	// cosas a la vez.
+	debePresionar := mover && p.Puntero != nil && r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1
+	if debePresionar != p.presionado {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		err := p.Puntero.Button(ctx, debePresionar)
+		cancel()
+		if err != nil {
+			p.err = err.Error()
+		} else {
+			p.presionado, p.err = debePresionar, ""
+		}
+	}
+
+	if r.Zoom != nil && mover && p.Acciones != nil {
+		p.zoom = string(r.Zoom.Direccion)
+		dir := platform.ZoomIn
+		if r.Zoom.Direccion == gestures.ZoomAlejar {
+			dir = platform.ZoomOut
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err := p.Acciones.Zoom(ctx, dir)
+		cancel()
+		if err != nil {
+			p.err = "zoom: " + err.Error()
+		}
+	}
+}
+
+func limitar01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+// soltarBoton suelta el botón virtual si estaba pulsado. Se llama con p.mu
+// tomado; en Parar y al recalibrar, para no dejarlo pulsado al apagar.
+func (p *Panel) soltarBoton() {
+	if !p.presionado || p.Puntero == nil {
+		p.presionado = false
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	err := p.Puntero.Button(ctx, false)
+	cancel()
+	if err != nil {
+		p.err = err.Error()
+		return
+	}
+	p.presionado = false
 }
 
 func (p *Panel) Preparar() error {
@@ -248,16 +367,26 @@ func (p *Panel) Preparar() error {
 func (p *Panel) Parar() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.soltarBoton()
+	if p.embrague != nil {
+		p.embrague.Parar()
+	}
 	p.muestras = nil
 	p.dentro = false
+	p.fase, p.armadas = gestures.EmbragueFuera, 0
 	p.filtro.Reiniciar()
 }
 
 func (p *Panel) Estado() EstadoPanel {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	fase := p.fase
+	if fase == "" {
+		fase = gestures.EmbragueFuera
+	}
 	e := EstadoPanel{Calibrado: p.calibrado, Calibrando: p.calibrando, Paso: p.paso,
-		Dentro: p.dentro, X: p.x, Y: p.y, Error: p.err}
+		Dentro: p.dentro, Fase: string(fase), ManosArmadas: p.armadas,
+		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err}
 	switch {
 	case p.calibrando && p.paso == 1:
 		e.Instruccion = "Pon la palma en la esquina superior izquierda del panel imaginario, mantenla quieta y captura la esquina."
@@ -265,8 +394,12 @@ func (p *Panel) Estado() EstadoPanel {
 		e.Instruccion = "Ahora pon la palma en la esquina inferior derecha del panel imaginario, mantenla quieta y captura la esquina."
 	case !p.calibrado:
 		e.Instruccion = "Calibra dos esquinas para crear el panel delante de ti."
+	case p.armadas == 2:
+		e.Instruccion = "Dos manos pellizcando: sepáralas o júntalas para hacer zoom."
+	case p.armadas == 1:
+		e.Instruccion = "Pellizco agarrado: el botón del ratón está pulsado. Suelta para soltar."
 	case p.dentro:
-		e.Instruccion = "Mano dentro del panel: el puntero sigue la palma."
+		e.Instruccion = "Mano dentro del panel: el puntero sigue la palma. Pellizca para agarrar."
 	default:
 		e.Instruccion = "Panel listo. Mete la palma dentro del rectángulo que calibraste."
 	}

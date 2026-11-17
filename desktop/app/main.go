@@ -699,6 +699,7 @@ func correr(o opciones) error {
 		if err != nil {
 			decir("aviso: no se cargó la calibración del panel: %v", err)
 		}
+		app.panel.Acciones = sis.TactileActions
 		if err := app.panel.Preparar(); err != nil {
 			decir("aviso: %v", err)
 		}
