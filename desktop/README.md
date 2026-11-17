@@ -1,12 +1,13 @@
 # Lazul en el escritorio (v0.2.0)
 
 La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
-Muestra si el modo táctil está **activo** o **inactivo** y destella un gesto
-cuando lo reconoce, sin tapar la clase. En Linux, un panel imaginario delante
-de la persona mueve el puntero, y los gestos controlan la ventana que tenga el
-foco: desplazar, acercar o alejar y cambiar de
-diapositiva. Es la prueba de uso real de la 0.2.0 (dec-gzgl). La vista de la
-cámara queda como opción para acomodarse y está apagada por defecto.
+Muestra si el modo táctil está **activo** o **inactivo**, y un halo sobre toda
+la pantalla sigue la mano: nada fuera del panel, suave dentro y encendido al
+agarrar. No tapa la clase. En Linux, un panel imaginario delante de la persona
+mueve el puntero, y los gestos controlan la ventana que tenga el foco:
+desplazar, acercar o alejar y cambiar de diapositiva. Es la prueba de uso real
+de la 0.2.0 (dec-gzgl). La vista de la cámara queda como opción para acomodarse
+y está apagada por defecto.
 
 Esta interfaz reemplaza la ventana chica fija de la 0.1.0 (cotejo-luzcr0). La
 transferencia entre dos PCs de la 0.1.0 sigue disponible con
@@ -25,6 +26,10 @@ En Linux la cámara la abre `ffmpeg` (tiene que estar instalado).
 
 La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
 (con 16 px de margen), permanece sobre las demás y recuerda dónde la dejaste.
+En el modo táctil de Linux, además, un halo transparente sobre toda la pantalla
+sigue la mano cuando entra en el panel calibrado (nada fuera, suave dentro y
+encendido al agarrar). Esa superficie no recibe clics ni foco y no tapa la
+píldora.
 Esa posición se guarda en `ventana.json`, junto al estado de la app
 (`~/.local/state/lazul` en Linux o `%LOCALAPPDATA%\lazul` en Windows). En
 Wayland Wails no garantiza que el compositor acepte restaurar la posición.
@@ -63,6 +68,28 @@ comprobar** porque su representación Lua puede variar con la capa que carga la
 configuración. El margen propuesto es de 12 px. El fijado a todos los espacios
 depende de `pin`; `AlwaysOnTop` de Wails por sí solo no sustituye esta regla en
 Wayland.
+
+### Hyprland: el aura encima de todo
+
+El aura no es una ventana normal: es una superficie **layer-shell** en la capa
+`overlay`, con el espacio de nombres `lazul-aura`. Por eso ya queda encima de
+las ventanas, su región de entrada está vacía (los clics pasan) y su modo de
+teclado es `none` (no roba el foco). No necesita una regla de ventana para eso.
+
+Lo único que conviene añadir en la configuración Lua de Hyprland es quitarle la
+animación de entrada, para que el halo no parpadee al aparecer:
+
+```lua
+hl.layer_rule({
+  match = { namespace = "lazul-aura" },
+  no_anim = true,
+})
+```
+
+Con `hyprctl layers` se comprueba que aparece en la capa `overlay` con el
+espacio de nombres `lazul-aura`. Si el compositor no soporta layer-shell (X11,
+o un Wayland sin `wlr-layer-shell`), el aura no se crea y la app sigue igual:
+la señal visual vuelve a ser la píldora del indicador.
 
 ## Emparejar los dos PCs (solo para transferencias)
 
@@ -115,8 +142,9 @@ otro también pueda mandarte, empareja al revés.
 - Si la cámara deja de ver una mano durante 3 segundos, el modo se apaga solo.
 - Si sueltas y vuelves a agarrar en la dirección contraria antes de 2,5 s, se
   ignora (es la mano que vuelve); para corregir, mueve la mano sin soltar.
-- Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
-  que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
+- El halo es la señal visual: fuera del panel calibrado no se ve nada; dentro,
+  un halo suave sigue la mano; al agarrar (pellizco) se enciende. La píldora
+  sigue mostrando el último gesto reconocido, sin tapar la pantalla.
 
 Los gestos se aplican a la ventana que tenga el foco; el panel sí mueve el
 cursor, pero todavía no hace clic. La vista de cámara (a demanda) muestra la
@@ -181,6 +209,10 @@ ni nombres de archivos o ventanas.
 - La ventana (Wails) es `desktop/app`, módulo aparte como
   `prototipos/camara`: necesita cgo y WebKitGTK en Linux, así que no entra en
   `./dev check`. `./dev app compilar` la compila para los dos sistemas.
+- El aura es una superficie layer-shell aparte de la ventana de Wails (Wails v2
+  no abre más de una ventana): `desktop/app/aura.c` la crea y
+  `desktop/app/aura_linux.go` la enlaza con Go. La página es
+  `desktop/app/frontend/aura.html`. Fuera de Linux con cgo no se dibuja.
 - `./dev app e2e win|linux`: la app de verdad en los dos PCs sin cámara: el
   PC que manda pasa grabaciones reales (activar, agarrar, soltar) por el mismo
   camino que la cámara, y la captura tiene que llegar al otro.

@@ -31,13 +31,7 @@
     --wails-draggable: no-drag;
   }
   #indicador .icono:hover, #indicador .icono:focus-visible { background: rgba(127, 168, 255, .16); color: var(--texto); outline: none; }
-  @keyframes destello {
-    0% { border-color: rgba(79, 209, 139, .95); box-shadow: 0 0 0 0 rgba(79, 209, 139, .5), 0 6px 20px rgba(0, 0, 0, .35); }
-    100% { border-color: rgba(120, 140, 220, .38); box-shadow: 0 0 0 10px rgba(79, 209, 139, 0), 0 6px 20px rgba(0, 0, 0, .35); }
-  }
-  #indicador.destello { animation: destello .55s ease-out; }
-  #indicador.destello .punto { background: var(--ojo); box-shadow: 0 0 0 3px rgba(255, 204, 77, .22); }
-  @media (prefers-reduced-motion: reduce) { #indicador.destello { animation: none; border-color: var(--bien); } }
+  /* El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la señal. */
 
   /* ---------- vista de cámara (a demanda) ---------- */
   #ajuste { display: none; height: 100%; }
@@ -221,9 +215,10 @@
 </div>
 <script>
   // Vista previa estática (al abrir el HTML suelto, sin Wails): deja el
-  // indicador con un destello de ejemplo. La app real lo pinta con cada gesto.
+  // indicador activo con una etiqueta de ejemplo. La app real lo pinta con
+  // cada gesto; el aura sobre la pantalla es la señal del gesto.
   if (location.protocol === "file:") {
-    document.getElementById("indicador").classList.add("activo", "destello");
+    document.getElementById("indicador").classList.add("activo");
     document.getElementById("indicador-estado").textContent = "activo";
     document.getElementById("indicador-gesto").textContent = "scroll ↑";
   }
