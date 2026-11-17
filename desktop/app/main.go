@@ -85,6 +85,7 @@ type Estado struct {
 	Red       desktop.EstadoRed      `json:"red"`
 	Vista     desktop.Vista          `json:"vista"`
 	Indicador desktop.VistaIndicador `json:"indicador"`
+	Panel     desktop.EstadoPanel    `json:"panel"`
 	Permiso   *Solicitud             `json:"permiso"`
 	Prueba    bool                   `json:"prueba"`
 	FPS       float64                `json:"fps"`
@@ -99,6 +100,7 @@ type App struct {
 	flujo  flujoCamara
 	reg    *desktop.Registro
 	cap    *captura
+	panel  *desktop.Panel
 
 	mu       sync.Mutex
 	permiso  *Solicitud
@@ -163,6 +165,9 @@ func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
 func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	ahora := time.Now()
 	v := a.flujo.Cuadro(c, ahora)
+	if a.panel != nil {
+		a.panel.Cuadro(c, !a.flujo.EnPrueba())
+	}
 
 	// En modo táctil el indicador lo alimenta desktop.Tactil (AlEvento), que
 	// además ejecuta la acción. En modo transferencia el clasificador táctil
@@ -218,6 +223,9 @@ func (a *App) CamaraApagar() {
 		a.cap.apagar()
 	}
 	a.flujo.Parar(time.Now())
+	if a.panel != nil {
+		a.panel.Parar()
+	}
 	a.mu.Lock()
 	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
 	a.mu.Unlock()
@@ -240,7 +248,30 @@ func (a *App) Estado() Estado {
 	a.mu.Unlock()
 	e.Red = a.nucleo.Estado()
 	e.Prueba = a.flujo.EnPrueba()
+	if a.panel != nil {
+		e.Panel = a.panel.Estado()
+	}
 	return e
+}
+
+// CalibrarPanel empieza (o repite) el asistente de dos esquinas.
+func (a *App) CalibrarPanel() string {
+	if a.panel == nil {
+		return "el puntero absoluto solo está disponible en el modo táctil de Linux"
+	}
+	a.panel.EmpezarCalibracion()
+	return ""
+}
+
+// CapturarEsquinaPanel guarda la muestra estable del paso visible.
+func (a *App) CapturarEsquinaPanel() string {
+	if a.panel == nil {
+		return "el panel no está disponible"
+	}
+	if err := a.panel.CapturarEsquina(); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 // VistaCamara abre o cierra la vista de la cámara para acomodarse. Al
@@ -523,6 +554,7 @@ func correr(o opciones) error {
 	}
 	rutaReg := filepath.Join(dirEstado, desktop.NombreRegistro)
 	rutaVentana := filepath.Join(dirEstado, desktop.NombreEstadoVentana)
+	rutaPanel := filepath.Join(dirEstado, desktop.NombreCalibracionPanel)
 	if o.resumen {
 		ls, err := desktop.LeerRegistroDe(rutaReg)
 		if err != nil {
@@ -593,6 +625,13 @@ func correr(o opciones) error {
 			return errors.New("el modo táctil solo está disponible en Linux")
 		}
 		app.flujo = &desktop.Tactil{Reg: reg, Acciones: sis.TactileActions, AlEvento: app.ind.Aplicar}
+		app.panel, err = desktop.NuevoPanel(rutaPanel, sis.AbsolutePointer)
+		if err != nil {
+			decir("aviso: no se cargó la calibración del panel: %v", err)
+		}
+		if err := app.panel.Preparar(); err != nil {
+			decir("aviso: %v", err)
+		}
 	} else {
 		app.flujo = &desktop.Vivo{Reg: reg, AlGesto: app.nucleo.Disparar}
 	}

@@ -2,8 +2,9 @@
 
 La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
 Muestra si el modo táctil está **activo** o **inactivo** y destella un gesto
-cuando lo reconoce, sin tapar la clase. En Linux, los gestos controlan la
-ventana que tenga el foco: desplazar, acercar o alejar y cambiar de
+cuando lo reconoce, sin tapar la clase. En Linux, un panel imaginario delante
+de la persona mueve el puntero, y los gestos controlan la ventana que tenga el
+foco: desplazar, acercar o alejar y cambiar de
 diapositiva. Es la prueba de uso real de la 0.2.0 (dec-gzgl). La vista de la
 cámara queda como opción para acomodarse y está apagada por defecto.
 
@@ -27,6 +28,7 @@ La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
 Esa posición se guarda en `ventana.json`, junto al estado de la app
 (`~/.local/state/lazul` en Linux o `%LOCALAPPDATA%\lazul` en Windows). En
 Wayland Wails no garantiza que el compositor acepte restaurar la posición.
+La calibración del panel se guarda aparte en `panel.json`, en la misma carpeta.
 
 **Acomodar la cámara:** pulsa el botón de cámara del indicador o
 `Ctrl+Mayús+C`. La ventana se agranda (`920 × 660`) y muestra la cámara con
@@ -90,6 +92,14 @@ otro también pueda mandarte, empareja al revés.
 
 ## Usarla
 
+- Abre la vista de cámara y pulsa **Calibrar panel**. Imagina un rectángulo
+  cómodo delante de ti: pon la palma quieta en su esquina superior izquierda y
+  guarda esa esquina; repite en la inferior derecha. Puedes pulsar **Recalibrar**
+  cuando cambies de silla, cámara o postura.
+- Dentro de ese rectángulo, la palma mueve el puntero por toda la pantalla. El
+  tamaño aparente de la mano compensa cuánto te acercas a la cámara y un filtro
+  One Euro suaviza el temblor. Fuera del panel o claramente por delante/detrás,
+  no mueve nada.
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
 - **Scroll como el clic central**: junta las puntas del pulgar, el índice y
@@ -108,10 +118,10 @@ otro también pueda mandarte, empareja al revés.
 - Cada gesto reconocido hace **destellar** el indicador durante ~0,7 s con lo
   que se reconoció (`scroll ↑`, `zoom −`, `→`…), sin tapar la pantalla.
 
-Los gestos se aplican a la ventana que tenga el foco; la app no mueve el
-cursor ni hace clic. La vista de cámara (a demanda) muestra la cámara con los
-puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás cuando no ve
-la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
+Los gestos se aplican a la ventana que tenga el foco; el panel sí mueve el
+cursor, pero todavía no hace clic. La vista de cámara (a demanda) muestra la
+cámara con los puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás
+cuando no ve la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
 transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
 `%APPDATA%\lazul\recibidos`).
 

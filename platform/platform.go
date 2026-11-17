@@ -130,12 +130,21 @@ type ContinuousScroller interface {
 	ScrollContinuo(ctx context.Context, unidades int) error
 }
 
+// AbsolutePointer mueve un puntero virtual a una posición normalizada de la
+// pantalla. (0,0) es la esquina superior izquierda y (1,1), la inferior
+// derecha. Es opcional: hoy solo lo ofrece Linux mediante uinput.
+type AbsolutePointer interface {
+	Prepare(ctx context.Context) error
+	MoveAbsolute(ctx context.Context, x, y float64) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
-	Screenshot     Screenshot
-	Clipboard      Clipboard
-	ActiveApp      ActiveApp
-	LaunchApp      LaunchApp
-	TactileActions TactileActions
+	Screenshot      Screenshot
+	Clipboard       Clipboard
+	ActiveApp       ActiveApp
+	LaunchApp       LaunchApp
+	TactileActions  TactileActions
+	AbsolutePointer AbsolutePointer
 }
