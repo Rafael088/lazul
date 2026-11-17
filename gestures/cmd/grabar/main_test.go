@@ -282,10 +282,11 @@ func TestTomaDePellizcoRecibeElPanelCalibrado(t *testing.T) {
 	dir := t.TempDir()
 	vendor := fstest.MapFS{"vision_bundle.mjs": {Data: []byte("// mediapipe")}}
 	s := nuevoServidor(dir, filepath.Join(dir, "pellizco"), vendor)
-	s.panel = panelDe(gestures.CalibracionPanel{
-		SuperiorIzquierda: gestures.MuestraPanel{X: 0.2, Y: 0.3, Tamano: 0.1},
-		InferiorDerecha:   gestures.MuestraPanel{X: 0.7, Y: 0.8, Tamano: 0.1},
-	})
+	// 640x480: aspecto 4/3. Esquinas centradas en unidades de alto.
+	s.panel = &gestures.CalibracionPanel{
+		SuperiorIzquierda: gestures.MuestraPanel{X: 0.4, Y: -0.2, Tamano: 0.3},
+		InferiorDerecha:   gestures.MuestraPanel{X: -0.4, Y: 0.3, Tamano: 0.3},
+	}
 	srv := httptest.NewServer(s.rutas())
 	t.Cleanup(srv.Close)
 	cuerpo := strings.Replace(tomaDePellizco(t, []float64{0.60, 0.25, 0.50}), `"panel":{"x0":0.1,"x1":0.9,"y0":0.1,"y1":0.9},`, "", 1)
@@ -305,7 +306,8 @@ func TestTomaDePellizcoRecibeElPanelCalibrado(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := g.Cabecera.Panel
-	if p == nil || p.X0 != 0.2 || p.Y0 != 0.3 || p.X1 != 0.7 || p.Y1 != 0.8 {
+	cerca := func(a, b float64) bool { return a-b < 1e-9 && b-a < 1e-9 }
+	if p == nil || !cerca(p.X0, 0.2) || !cerca(p.Y0, 0.3) || !cerca(p.X1, 0.8) || !cerca(p.Y1, 0.8) {
 		t.Fatalf("panel: %+v", p)
 	}
 }

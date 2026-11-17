@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -85,8 +86,8 @@ type servidor struct {
 	mu       sync.Mutex
 	estado   gestures.Estado
 	pellizco *gestures.MedidorPellizco
-	panel    *gestures.Panel   // la calibración de ./dev app; nil sin calibrar
-	propias  map[string]string // nombre → carpeta: solo se descartan las de esta sesión
+	panel    *gestures.CalibracionPanel // la calibración de ./dev app; nil sin calibrar
+	propias  map[string]string          // nombre → carpeta: solo se descartan las de esta sesión
 }
 
 func nuevoServidor(dir, dirPellizco string, vendor fs.FS) *servidor {
@@ -248,8 +249,7 @@ func (s *servidor) guardar(w http.ResponseWriter, r *http.Request) {
 		// El estado del pellizco se calcula aquí, sobre los puntos crudos.
 		g = gestures.AnotarPellizco(g)
 		if g.Cabecera.Panel == nil && s.panel != nil {
-			p := *s.panel
-			g.Cabecera.Panel = &p
+			g.Cabecera.Panel = panelDe(*s.panel, g.Cabecera.Ancho, g.Cabecera.Alto)
 		}
 	}
 	destino := s.dir
@@ -350,8 +350,8 @@ func contarTomas(dir string) map[string]int {
 }
 
 // panelCalibrado lee la calibración que guarda ./dev app en la carpeta de
-// estado y la pasa al rectángulo de la cabecera. Sin calibración, nil.
-func panelCalibrado() *gestures.Panel {
+// estado. Sin calibración, nil.
+func panelCalibrado() *gestures.CalibracionPanel {
 	dir, err := desktop.DirEstado()
 	if err != nil {
 		return nil
@@ -360,12 +360,31 @@ func panelCalibrado() *gestures.Panel {
 	if err != nil {
 		return nil
 	}
-	return panelDe(c)
+	return &c
 }
 
-func panelDe(c gestures.CalibracionPanel) *gestures.Panel {
-	return &gestures.Panel{
-		X0: c.SuperiorIzquierda.X, Y0: c.SuperiorIzquierda.Y,
-		X1: c.InferiorDerecha.X, Y1: c.InferiorDerecha.Y,
+// panelDe pasa las esquinas calibradas a coordenadas normalizadas de la
+// imagen (0 a 1, sin espejar), que es lo que lleva la cabecera. La
+// calibración las guarda centradas en el eje óptico y en unidades de alto de
+// la imagen (ver gestures.MuestraPanelDe), así que hace falta el aspecto.
+// Sin tamaño de imagen no se puede convertir: nil.
+func panelDe(c gestures.CalibracionPanel, ancho, alto int) *gestures.Panel {
+	if ancho <= 0 || alto <= 0 {
+		return nil
 	}
+	// La imagen llega sin espejar: la esquina izquierda de la persona puede
+	// quedar a la derecha de la imagen. La cabecera guarda el rectángulo en
+	// el orden de la imagen, así que van el mínimo y el máximo.
+	a := float64(ancho) / float64(alto)
+	xa, xb := c.SuperiorIzquierda.X/a+0.5, c.InferiorDerecha.X/a+0.5
+	p := gestures.Panel{
+		X0: math.Min(xa, xb), Y0: c.SuperiorIzquierda.Y + 0.5,
+		X1: math.Max(xa, xb), Y1: c.InferiorDerecha.Y + 0.5,
+	}
+	for _, v := range []float64{p.X0, p.Y0, p.X1, p.Y1} {
+		if v < 0 || v > 1 {
+			return nil // calibrada con la mano medio fuera de la imagen
+		}
+	}
+	return &p
 }
