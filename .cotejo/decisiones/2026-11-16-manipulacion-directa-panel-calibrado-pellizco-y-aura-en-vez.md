@@ -2,8 +2,9 @@
 id: dec-fa72
 fecha: 2026-11-16
 temas: [gestos, modo-tactil, interaccion]
-estado: propuesta
+estado: aceptada
 autor: opus
+aceptada_el: 2026-11-16
 ---
 # Manipulación directa: panel calibrado, pellizco y aura en vez del agarre de tres dedos
 
