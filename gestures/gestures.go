@@ -10,6 +10,8 @@
 //   - Clasificar (clasificador.go): los gestos 1 a 4 de transferencia.
 //   - ClasificarTactil (tactil.go): la L alterna el modo táctil y, cuando
 //     está activo, reconoce scroll, zoom y barrido sin cursor ni clic.
+//   - Pellizco (pellizco.go): apertura pulgar-índice y estado con histéresis
+//     para las tomas del modelo nuevo de manipulación directa.
 //
 // El formato de las grabaciones está en grabacion.go y la herramienta para
 // grabarlas en gestures/cmd/grabar (./dev grabar).
@@ -48,6 +50,9 @@ type Punto struct{ X, Y, Z float32 }
 type Mano struct {
 	Puntos  [NumPuntos]Punto
 	Derecha bool // según MediaPipe (imagen sin espejar)
+	// Pellizco solo viene en las tomas del modelo nuevo: estado del embrague
+	// y apertura pulgar-índice de esta mano en este cuadro (ver pellizco.go).
+	Pellizco *EstadoPellizco
 }
 
 // Cuadro es lo que MediaPipe ve en un instante.
