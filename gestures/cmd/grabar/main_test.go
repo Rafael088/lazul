@@ -276,3 +276,36 @@ func TestTomaDePellizcoInvalida(t *testing.T) {
 		}
 	}
 }
+
+// Una toma de pellizco que llega sin panel sale con el calibrado en ./dev app.
+func TestTomaDePellizcoRecibeElPanelCalibrado(t *testing.T) {
+	dir := t.TempDir()
+	vendor := fstest.MapFS{"vision_bundle.mjs": {Data: []byte("// mediapipe")}}
+	s := nuevoServidor(dir, filepath.Join(dir, "pellizco"), vendor)
+	s.panel = panelDe(gestures.CalibracionPanel{
+		SuperiorIzquierda: gestures.MuestraPanel{X: 0.2, Y: 0.3, Tamano: 0.1},
+		InferiorDerecha:   gestures.MuestraPanel{X: 0.7, Y: 0.8, Tamano: 0.1},
+	})
+	srv := httptest.NewServer(s.rutas())
+	t.Cleanup(srv.Close)
+	cuerpo := strings.Replace(tomaDePellizco(t, []float64{0.60, 0.25, 0.50}), `"panel":{"x0":0.1,"x1":0.9,"y0":0.1,"y1":0.9},`, "", 1)
+	if strings.Contains(cuerpo, `"panel"`) {
+		t.Fatalf("la toma de prueba todavía trae panel: %s", cuerpo[:200])
+	}
+	if cod, res := pedir(t, "POST", srv.URL+"/guardar", cuerpo); cod != 200 {
+		t.Fatalf("%d %v", cod, res)
+	}
+	f, err := os.Open(filepath.Join(dir, "pellizco", "arrastrar-arriba-buena-001.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	g, err := gestures.LeerGrabacion("toma", f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := g.Cabecera.Panel
+	if p == nil || p.X0 != 0.2 || p.Y0 != 0.3 || p.X1 != 0.7 || p.Y1 != 0.8 {
+		t.Fatalf("panel: %+v", p)
+	}
+}

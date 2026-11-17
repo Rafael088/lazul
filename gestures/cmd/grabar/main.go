@@ -35,6 +35,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Rafael088/lazul/desktop"
 	"github.com/Rafael088/lazul/gestures"
 	"github.com/Rafael088/lazul/proto/go/lazulv1"
 )
@@ -59,12 +60,18 @@ func main() {
 		}
 	}
 	s := nuevoServidor(*dir, *dirPellizco, os.DirFS(*vendor))
+	s.panel = panelCalibrado()
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *puerto))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	fmt.Printf("grabar: abre http://%s en el navegador (Ctrl+C para salir); las tomas van a %s y %s\n", ln.Addr(), *dir, *dirPellizco)
+	if s.panel == nil {
+		fmt.Println("grabar: sin panel calibrado; calibra en ./dev app (Calibrar panel) para que las tomas lo lleven")
+	} else {
+		fmt.Println("grabar: las tomas de pellizco llevan el panel calibrado de ./dev app")
+	}
 	if err := http.Serve(ln, s.rutas()); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -78,6 +85,7 @@ type servidor struct {
 	mu       sync.Mutex
 	estado   gestures.Estado
 	pellizco *gestures.MedidorPellizco
+	panel    *gestures.Panel   // la calibración de ./dev app; nil sin calibrar
 	propias  map[string]string // nombre → carpeta: solo se descartan las de esta sesión
 }
 
@@ -239,6 +247,10 @@ func (s *servidor) guardar(w http.ResponseWriter, r *http.Request) {
 	if esToma {
 		// El estado del pellizco se calcula aquí, sobre los puntos crudos.
 		g = gestures.AnotarPellizco(g)
+		if g.Cabecera.Panel == nil && s.panel != nil {
+			p := *s.panel
+			g.Cabecera.Panel = &p
+		}
 	}
 	destino := s.dir
 	if esToma {
@@ -335,4 +347,25 @@ func contarTomas(dir string) map[string]int {
 		}
 	}
 	return n
+}
+
+// panelCalibrado lee la calibración que guarda ./dev app en la carpeta de
+// estado y la pasa al rectángulo de la cabecera. Sin calibración, nil.
+func panelCalibrado() *gestures.Panel {
+	dir, err := desktop.DirEstado()
+	if err != nil {
+		return nil
+	}
+	c, err := desktop.LeerCalibracionPanel(filepath.Join(dir, desktop.NombreCalibracionPanel))
+	if err != nil {
+		return nil
+	}
+	return panelDe(c)
+}
+
+func panelDe(c gestures.CalibracionPanel) *gestures.Panel {
+	return &gestures.Panel{
+		X0: c.SuperiorIzquierda.X, Y0: c.SuperiorIzquierda.Y,
+		X1: c.InferiorDerecha.X, Y1: c.InferiorDerecha.Y,
+	}
 }
