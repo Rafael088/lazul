@@ -20,6 +20,8 @@
   button { cursor: pointer; margin-top: 14px; margin-right: 6px; }
   button.principal { background: var(--lapis); color: #0b1020; border: 0; font-weight: 600; }
   #guia { margin-top: 12px; padding: 10px 12px; background: #161c3a; border-radius: 6px; }
+  #notaPanel { margin-top: 8px; font-size: 13px; color: var(--tenue); }
+  #notaPanel:empty { display: none; }
   #ultima { margin-top: 12px; }
   .bien { color: var(--bien); } .mal { color: var(--mal); }
   #cuenta { margin-top: 12px; font-size: 13px; color: var(--tenue); font-family: ui-monospace, monospace; white-space: pre-wrap; }
@@ -35,13 +37,25 @@
   <section>
     <label for="gesto">Qué grabas</label>
     <select id="gesto">
-      <option value="ACTIVAR">1 · la L (activar)</option>
-      <option value="AGARRAR">2 · puño (agarrar)</option>
-      <option value="SOLTAR">3 · abrir la mano a un lado (soltar)</option>
-      <option value="MANDAR_APP">4 · pinza y arrastrar (mandar la app)</option>
-      <option value="NINGUNO:pinza">negativo · pinza</option>
-      <option value="NINGUNO:senalar">negativo · señalar con el índice</option>
-      <option value="NINGUNO:normal">negativo · movimiento normal (2 min)</option>
+      <optgroup label="Gestos 0.1 (reconocer el gesto)">
+        <option value="ACTIVAR">1 · la L (activar)</option>
+        <option value="AGARRAR">2 · puño (agarrar)</option>
+        <option value="SOLTAR">3 · abrir la mano a un lado (soltar)</option>
+        <option value="MANDAR_APP">4 · pinza y arrastrar (mandar la app)</option>
+        <option value="NINGUNO:pinza">negativo · pinza</option>
+        <option value="NINGUNO:senalar">negativo · señalar con el índice</option>
+        <option value="NINGUNO:normal">negativo · movimiento normal (2 min)</option>
+      </optgroup>
+      <optgroup label="Modelo nuevo (manipulación directa)">
+        <option value="toma:arrastrar-arriba">pellizcar y arrastrar arriba</option>
+        <option value="toma:arrastrar-abajo">pellizcar y arrastrar abajo</option>
+        <option value="toma:arrastrar-izquierda">pellizcar y arrastrar a la izquierda</option>
+        <option value="toma:arrastrar-derecha">pellizcar y arrastrar a la derecha</option>
+        <option value="toma:entrar-panel">entrar en el panel</option>
+        <option value="toma:salir-panel">salir del panel</option>
+        <option value="toma:zoom-dos-manos">dos manos para zoom</option>
+        <option value="toma:normal">movimiento normal (2 min)</option>
+      </optgroup>
     </select>
     <label for="luz">Luz</label>
     <select id="luz"><option value="buena">buena</option><option value="mala">mala (luz normal de cuarto, de noche)</option></select>
@@ -52,6 +66,7 @@
       <button id="descartar" disabled>Descartar la última</button>
     </div>
     <div id="guia"></div>
+    <div id="notaPanel" class="tenue"></div>
     <div id="ultima"></div>
     <div id="cuenta"></div>
   </section>

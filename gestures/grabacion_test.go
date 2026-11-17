@@ -41,6 +41,75 @@ func TestGestoDesconocidoEsError(t *testing.T) {
 	}
 }
 
+func TestPellizcoDesconocidoEsError(t *testing.T) {
+	for _, cabecera := range []string{
+		`{"gesto":"NINGUNO","toma":"saludar"}`,
+		`{"gesto":"ACTIVAR","toma":"normal"}`,
+		`{"gesto":"NINGUNO","panel":{"x0":0.1,"y0":0.1,"x1":0.9,"y1":0.9}}`,
+		`{"gesto":"NINGUNO","toma":"normal","panel":{"x0":0.9,"y0":0.1,"x1":0.1,"y1":0.9}}`,
+		`{"gesto":"NINGUNO","toma":"normal","panel":{"x0":0,"y0":0,"x1":1.2,"y1":1}}`,
+	} {
+		if _, err := LeerGrabacion("x", strings.NewReader(cabecera)); err == nil {
+			t.Errorf("aceptó %s", cabecera)
+		}
+	}
+	puntos := strings.TrimSuffix(strings.Repeat("[0,0,0],", NumPuntos), ",")
+	if _, err := LeerGrabacion("x", strings.NewReader(
+		`{"gesto":"NINGUNO","toma":"normal"}`+"\n"+`{"t":0,"manos":[{"p":[`+puntos+`],"pellizco":{"apertura":-1}}]}`)); err == nil {
+		t.Error("aceptó una apertura negativa")
+	}
+}
+
+func TestEscribirYLeerTomaDePellizco(t *testing.T) {
+	cab := Cabecera{
+		Gesto: "NINGUNO", Luz: "mala", Ancho: 640, Alto: 480,
+		Toma: "zoom-dos-manos", Panel: &Panel{X0: 0.1, Y0: 0.2, X1: 0.8, Y1: 0.9},
+		Nota: "dos manos",
+	}
+	var m Mano
+	for i := range m.Puntos {
+		m.Puntos[i] = Punto{0.25, 0.5, 0}
+	}
+	derecha := EstadoPellizco{Cerrado: true, Apertura: 0.23456}
+	izquierda := EstadoPellizco{Cerrado: false, Apertura: 0.61234}
+	cuadros := []Cuadro{{
+		TMs: 0,
+		Manos: []Mano{
+			{Derecha: true, Puntos: m.Puntos, Pellizco: &derecha},
+			{Derecha: false, Puntos: m.Puntos, Pellizco: &izquierda},
+		},
+	}}
+	var b strings.Builder
+	if err := EscribirGrabacion(&b, cab, cuadros); err != nil {
+		t.Fatal(err)
+	}
+	s := b.String()
+	for _, trozo := range []string{
+		`"toma":"zoom-dos-manos"`, `"panel":{"x0":0.1,"y0":0.2,"x1":0.8,"y1":0.9}`,
+		`"pellizco":{"cerrado":true,"apertura":0.2346}`, `"pellizco":{"cerrado":false,"apertura":0.6123}`,
+	} {
+		if !strings.Contains(s, trozo) {
+			t.Errorf("falta %s en:\n%s", trozo, s)
+		}
+	}
+	g, err := LeerGrabacion("x", strings.NewReader(s))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Cabecera.Toma != cab.Toma || g.Cabecera.Panel == nil || *g.Cabecera.Panel != *cab.Panel {
+		t.Fatalf("cabecera: %+v", g.Cabecera)
+	}
+	if len(g.Cuadros) != 1 || len(g.Cuadros[0].Manos) != 2 {
+		t.Fatalf("cuadro: %+v", g.Cuadros)
+	}
+	if p := g.Cuadros[0].Manos[0].Pellizco; p == nil || !p.Cerrado || p.Apertura != 0.2346 {
+		t.Fatalf("pellizco derecho: %+v", p)
+	}
+	if p := g.Cuadros[0].Manos[1].Pellizco; p == nil || p.Cerrado || p.Apertura != 0.6123 {
+		t.Fatalf("pellizco izquierdo: %+v", p)
+	}
+}
+
 func TestTactilDesconocidoEsError(t *testing.T) {
 	for _, cabecera := range []string{
 		`{"gesto":"NINGUNO","tactil":"CLIC"}`,

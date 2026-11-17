@@ -33,6 +33,16 @@ import (
 // Las grabaciones táctiles añaden "tactil" (MODO, SCROLL, ZOOM, BARRIDO),
 // "direccion_tactil" y, cuando hace falta, "inicio_tactil"/"estado_tactil".
 // Así cada repetición se graba sola, sin hacer antes los gestos previos.
+//
+// Las tomas del modelo nuevo de manipulación directa (dec-fa72) se marcan
+// con "toma" (arrastrar-arriba, arrastrar-abajo, arrastrar-izquierda,
+// arrastrar-derecha, entrar-panel, salir-panel, zoom-dos-manos, normal) y
+// gesto NINGUNO. La cabecera puede llevar además "panel", el rectángulo
+// calibrado del panel virtual en coordenadas normalizadas de la imagen; si
+// no hay calibración, no viene. Cada mano de cada cuadro lleva "pellizco"
+// con el estado (con histéresis) y la apertura pulgar-índice en largos de
+// palma, calculados al guardar (ver pellizco.go). Los puntos crudos de las
+// dos manos van siempre, así que el estado se puede recalcular.
 type Cabecera struct {
 	Gesto           string `json:"gesto"`
 	Luz             string `json:"luz"`
@@ -44,7 +54,20 @@ type Cabecera struct {
 	DireccionTactil string `json:"direccion_tactil,omitempty"`
 	InicioTactil    string `json:"inicio_tactil,omitempty"`
 	EstadoTactil    string `json:"estado_tactil,omitempty"`
+	Toma            string `json:"toma,omitempty"`
+	Panel           *Panel `json:"panel,omitempty"`
 	Nota            string `json:"nota,omitempty"`
+}
+
+// Panel es el rectángulo calibrado del panel virtual en coordenadas
+// normalizadas de la imagen: (X0,Y0) esquina superior izquierda y (X1,Y1)
+// inferior derecha, en el orden de la imagen sin espejar. Sin calibrar, la
+// cabecera de la toma no lo lleva.
+type Panel struct {
+	X0 float64 `json:"x0"`
+	Y0 float64 `json:"y0"`
+	X1 float64 `json:"x1"`
+	Y1 float64 `json:"y1"`
 }
 
 // ModoInicial es el modo en que arranca el clasificador para esta cabecera.
@@ -66,8 +89,9 @@ func (c Cabecera) ModoInicial() (Modo, error) {
 }
 
 type manoJSON struct {
-	Derecha bool         `json:"derecha"`
-	P       [][3]float32 `json:"p"`
+	Derecha  bool            `json:"derecha"`
+	P        [][3]float32    `json:"p"`
+	Pellizco *EstadoPellizco `json:"pellizco,omitempty"`
 }
 
 type cuadroJSON struct {
@@ -128,6 +152,9 @@ func LeerGrabacion(nombre string, r io.Reader) (Grabacion, error) {
 			if err = validarCabeceraTactil(g.Cabecera); err != nil {
 				return g, fmt.Errorf("%s:1: %w", nombre, err)
 			}
+			if err = validarCabeceraPellizco(g.Cabecera); err != nil {
+				return g, fmt.Errorf("%s:1: %w", nombre, err)
+			}
 			if g.Cabecera.Ancho > 0 && g.Cabecera.Alto > 0 {
 				aspecto = float32(g.Cabecera.Ancho) / float32(g.Cabecera.Alto)
 			}
@@ -146,6 +173,13 @@ func LeerGrabacion(nombre string, r io.Reader) (Grabacion, error) {
 			mano.Derecha = m.Derecha
 			for i, p := range m.P {
 				mano.Puntos[i] = Punto{p[0], p[1], p[2]}
+			}
+			if m.Pellizco != nil {
+				if m.Pellizco.Apertura < 0 {
+					return g, fmt.Errorf("%s:%d: apertura de pellizco negativa", nombre, linea)
+				}
+				e := *m.Pellizco
+				mano.Pellizco = &e
 			}
 			c.Manos = append(c.Manos, mano)
 		}
@@ -204,6 +238,11 @@ func EscribirGrabacion(w io.Writer, cab Cabecera, cuadros []Cuadro) error {
 			mj := manoJSON{Derecha: m.Derecha, P: make([][3]float32, NumPuntos)}
 			for i, p := range m.Puntos {
 				mj.P[i] = [3]float32{redondear(p.X), redondear(p.Y), redondear(p.Z)}
+			}
+			if m.Pellizco != nil {
+				e := *m.Pellizco
+				e.Apertura = redondear(e.Apertura)
+				mj.Pellizco = &e
 			}
 			cj.Manos = append(cj.Manos, mj)
 		}
