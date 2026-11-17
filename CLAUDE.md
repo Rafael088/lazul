@@ -74,7 +74,10 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 En Linux, `./dev app` permite calibrar dos esquinas de un panel imaginario. La
 palma dentro del panel mueve un puntero absoluto uinput; su tamaño aparente
 compensa la profundidad y un filtro One Euro quita temblor. La calibración se
-guarda en `panel.json`. Además, cada cuadro pasa por `ClasificarTactil`: la L
+guarda en `panel.json`. El pellizco pulgar-índice es el embrague del botón
+principal (empieza dentro del panel y se suelta con 3 cuadros/200 ms abierto,
+para que el parpadeo no corte el arrastre); dos manos pellizcando y
+separándose o juntándose hacen zoom. Además, cada cuadro pasa por `ClasificarTactil`: la L
 sostenida alterna el modo; el agarre (pulgar, índice y medio con las puntas
 juntas) hace scroll continuo con la rueda virtual mientras se sostiene, según
 cuánto se aleje la mano del punto de agarre; una pinza que abre/cierra

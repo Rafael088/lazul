@@ -21,6 +21,18 @@ func TestPunteroCodificaPosicionAbsoluta(t *testing.T) {
 	}
 }
 
+func TestPunteroPulsaYSueltaElBotonPrincipal(t *testing.T) {
+	for _, caso := range []struct {
+		down bool
+		val  int32
+	}{{true, 1}, {false, 0}} {
+		ev := leerEventos(eventosBoton(caso.down))
+		if len(ev) != 2 || ev[0] != (eventoLeido{evKey, btnLeft, caso.val}) || ev[1].tipo != evSyn {
+			t.Fatalf("botón down=%v: %+v", caso.down, ev)
+		}
+	}
+}
+
 func TestPunteroRechazaCoordenadasFueraDePantalla(t *testing.T) {
 	for _, p := range [][2]float64{{-.01, .5}, {.5, 1.01}} {
 		if _, err := eventosPuntero(p[0], p[1]); !errors.Is(err, platform.ErrAccionInvalida) {
