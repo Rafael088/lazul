@@ -32,7 +32,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -258,10 +257,9 @@ func (a *App) Estado() Estado {
 	return e
 }
 
-// actualizarAura lleva al halo la posición de la mano y el estado del panel.
-// El pellizco (cotejo-l9dyjg) todavía no lo expone: en cuanto añada
-// `Agarrando bool` a EstadoPanel, campoAgarrando lo enciende sin tocar más
-// código. Mientras no exista, el halo se queda en «dentro» (suave).
+// actualizarAura lleva al halo la posición de la mano y la fase del pellizco
+// (cotejo-l9dyjg): fuera, dentro o agarrando. Agarrando, el puntero sigue a
+// la mano aunque salga del panel, así que el halo también.
 func (a *App) actualizarAura() {
 	a.mu.Lock()
 	aura := a.aura
@@ -273,8 +271,8 @@ func (a *App) actualizarAura() {
 	e := EstadoAura{Activa: activa}
 	if a.panel != nil {
 		p := a.panel.Estado()
-		e.Calibrado, e.Dentro, e.X, e.Y = p.Calibrado, p.Dentro, p.X, p.Y
-		e.Agarrando = campoAgarrando(p)
+		e.Agarrando = p.Fase == string(gestures.EmbragueAgarrando)
+		e.Calibrado, e.Dentro, e.X, e.Y = p.Calibrado, p.Dentro || e.Agarrando, p.X, p.Y
 	}
 	aura.Actualizar(e)
 }
@@ -306,21 +304,6 @@ func (a *App) cerrarAura() {
 	if aura != nil {
 		aura.Cerrar()
 	}
-}
-
-// campoAgarrando busca el campo `Agarrando` en el estado que exponga el
-// pellizco. Es a propósito blando: la tarea del aura y la del pellizco se
-// hacen en paralelo y ninguna debe romper a la otra.
-func campoAgarrando(v any) bool {
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Pointer {
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
-		return false
-	}
-	f := rv.FieldByName("Agarrando")
-	return f.IsValid() && f.Kind() == reflect.Bool && f.Bool()
 }
 
 // CalibrarPanel empieza (o repite) el asistente de dos esquinas.
