@@ -132,10 +132,12 @@ type ContinuousScroller interface {
 
 // AbsolutePointer mueve un puntero virtual a una posición normalizada de la
 // pantalla. (0,0) es la esquina superior izquierda y (1,1), la inferior
-// derecha. Es opcional: hoy solo lo ofrece Linux mediante uinput.
+// derecha. Button pulsa o suelta el botón principal, que es el embrague del
+// pellizco. Es opcional: hoy solo lo ofrece Linux mediante uinput.
 type AbsolutePointer interface {
 	Prepare(ctx context.Context) error
 	MoveAbsolute(ctx context.Context, x, y float64) error
+	Button(ctx context.Context, down bool) error
 }
 
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
