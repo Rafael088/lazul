@@ -200,6 +200,16 @@ function texto(id, t) { const el = $(id); if (el) el.textContent = t; }
 
 function pintarEstado(e) {
   mostrarIndicador(e.indicador);
+  const panel = e.panel || {};
+  texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas para crear el panel delante de ti.");
+  texto("panelerror", panel.error || "");
+  texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 2` :
+    (panel.calibrado ? (panel.dentro ? "Mano dentro del panel" : "Panel listo") : "Sin calibrar"));
+  texto("panelpos", panel.dentro ? `${Math.round(100 * panel.x)} %, ${Math.round(100 * panel.y)} %` : "");
+  $("calibrarpanel").textContent = panel.calibrado ? "Recalibrar" : "Calibrar panel";
+  $("capturarpanel").style.display = panel.calibrando ? "inline-block" : "none";
+  $("capturarpanel").disabled = !panel.listo_capturar;
+  $("capturarpanel").textContent = panel.paso === 2 ? "Guardar esquina inferior derecha" : "Guardar esquina superior izquierda";
   const r = e.red;
   texto("nombre", r.nombre); texto("huella", r.huella);
   texto("dirs", (r.direcciones || []).join("  ·  ") || (r.escuchando ? "(sin red local)" : "-"));
@@ -260,6 +270,9 @@ async function main() {
   texto("modoetiqueta", tactil ? "Modo táctil" : "Modo");
   $("ayudatactil").style.display = tactil ? "block" : "none";
   $("ayudatransferencia").style.display = tactil ? "none" : "block";
+  $("panelcal").style.display = tactil ? "block" : "none";
+  $("calibrarpanel").onclick = async () => texto("panelerror", await go().CalibrarPanel());
+  $("capturarpanel").onclick = async () => texto("panelerror", await go().CapturarEsquinaPanel());
   $("abrircodigo").onclick = () => go().AbrirCodigo();
   $("emparejar").onclick = async () => {
     $("emparejar").disabled = true;
