@@ -14,7 +14,7 @@ async function esperarWails() {
 }
 
 // ---------- indicador pequeño ----------
-let vistaCamara = false, ultimaSecuencia = 0;
+let vistaCamara = false;
 
 const FLECHAS = { arriba: "↑", abajo: "↓", izquierda: "←", derecha: "→", abrir: "+", cerrar: "−" };
 
@@ -33,20 +33,9 @@ function mostrarIndicador(ind) {
   const activo = !!(ind && ind.activo);
   pill.classList.toggle("activo", activo);
   $("indicador-estado").textContent = activo ? "activo" : "inactivo";
-  if (!ind || !ind.destello) {
-    $("indicador-gesto").textContent = "";
-    pill.classList.remove("destello");
-    return;
-  }
-  $("indicador-gesto").textContent = etiquetaGesto(ind);
-  // Cada gesto tiene una secuencia nueva: así la animación se reinicia
-  // aunque dos gestos caigan dentro del mismo destello.
-  if (ind.secuencia !== ultimaSecuencia) {
-    ultimaSecuencia = ind.secuencia;
-    pill.classList.remove("destello");
-    void pill.offsetWidth;
-    pill.classList.add("destello");
-  }
+  // El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la
+  // señal visual. Queda la etiqueta como recordatorio en la píldora.
+  $("indicador-gesto").textContent = ind && ind.destello ? etiquetaGesto(ind) : "";
 }
 
 async function alternarAjuste(on = !vistaCamara) {

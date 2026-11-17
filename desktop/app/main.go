@@ -101,6 +101,7 @@ type App struct {
 	reg    *desktop.Registro
 	cap    *captura
 	panel  *desktop.Panel
+	aura   *Aura
 
 	mu       sync.Mutex
 	permiso  *Solicitud
@@ -168,6 +169,7 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	if a.panel != nil {
 		a.panel.Cuadro(c, !a.flujo.EnPrueba())
 	}
+	a.actualizarAura()
 
 	// En modo táctil el indicador lo alimenta desktop.Tactil (AlEvento), que
 	// además ejecuta la acción. En modo transferencia el clasificador táctil
@@ -230,6 +232,7 @@ func (a *App) CamaraApagar() {
 	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
 	a.mu.Unlock()
 	a.ind.Apagar()
+	a.actualizarAura()
 	decir("cámara apagada")
 }
 
@@ -252,6 +255,55 @@ func (a *App) Estado() Estado {
 		e.Panel = a.panel.Estado()
 	}
 	return e
+}
+
+// actualizarAura lleva al halo la posición de la mano y la fase del pellizco
+// (cotejo-l9dyjg): fuera, dentro o agarrando. Agarrando, el puntero sigue a
+// la mano aunque salga del panel, así que el halo también.
+func (a *App) actualizarAura() {
+	a.mu.Lock()
+	aura := a.aura
+	activa := a.cfg.Modo == "tactil" && !a.vistaCamara
+	a.mu.Unlock()
+	if aura == nil {
+		return
+	}
+	e := EstadoAura{Activa: activa}
+	if a.panel != nil {
+		p := a.panel.Estado()
+		e.Agarrando = p.Fase == string(gestures.EmbragueAgarrando)
+		e.Calibrado, e.Dentro, e.X, e.Y = p.Calibrado, p.Dentro || e.Agarrando, p.X, p.Y
+	}
+	aura.Actualizar(e)
+}
+
+// crearAura abre el halo encima de la pantalla. Solo en modo táctil: en
+// transferencia la señal visual es la píldora del indicador. Fuera de Linux
+// con cgo NuevaAura devuelve nil y no se dibuja nada; la app sigue igual.
+func (a *App) crearAura() {
+	if a.cfg.Modo != "tactil" {
+		return
+	}
+	html, err := fs.ReadFile(assets, "frontend/aura.html")
+	if err != nil {
+		decir("aviso: no se cargó el aura: %v", err)
+		return
+	}
+	aura := NuevaAura(string(html))
+	a.mu.Lock()
+	a.aura = aura
+	a.mu.Unlock()
+}
+
+// cerrarAura suelta la superficie antes de que termine la app.
+func (a *App) cerrarAura() {
+	a.mu.Lock()
+	aura := a.aura
+	a.aura = nil
+	a.mu.Unlock()
+	if aura != nil {
+		aura.Cerrar()
+	}
 }
 
 // CalibrarPanel empieza (o repite) el asistente de dos esquinas.
@@ -306,6 +358,7 @@ func (a *App) VistaCamara(on bool) string {
 			wruntime.WindowSetPosition(a.ctx, x, y)
 		}
 	}
+	a.actualizarAura()
 	decir("vista de cámara %v", on)
 	return ""
 }
@@ -689,6 +742,10 @@ func correr(o opciones) error {
 		AssetServer: &assetserver.Options{Assets: sub, Handler: manejador(app.cap)},
 		OnStartup: func(c context.Context) {
 			app.ctx = c
+			// El aura es una superficie layer-shell aparte de la ventana de
+			// Wails (Wails v2 no da más de una ventana): transparente, encima
+			// de todo, sin foco ni clics. Solo tiene sentido en modo táctil.
+			app.crearAura()
 			if ventana.TienePosicion {
 				wruntime.WindowSetPosition(c, ventana.X, ventana.Y)
 			} else if ancho, alto, ok := pantallaActual(c); ok {
@@ -712,6 +769,7 @@ func correr(o opciones) error {
 			return false
 		},
 		OnShutdown: func(context.Context) {
+			app.cerrarAura()
 			if app.cap != nil {
 				app.cap.apagar()
 			}

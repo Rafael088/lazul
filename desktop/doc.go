@@ -6,7 +6,7 @@
 //   - Vivo (vivo.go): cuadro a cuadro, de los puntos de MediaPipe a la pose,
 //     el modo de transferencia y sus gestos (gestures.Clasificar).
 //   - Indicador (indicador.go): el estado del modo táctil que pinta la píldora
-//     de la esquina (activo/inactivo y un destello breve por gesto).
+//     de la esquina (activo/inactivo y el último gesto reconocido).
 //   - Registro (registro.go): el archivo local de la prueba de factibilidad
 //     (JSONL). Nunca lleva imágenes, URL ni nada de lo que hay en pantalla.
 //   - Resumen (resumen.go): activaciones en los últimos 30 min de uso, para
@@ -17,5 +17,6 @@
 //     emparejado).
 //
 // La ventana (Wails, módulo aparte para no meter cgo en ./dev check) está en
-// desktop/app; cómo usarla, en desktop/README.md.
+// desktop/app; cómo usarla, en desktop/README.md. El aura (el halo layer-shell
+// que sigue la mano) vive en desktop/app/aura.c y aura_linux.go.
 package desktop
