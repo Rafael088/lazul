@@ -4,8 +4,9 @@ La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
 Muestra si el modo táctil está **activo** o **inactivo**, y un halo sobre toda
 la pantalla sigue la mano: nada fuera del panel, suave dentro y encendido al
 agarrar. No tapa la clase. En Linux, un panel imaginario delante de la persona
-mueve el puntero, y los gestos controlan la ventana que tenga el foco:
-desplazar, acercar o alejar y cambiar de diapositiva. Es la prueba de uso real
+mueve el puntero; al pellizcar, una pantalla táctil virtual toca la ventana que
+tenga el foco (un dedo para tocar o arrastrar y dos para el zoom nativo). Los
+otros gestos desplazan o cambian de diapositiva. Es la prueba de uso real
 de la 0.2.0 (dec-gzgl). La vista de la cámara queda como opción para acomodarse
 y está apagada por defecto.
 
@@ -133,12 +134,19 @@ otro también pueda mandarte, empareja al revés.
   torso que Pose delimita entre hombros y caderas. Rascarse la cabeza, señalar
   fuera del cuerpo o bajar el brazo no activa gestos ni mueve el puntero. Si
   Pose pierde el torso, Lazul falla cerrado y espera a volver a verlo.
-- **Pellizco pulgar-índice = botón del ratón**: agarras mientras lo mantienes
-  cerrado y sueltas al abrirlo, así el regreso de la mano no cuenta como parte
-  del arrastre. Solo cuenta si el pellizco empieza dentro del panel; uno que
-  empieza fuera se ignora hasta soltarlo. Para que el parpadeo del pellizco no
-  corte un arrastre, al soltar se exigen unos cuadros y 200 ms abierto. Dos
-  manos pellizcando y separándose o juntándose hacen zoom.
+- **Pellizco pulgar-índice = dedo en la pantalla**: el puntero sigue la palma
+  sin pulsar ningún botón, para anticipar dónde caerá el contacto. Al cerrar el
+  pellizco se apoya un dedo táctil, al moverlo se arrastra y al abrirlo se
+  levanta. Solo cuenta si empieza dentro del panel; uno que empieza fuera se
+  ignora hasta soltarlo. Para que el parpadeo no corte el contacto, al soltar se
+  exigen unos cuadros y 200 ms abierto. Dos manos pellizcando son dos dedos:
+  el navegador, PDF u otra app reconoce directamente su zoom. Cada dedo lleva
+  su propio filtro contra el temblor.
+- Al arrancar, la vista de cámara dice **Entrada: pantalla táctil virtual**. Si
+  no se puede crear (por ejemplo, falta acceso a `/dev/uinput`), la píldora
+  muestra **respaldo** y la vista explica que Lazul conserva el comportamiento
+  anterior: un pellizco pulsa el botón y dos manos mandan `Ctrl` + `+` / `-`.
+  Apagar la cámara, salir o recalibrar levanta cualquier dedo o botón pendiente.
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
 - **Scroll como el clic central**: junta las puntas del pulgar, el índice y
@@ -159,7 +167,8 @@ otro también pueda mandarte, empareja al revés.
   sigue mostrando el último gesto reconocido, sin tapar la pantalla.
 
 Los gestos se aplican a la ventana que tenga el foco; el panel mueve el
-cursor y el pellizco hace de botón (pulsar, arrastrar y soltar). La vista de cámara (a demanda) muestra la
+cursor y el pellizco toca (o usa el respaldo de botón si el táctil no está
+disponible). La vista de cámara (a demanda) muestra la
 cámara con los puntos de la mano y la zona del torso, el modo **ACTIVO/INACTIVO**, la cuenta atrás
 cuando no ve la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
 transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
@@ -179,7 +188,8 @@ Cada gesto se traduce según la ventana con foco (`platform/linux/perfiles_tacti
 El scroll normal es continuo por la rueda virtual (`platform/linux/rueda.go`,
 `/dev/uinput`, que el usuario de la sesión puede escribir); las flechas solo
 se usan si no se puede crear. La velocidad está en `desktop.VelocidadRueda`.
-El zoom es siempre `Ctrl` + `+` / `-`.
+El zoom de dos manos lo reconoce la app como dos dedos. `Ctrl` + `+` / `-`
+solo se usa como respaldo si no se pudo crear la pantalla táctil virtual.
 
 ## La prueba de las activaciones falsas (30 min)
 
@@ -202,7 +212,9 @@ activación fue sin querer**; si la activaste tú y no hiciste nada después,
 
 Todo queda en un archivo de este PC (`factibilidad.jsonl` en
 `~/.local/state/lazul` o `%LOCALAPPDATA%\lazul`): la hora, cada gesto táctil,
-su dirección, confianza, resultado y la activación a la que pertenece.
+su dirección, confianza, resultado y la activación a la que pertenece. También
+anota si se usó la pantalla táctil o el respaldo y cuándo se apoyan o levantan
+dedos, pero no sus posiciones.
 **Nunca** guarda imágenes de la cámara ni de la pantalla, ni direcciones web,
 ni nombres de archivos o ventanas.
 

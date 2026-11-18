@@ -3,7 +3,8 @@
 // el modo táctil está activo y destella el gesto reconocido. La vista de la
 // cámara queda como opción para acomodarse (botón o Ctrl+Mayús+C) y la app
 // arranca con la cámara encendida aunque su vista esté apagada. En Linux abre
-// por defecto el modo táctil local (los gestos mueven la ventana con foco);
+// por defecto el modo táctil local (el pellizco toca la pantalla virtual y
+// los otros gestos actúan sobre la ventana con foco);
 // el modo de transferencia anterior sigue disponible con -modo transferencia.
 //
 // La webview abre la cámara (Windows: getUserMedia; Linux: ffmpeg en un
@@ -808,6 +809,8 @@ func correr(o opciones) error {
 			decir("aviso: no se cargó la calibración del panel: %v", err)
 		}
 		app.panel.Acciones = sis.TactileActions
+		app.panel.Tactil = sis.TouchScreen
+		app.panel.Reg = reg
 		if err := app.panel.Preparar(); err != nil {
 			decir("aviso: %v", err)
 		}
@@ -899,6 +902,9 @@ func correr(o opciones) error {
 				app.cap.apagar()
 			}
 			app.flujo.Parar(time.Now())
+			if app.panel != nil {
+				app.panel.Parar()
+			}
 			e := app.nucleo.Estado()
 			decir("fin · última acción: %s · último recibido: %s", e.Accion, e.Recibido)
 			cancel()

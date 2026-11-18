@@ -2,7 +2,9 @@
 id: pro-8pqe
 fecha: 2026-11-18
 temas: [modo-tactil, gestos]
-estado: abierto
+estado: resuelto
+solucion: gestures.TraductorToques conserva las ranuras entre llamadas y traduce un ResultadoEmbrague por cuadro; ToquesDe queda como envoltorio puro y Parar genera los levantamientos finales. Cubierto por TestTraductorToquesCuadroACuadroYParar y las pruebas anteriores de ToquesDe.
+resuelto_el: 2026-11-18
 ---
 # ToquesDe no sirve en vivo tal cual: hace falta una versión cuadro a cuadro (para cotejo-8fufqk)
 

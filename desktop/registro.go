@@ -26,6 +26,7 @@ const (
 	TipoPrueba      = "prueba"      // empieza o termina la prueba de trabajo normal
 	TipoEvitada     = "evitada"     // una mano quedó fuera de la zona; Resultado dice por qué
 	TipoRendimiento = "rendimiento" // muestra periódica de fps, CPU e inferencia
+	TipoPanel       = "panel"       // modo de entrada y apoyar/levantar dedos, nunca posiciones
 )
 
 // Resultados de una activación.
@@ -71,6 +72,7 @@ type Linea struct {
 	Ms       int64   `json:"ms,omitempty"`
 	Cuadros  int     `json:"cuadros,omitempty"`
 	ConMano  int     `json:"con_mano,omitempty"`
+	Dedos    int     `json:"dedos,omitempty"` // cantidad apoyada; nunca posiciones
 	FPS      float64 `json:"fps,omitempty"`
 	CPUCore  float64 `json:"cpu_core,omitempty"`
 	CPUTotal float64 `json:"cpu_total,omitempty"`

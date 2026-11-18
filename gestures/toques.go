@@ -8,8 +8,9 @@ import "sort"
 // toque los pone ella con su propia física.
 //
 // ToquesDe es puro: la misma secuencia de resultados da siempre los mismos
-// cuadros. No habla con platform; el adaptador táctil solo escribe lo que
-// aquí sale.
+// cuadros. TraductorToques conserva ese mismo estado cuadro a cuadro para el
+// recorrido en vivo. Ninguno habla con platform; el adaptador táctil solo
+// escribe lo que aquí sale.
 
 // maxDedos es lo que admite la pantalla táctil: dos ranuras.
 const maxDedos = 2
@@ -35,6 +36,83 @@ type CuadroToques struct {
 	Dedos []Dedo `json:"dedos"`
 }
 
+// TraductorToques convierte resultados del embrague uno por uno, sin guardar
+// todo el historial de una sesión. Mantiene la ranura de cada mano hasta que
+// se levanta y recuerda su última posición para emitir el levantamiento.
+type TraductorToques struct {
+	ranura map[ClaveMano]int
+	ultima map[int]PuntoPanel
+	tMs    int64
+}
+
+func NuevoTraductorToques() *TraductorToques {
+	return &TraductorToques{ranura: map[ClaveMano]int{}, ultima: map[int]PuntoPanel{}}
+}
+
+// Cuadro traduce un solo resultado. El estado previo queda listo para el
+// siguiente cuadro de la cámara.
+func (t *TraductorToques) Cuadro(r ResultadoEmbrague) CuadroToques {
+	if t.ranura == nil {
+		t.ranura = map[ClaveMano]int{}
+	}
+	if t.ultima == nil {
+		t.ultima = map[int]PuntoPanel{}
+	}
+	t.tMs = r.TMs
+	ct := CuadroToques{TMs: r.TMs}
+
+	armadas := append([]ManoArmada(nil), r.Armadas...)
+	sort.Slice(armadas, func(a, b int) bool {
+		return antesQue(armadas[a].Clave, armadas[b].Clave)
+	})
+	apoyadas := make(map[ClaveMano]bool, len(armadas))
+	for _, m := range armadas {
+		apoyadas[m.Clave] = true
+	}
+
+	liberadas := map[int]bool{}
+	for clave, n := range t.ranura {
+		if apoyadas[clave] {
+			continue
+		}
+		p := t.ultima[n]
+		ct.Dedos = append(ct.Dedos, Dedo{Ranura: n, X: p.X, Y: p.Y, Apoyado: false})
+		delete(t.ranura, clave)
+		delete(t.ultima, n)
+		liberadas[n] = true
+	}
+	for _, m := range armadas {
+		n, ok := t.ranura[m.Clave]
+		if !ok {
+			n = ranuraLibre(t.ranura, liberadas)
+			if n < 0 {
+				continue
+			}
+			t.ranura[m.Clave] = n
+		}
+		p := PuntoPanel{X: acotar01(m.X), Y: acotar01(m.Y)}
+		t.ultima[n] = p
+		ct.Dedos = append(ct.Dedos, Dedo{Ranura: n, X: p.X, Y: p.Y, Apoyado: true})
+	}
+	sort.Slice(ct.Dedos, func(a, b int) bool {
+		return ct.Dedos[a].Ranura < ct.Dedos[b].Ranura
+	})
+	return ct
+}
+
+// Parar levanta todas las ranuras que sigan apoyadas y olvida el estado. El
+// cuadro se puede enviar al sistema al apagar o recalibrar.
+func (t *TraductorToques) Parar() CuadroToques {
+	ct := CuadroToques{TMs: t.tMs}
+	for n, p := range t.ultima {
+		ct.Dedos = append(ct.Dedos, Dedo{Ranura: n, X: p.X, Y: p.Y, Apoyado: false})
+	}
+	sort.Slice(ct.Dedos, func(a, b int) bool { return ct.Dedos[a].Ranura < ct.Dedos[b].Ranura })
+	t.ranura = map[ClaveMano]int{}
+	t.ultima = map[int]PuntoPanel{}
+	return ct
+}
+
 // ToquesDe convierte una secuencia de resultados del embrague en un cuadro de
 // dedos por resultado: pellizco armado = apoyar, seguir armado = mover,
 // soltar = levantar.
@@ -53,56 +131,9 @@ type CuadroToques struct {
 // entregados no cambian.
 func ToquesDe(resultados []ResultadoEmbrague) []CuadroToques {
 	cuadros := make([]CuadroToques, len(resultados))
-	ranura := map[ClaveMano]int{}
-	ultima := map[int]PuntoPanel{} // última posición de la ranura, para el levantar
+	traductor := NuevoTraductorToques()
 	for i, r := range resultados {
-		ct := CuadroToques{TMs: r.TMs}
-
-		armadas := append([]ManoArmada(nil), r.Armadas...)
-		sort.Slice(armadas, func(a, b int) bool {
-			return antesQue(armadas[a].Clave, armadas[b].Clave)
-		})
-		apoyadas := make(map[ClaveMano]bool, len(armadas))
-		for _, m := range armadas {
-			apoyadas[m.Clave] = true
-		}
-
-		// Primero se levanta lo que ya no está armado. Su ranura queda libre
-		// para el cuadro siguiente, no para una mano que apoye en este: un
-		// cuadro no puede llevar a la vez el levantar y el apoyar de la misma
-		// ranura.
-		liberadas := map[int]bool{}
-		for clave, n := range ranura {
-			if apoyadas[clave] {
-				continue
-			}
-			p := ultima[n]
-			ct.Dedos = append(ct.Dedos, Dedo{Ranura: n, X: p.X, Y: p.Y, Apoyado: false})
-			delete(ranura, clave)
-			delete(ultima, n)
-			liberadas[n] = true
-		}
-		for _, m := range armadas {
-			n, ok := ranura[m.Clave]
-			if !ok {
-				n = ranuraLibre(ranura, liberadas)
-				if n < 0 {
-					// No hay ranura para una mano nueva en este cuadro (la
-					// otra mano sigue tocando o la ranura se acaba de
-					// levantar): espera al siguiente, así nunca se mueve un
-					// dedo que ya está tocando.
-					continue
-				}
-				ranura[m.Clave] = n
-			}
-			p := PuntoPanel{X: acotar01(m.X), Y: acotar01(m.Y)}
-			ultima[n] = p
-			ct.Dedos = append(ct.Dedos, Dedo{Ranura: n, X: p.X, Y: p.Y, Apoyado: true})
-		}
-		sort.Slice(ct.Dedos, func(a, b int) bool {
-			return ct.Dedos[a].Ranura < ct.Dedos[b].Ranura
-		})
-		cuadros[i] = ct
+		cuadros[i] = traductor.Cuadro(r)
 	}
 	return cuadros
 }

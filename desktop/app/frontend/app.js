@@ -15,6 +15,7 @@ async function esperarWails() {
 
 // ---------- indicador pequeño ----------
 let vistaCamara = false;
+let modoEntradaPanel = "";
 
 const FLECHAS = { arriba: "↑", abajo: "↓", izquierda: "←", derecha: "→", abrir: "+", cerrar: "−" };
 
@@ -32,7 +33,7 @@ function mostrarIndicador(ind) {
   if (!pill) return;
   const activo = !!(ind && ind.activo);
   pill.classList.toggle("activo", activo);
-  $("indicador-estado").textContent = activo ? "activo" : "inactivo";
+  $("indicador-estado").textContent = (activo ? "activo" : "inactivo") + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
   // El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la
   // señal visual. Queda la etiqueta como recordatorio en la píldora.
   $("indicador-gesto").textContent = ind && ind.destello ? etiquetaGesto(ind) : "";
@@ -214,8 +215,11 @@ async function bucleWebview(gen) {
 function texto(id, t) { const el = $(id); if (el) el.textContent = t; }
 
 function pintarEstado(e) {
-  mostrarIndicador(e.indicador);
   const panel = e.panel || {};
+	modoEntradaPanel = panel.modo_entrada || "";
+	mostrarIndicador(e.indicador);
+	texto("panelentrada", panel.modo_entrada === "tactil" ? "Entrada: pantalla táctil virtual" : "Entrada: respaldo de ratón y teclado");
+	texto("panelaviso", panel.aviso_entrada || "");
   texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas para crear el panel delante de ti.");
   texto("panelerror", panel.error || "");
   texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 2` :
