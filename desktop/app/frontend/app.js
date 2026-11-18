@@ -65,6 +65,8 @@ async function alternarAjuste(on = !vistaCamara) {
 // ---------- cámara + MediaPipe ----------
 let cfg, lm = null, pm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
 const puntos = () => $("puntos").getContext("2d");
+const CADA_POSE = 3;
+let ultimaPose = null, cuadrosSinPose = 0;
 
 function pintar(manos, cuerpo) {
   const c = puntos();
@@ -105,9 +107,17 @@ function procesar(fuente, w, h) {
 	const inicioMano = performance.now();
   const r = lm.detectForVideo(fuente, ts);
 	const manoMs = performance.now() - inicioMano;
-	const inicioPose = performance.now();
-	const rp = pm.detectForVideo(fuente, ts);
-	const poseMs = performance.now() - inicioPose;
+	// Pose solo confirma que hay una persona y dónde está su torso: cambia
+	// despacio, así que corre 1 de cada CADA_POSE cuadros y entre medias se
+	// reutiliza. Con la mano y la pose en cada cuadro, en el portátil bajaba
+	// a 7 fps cuando el sistema estaba cargado.
+	let rp = ultimaPose, poseMs = 0;
+	if (!rp || ++cuadrosSinPose >= CADA_POSE) {
+		const inicioPose = performance.now();
+		rp = ultimaPose = pm.detectForVideo(fuente, ts);
+		poseMs = performance.now() - inicioPose;
+		cuadrosSinPose = 0;
+	}
   const manos = r.landmarks.map((pts, i) => {
     const hd = (r.handedness || r.handednesses || [])[i];
     return { derecha: !!(hd && hd[0] && hd[0].categoryName === "Right"), p: pts.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]) };
