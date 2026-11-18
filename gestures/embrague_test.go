@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -216,33 +215,14 @@ func TestEmbragueDosManosHacenZoom(t *testing.T) {
 // mediano del corpus: la pertenencia al rectángulo no depende de ese valor y
 // la tolerancia de profundidad sigue siendo realista.
 func calibracionDeToma(g Grabacion, tamano float64) CalibracionPanel {
-	p := g.Cabecera.Panel
-	a := float64(g.Cabecera.Ancho) / float64(g.Cabecera.Alto)
-	// La imagen llega sin espejar: la izquierda de la persona es la X mayor.
-	return CalibracionPanel{
-		Version:           1,
-		SuperiorIzquierda: MuestraPanel{X: (p.X1 - 0.5) * a, Y: p.Y0 - 0.5, Tamano: tamano},
-		InferiorDerecha:   MuestraPanel{X: (p.X0 - 0.5) * a, Y: p.Y1 - 0.5, Tamano: tamano},
+	cal, err := CalibracionDeToma(g, tamano)
+	if err != nil {
+		panic(err)
 	}
+	return cal
 }
 
-func tamanoMedianoPellizco(gs []Grabacion) float64 {
-	var ts []float64
-	for _, g := range gs {
-		for _, c := range g.Cuadros {
-			for _, m := range c.Manos {
-				if mu, ok := MuestraPanelDe(m, c.Aspecto); ok {
-					ts = append(ts, mu.Tamano)
-				}
-			}
-		}
-	}
-	sort.Float64s(ts)
-	if len(ts) == 0 {
-		return 0
-	}
-	return ts[len(ts)/2]
-}
+func tamanoMedianoPellizco(gs []Grabacion) float64 { return TamanoMedianoPellizco(gs) }
 
 type medidaToma struct {
 	arrastres []Arrastre
