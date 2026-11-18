@@ -14,7 +14,7 @@ type vacio struct{}
 // New devuelve un Sistema en el que nada está implementado.
 func New() platform.Sistema {
 	v := vacio{}
-	return platform.Sistema{Screenshot: v, Clipboard: v, ActiveApp: v, LaunchApp: v, TactileActions: v}
+	return platform.Sistema{Screenshot: v, Clipboard: v, ActiveApp: v, LaunchApp: v, TactileActions: v, TouchScreen: v}
 }
 
 func (vacio) Capture(context.Context) (platform.Imagen, error) {
@@ -40,5 +40,11 @@ func (vacio) Zoom(context.Context, platform.ZoomDirection) error {
 }
 
 func (vacio) Navigate(context.Context, platform.NavigationDirection, platform.NavigationMode) error {
+	return platform.ErrNoImplementado
+}
+
+func (vacio) Prepare(context.Context) error { return platform.ErrNoImplementado }
+
+func (vacio) Frame(context.Context, []platform.TouchPoint) error {
 	return platform.ErrNoImplementado
 }

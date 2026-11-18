@@ -7,6 +7,7 @@ import "github.com/Rafael088/lazul/platform"
 // New devuelve las capacidades de este sistema.
 func New() platform.Sistema {
 	puntero := &punteroVirtual{}
+	tactil := nuevoTactilVirtual()
 	return platform.Sistema{
 		Screenshot:      captura{},
 		Clipboard:       portapapeles{},
@@ -14,5 +15,6 @@ func New() platform.Sistema {
 		LaunchApp:       abrirApp{},
 		TactileActions:  accionesTactiles{rueda: &ruedaVirtual{}},
 		AbsolutePointer: puntero,
+		TouchScreen:     tactil,
 	}
 }

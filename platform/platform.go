@@ -140,6 +140,24 @@ type AbsolutePointer interface {
 	Button(ctx context.Context, down bool) error
 }
 
+// TouchPoint describe un dedo en una ranura estable de la pantalla táctil.
+// Slot solo puede ser 0 o 1. X e Y están normalizados: (0,0) es la esquina
+// superior izquierda y (1,1), la inferior derecha. Down dice si el dedo está
+// apoyado; un punto omitido del cuadro también se considera levantado.
+type TouchPoint struct {
+	Slot int
+	X, Y float64
+	Down bool
+}
+
+// TouchScreen inyecta cuadros completos de hasta dos dedos. Prepare crea el
+// dispositivo con antelación, porque el compositor puede tardar en verlo.
+// Frame sustituye el estado anterior: toda ranura omitida queda levantada.
+type TouchScreen interface {
+	Prepare(ctx context.Context) error
+	Frame(ctx context.Context, points []TouchPoint) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
@@ -149,4 +167,5 @@ type Sistema struct {
 	LaunchApp       LaunchApp
 	TactileActions  TactileActions
 	AbsolutePointer AbsolutePointer
+	TouchScreen     TouchScreen
 }
