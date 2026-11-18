@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Lazul · aura</title>
 <style>
-  /* Aura de Lazul: un halo sobre toda la pantalla que sigue la mano.
+  /* Aura de Lazul: un halo en una superficie chica que sigue la mano.
      Tres estados: fuera del panel (nada), dentro (halo suave) y agarrando
      (halo encendido). La superficie es transparente y no recibe clics. */
   :root { --noche: #101428; --lapis: #315fdc; --hielo: #e8ecff; --x: 0px; --y: 0px; }
@@ -77,34 +77,19 @@
     <div id="aro"></div>
   </div>
 <script>
-  // La app llama window.aura(estado) en cada cuadro con la posición de la
-  // mano en 0..1 dentro del panel calibrado. Aquí solo se pinta: nada de
-  // clics, foco ni teclado (la superficie ya llega con la entrada vacía).
+  // La app llama window.aura(estado, ox, oy) en cada cuadro. La superficie es
+  // chica (240 px) y la mueve el layer-shell para centrarla en la mano; ox y
+  // oy son el punto de la mano dentro de ella (difieren del centro solo junto
+  // a los bordes del monitor). Aquí solo se pinta: nada de clics ni foco.
   const raiz = document.documentElement;
-  let tx = 0, ty = 0, x = 0, y = 0, visible = false, animando = false;
-
-  function paso() {
-    if (!visible) { animando = false; return; }
-    x += (tx - x) * 0.35;
-    y += (ty - y) * 0.35;
-    raiz.style.setProperty("--x", x.toFixed(1) + "px");
-    raiz.style.setProperty("--y", y.toFixed(1) + "px");
-    requestAnimationFrame(paso);
-  }
-
-  window.aura = function (e) {
+  window.aura = function (e, ox, oy) {
     if (!e) return;
     const dentro = !!(e.activa && e.calibrado && e.dentro);
-    const estaba = visible;
-    visible = dentro;
     document.body.classList.toggle("visible", dentro);
     document.body.classList.toggle("agarrando", dentro && !!e.agarrando);
     if (!dentro) return;
-    tx = Number(e.x || 0) * window.innerWidth;
-    ty = Number(e.y || 0) * window.innerHeight;
-    // Primera aparición: se coloca sin arrastrar el halo desde el origen.
-    if (!estaba) { x = tx; y = ty; }
-    if (!animando) { animando = true; requestAnimationFrame(paso); }
+    raiz.style.setProperty("--x", Number(ox || 0) + "px");
+    raiz.style.setProperty("--y", Number(oy || 0) + "px");
   };
 </script>
 </body>

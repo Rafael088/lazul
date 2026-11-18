@@ -6,7 +6,11 @@
 typedef struct Aura Aura;
 
 Aura *lazul_aura_crear(const char *html);
-void lazul_aura_actualizar(Aura *aura, const char *json);
+/* Lado en píxeles lógicos de la superficie: cabe el halo encendido. */
+#define LAZUL_AURA_LADO 240
+
+/* x, y: posición de la mano en 0..1 sobre el monitor. */
+void lazul_aura_actualizar(Aura *aura, const char *json, double x, double y);
 void lazul_aura_cerrar(Aura *aura);
 
 #endif

@@ -47,7 +47,7 @@ func (a *Aura) Actualizar(e EstadoAura) {
 	if a.ptr == nil {
 		return
 	}
-	C.lazul_aura_actualizar(a.ptr, js)
+	C.lazul_aura_actualizar(a.ptr, js, C.double(e.X), C.double(e.Y))
 }
 
 // Cerrar destruye la superficie. Wails ya está cerrando: solo libera.

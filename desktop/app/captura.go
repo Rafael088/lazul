@@ -52,6 +52,13 @@ func (c *captura) encender() error {
 		c.error = "falta ffmpeg (instálalo con el gestor de paquetes)"
 		return errors.New(c.error)
 	}
+	// Con poca luz muchas webcams alargan la exposición y bajan a 15 fps
+	// (exposure_dynamic_framerate): la mano llega con la mitad de cuadros y
+	// el panel se siente impreciso (18-nov). Mejor imagen más oscura a 30.
+	// Se intenta con v4l2-ctl si está; si no, la cámara queda como venga.
+	if _, err := exec.LookPath("v4l2-ctl"); err == nil {
+		_ = exec.Command("v4l2-ctl", "-d", c.dispositivo, "-c", "exposure_dynamic_framerate=0").Run()
+	}
 	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error",
 		"-f", "v4l2", "-input_format", "mjpeg", "-video_size", "640x480", "-framerate", "30",
 		"-i", c.dispositivo, "-c:v", "copy", "-f", "mjpeg", "-")

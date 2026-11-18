@@ -9,6 +9,7 @@ struct Aura {
   GtkWidget *web;
   char *html;
   char *pendiente;
+  double x, y; /* posición pendiente, 0..1 en el monitor */
   gboolean listo;
   guint fuente_crear;
   guint fuente_aplicar;
@@ -22,11 +23,35 @@ static gboolean aplicar_idle(gpointer datos) {
   aura->fuente_aplicar = 0;
   char *js = aura->pendiente;
   aura->pendiente = NULL;
+  double x = aura->x, y = aura->y;
   g_mutex_unlock(&aura->mutex);
 
   if (js != NULL && aura->web != NULL) {
-    webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(aura->web), js, -1,
+    /* Margen para centrar la superficie en la mano, acotado al monitor; lo
+       que no se pudo mover va como desplazamiento dentro de la página. */
+    int ancho = 0, alto = 0;
+    GdkDisplay *pantalla = gtk_widget_get_display(aura->ventana);
+    GdkMonitor *monitor = NULL;
+    GdkWindow *gw = gtk_widget_get_window(aura->ventana);
+    if (gw != NULL) monitor = gdk_display_get_monitor_at_window(pantalla, gw);
+    if (monitor == NULL) monitor = gdk_display_get_primary_monitor(pantalla);
+    if (monitor == NULL) monitor = gdk_display_get_monitor(pantalla, 0);
+    if (monitor != NULL) {
+      GdkRectangle g;
+      gdk_monitor_get_geometry(monitor, &g);
+      ancho = g.width;
+      alto = g.height;
+    }
+    int mitad = LAZUL_AURA_LADO / 2;
+    int px = (int)(x * ancho), py = (int)(y * alto);
+    int ml = CLAMP(px - mitad, 0, MAX(0, ancho - LAZUL_AURA_LADO));
+    int mt = CLAMP(py - mitad, 0, MAX(0, alto - LAZUL_AURA_LADO));
+    gtk_layer_set_margin(GTK_WINDOW(aura->ventana), GTK_LAYER_SHELL_EDGE_LEFT, ml);
+    gtk_layer_set_margin(GTK_WINDOW(aura->ventana), GTK_LAYER_SHELL_EDGE_TOP, mt);
+    char *llamada = g_strdup_printf("window.aura && window.aura(%s, %d, %d)", js, px - ml, py - mt);
+    webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(aura->web), llamada, -1,
                                         NULL, NULL, NULL, NULL, NULL);
+    g_free(llamada);
   }
   g_free(js);
   return G_SOURCE_REMOVE;
@@ -106,10 +131,12 @@ static gboolean crear_idle(gpointer datos) {
   gtk_layer_init_for_window(GTK_WINDOW(ventana));
   gtk_layer_set_namespace(GTK_WINDOW(ventana), "lazul-aura");
   gtk_layer_set_layer(GTK_WINDOW(ventana), GTK_LAYER_SHELL_LAYER_OVERLAY);
+  /* Superficie chica que se mueve con la mano (márgenes del layer-shell).
+     Una a pantalla completa se repintaba entera en cada cuadro y, con
+     WebKit en la NVIDIA, se copiaba a la Intel: 210 % de CPU (18-nov). */
   gtk_layer_set_anchor(GTK_WINDOW(ventana), GTK_LAYER_SHELL_EDGE_TOP, TRUE);
-  gtk_layer_set_anchor(GTK_WINDOW(ventana), GTK_LAYER_SHELL_EDGE_BOTTOM, TRUE);
   gtk_layer_set_anchor(GTK_WINDOW(ventana), GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
-  gtk_layer_set_anchor(GTK_WINDOW(ventana), GTK_LAYER_SHELL_EDGE_RIGHT, TRUE);
+  gtk_widget_set_size_request(ventana, LAZUL_AURA_LADO, LAZUL_AURA_LADO);
   gtk_layer_set_exclusive_zone(GTK_WINDOW(ventana), -1);
   gtk_layer_set_keyboard_mode(GTK_WINDOW(ventana),
                               GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
@@ -140,14 +167,16 @@ Aura *lazul_aura_crear(const char *html) {
   return aura;
 }
 
-void lazul_aura_actualizar(Aura *aura, const char *json) {
+void lazul_aura_actualizar(Aura *aura, const char *json, double x, double y) {
   if (aura == NULL) {
     return;
   }
-  char *js = g_strdup_printf("window.aura && window.aura(%s)", json);
+  char *js = g_strdup(json);
   g_mutex_lock(&aura->mutex);
   g_free(aura->pendiente);
   aura->pendiente = js;
+  aura->x = x;
+  aura->y = y;
   g_mutex_unlock(&aura->mutex);
   programa_aplicar(aura);
 }
