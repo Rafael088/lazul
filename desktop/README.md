@@ -21,7 +21,8 @@ transferencia entre dos PCs de la 0.1.0 sigue disponible con
 | Windows, desde el Linux | `./dev app win` (la copia a `%USERPROFILE%\Lazul\lazul.exe` y la abre en el escritorio de Windows) |
 | Windows, después | doble clic en `%USERPROFILE%\Lazul\lazul.exe` |
 
-La primera vez se baja MediaPipe (unos 37 MB) y queda dentro del programa.
+La primera vez se baja MediaPipe con los modelos de manos y Pose y queda
+dentro del programa.
 En Linux la cámara la abre `ffmpeg` (tiene que estar instalado).
 
 La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
@@ -37,7 +38,8 @@ La calibración del panel se guarda aparte en `panel.json`, en la misma carpeta.
 
 **Acomodar la cámara:** pulsa el botón de cámara del indicador o
 `Ctrl+Mayús+C`. La ventana se agranda (`920 × 660`) y muestra la cámara con
-los puntos de la mano y todos los controles. `Esc`, **Volver al indicador** o
+los puntos de la mano, el torso permitido en verde y todos los controles.
+`Esc`, **Volver al indicador** o
 el mismo atajo la devuelven a su esquina. La cámara sigue encendida aunque la
 vista esté apagada: encenderla o apagarla es el botón **Apagar cámara** de la
 vista de cámara.
@@ -127,6 +129,10 @@ otro también pueda mandarte, empareja al revés.
   tamaño aparente de la mano compensa cuánto te acercas a la cámara y un filtro
   One Euro suaviza el temblor. Fuera del panel o claramente por delante/detrás,
   no mueve nada.
+- La mano solo cuenta si su palma está a la vez dentro del panel y delante del
+  torso que Pose delimita entre hombros y caderas. Rascarse la cabeza, señalar
+  fuera del cuerpo o bajar el brazo no activa gestos ni mueve el puntero. Si
+  Pose pierde el torso, Lazul falla cerrado y espera a volver a verlo.
 - **Pellizco pulgar-índice = botón del ratón**: agarras mientras lo mantienes
   cerrado y sueltas al abrirlo, así el regreso de la mano no cuenta como parte
   del arrastre. Solo cuenta si el pellizco empieza dentro del panel; uno que
@@ -154,7 +160,7 @@ otro también pueda mandarte, empareja al revés.
 
 Los gestos se aplican a la ventana que tenga el foco; el panel mueve el
 cursor y el pellizco hace de botón (pulsar, arrastrar y soltar). La vista de cámara (a demanda) muestra la
-cámara con los puntos de la mano, el modo **ACTIVO/INACTIVO**, la cuenta atrás
+cámara con los puntos de la mano y la zona del torso, el modo **ACTIVO/INACTIVO**, la cuenta atrás
 cuando no ve la mano y el último gesto con su hora. Lo que llega al otro PC en el modo de
 transferencia queda en la carpeta `recibidos` (`~/.config/lazul/recibidos` o
 `%APPDATA%\lazul\recibidos`).
@@ -184,6 +190,11 @@ La meta: menos de 1 activación sin querer en 30 min de trabajo normal.
    **sin** hacer gestos a propósito. Mientras dure, Lazul reconoce y registra
    los gestos, pero no manda teclas, y toda activación cuenta como falsa.
 3. Pulsa **Terminar prueba** y **Resumen**: dice PASA o NO PASA.
+
+La línea de rendimiento muestra cuadros/s, CPU del árbol completo de Lazul,
+milisegundos de Hand y Pose y cuántos episodios quedaron bloqueados por falta
+de torso, fuera del torso o fuera del panel. El resumen guarda esas
+activaciones evitadas por motivo junto a las activaciones falsas.
 
 Fuera de la prueba también se cuenta: si se activa sola, pulsa **La última
 activación fue sin querer**; si la activaste tú y no hiciste nada después,

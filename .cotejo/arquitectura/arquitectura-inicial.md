@@ -1,17 +1,17 @@
 ---
 id: arq-mgew
 temas: [arquitectura]
-actualizado: 2026-11-16
+actualizado: 2026-11-18
 ---
 # Arquitectura inicial
 
-Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dígitos y TLS con huella fijada, permisos por dispositivo, enrutador de comandos; no llama al sistema. (2) platform/<so>/: una interfaz por capacidad (Screenshot, Clipboard, InjectKey, Media, ActiveApp, LaunchApp), un archivo por sistema. (3) desktop/ (Wails): webview con cámara y MediaPipe Hand Landmarker; por defecto abre solo un indicador pequeño y la vista de cámara es opcional; el clasificador (puntos de la mano → gesto) es una función pura en gestures/, probada con grabaciones en fixtures/gestos/. (4) proto/: esquema único de mensajes; se generan los tipos de Go y TS. Cómo se hablan: la webview emite eventos de gesto al núcleo Go; el controlador manda a cada receptor comandos de pocos bytes por WebSocket; los archivos viajan directo de origen a destino con el protocolo de LocalSend. ./dev sim levanta un controlador y N receptores falsos en local.
+Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dígitos y TLS con huella fijada, permisos por dispositivo, enrutador de comandos; no llama al sistema. (2) platform/<so>/: una interfaz por capacidad (Screenshot, Clipboard, InjectKey, Media, ActiveApp, LaunchApp), un archivo por sistema. (3) desktop/ (Wails): webview con cámara y MediaPipe Hand + Pose Landmarker; Pose delimita el torso y Go solo deja pasar manos que estén a la vez delante del torso y dentro del panel calibrado. Por defecto abre solo un indicador pequeño y la vista de cámara es opcional; el clasificador (puntos de la mano → gesto) es una función pura en gestures/, probada con grabaciones en fixtures/gestos/. El registro guarda rendimiento (fps, CPU, milisegundos de Hand y Pose) y episodios rechazados por la zona, nunca imágenes ni puntos. (4) proto/: esquema único de mensajes; se generan los tipos de Go y TS. Cómo se hablan: la webview emite cuadros de manos y Pose a Go; tras filtrar la zona, el núcleo recibe eventos de gesto; el controlador manda a cada receptor comandos de pocos bytes por WebSocket; los archivos viajan directo de origen a destino con el protocolo de LocalSend. ./dev sim levanta un controlador y N receptores falsos en local.
 
 ## Piezas
 
 | Capa | Pieza | Qué es | Tecnología | Tareas |
 | --- | --- | --- | --- | --- |
-| ve | Cámara y gestos | El indicador que mira tu mano con la cámara | Wails + MediaPipe | cotejo-cphace, cotejo-2iwx1x |
+| ve | Cámara y gestos | El indicador que mira tu mano con la cámara | Wails + MediaPipe | cotejo-cphace, cotejo-2iwx1x, cotejo-v2yyii |
 | hace | Clasificador de gestos | Convierte la posición de la mano en uno de los 4 gestos | | cotejo-tw9i76 |
 | hace | Núcleo | Revisa qué equipo puede hacer qué y reparte las órdenes | Go | cotejo-f09uwv |
 | hace | Adaptadores de Linux | Hacen la captura, el portapapeles y abrir apps en Hyprland | Go | cotejo-42s7rt |
@@ -20,10 +20,10 @@ Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dí
 | guarda | Gestos grabados | Las grabaciones de cada gesto con que se prueba el clasificador | | cotejo-x2hyu0 |
 | conecta | Emparejamiento | Encuentra tus otros equipos en la red y los une con un código de 6 dígitos | mDNS + TLS | cotejo-1od1ta |
 | conecta | Órdenes entre equipos | Los mensajes cortos que van de un equipo a otro | WebSocket | cotejo-f09uwv, cotejo-sb2kdm |
-| conecta | Envío de archivos | Pasa capturas y archivos directo de un equipo al otro | LocalSend | cotejo-sb2kdm |
+| conecta | Envío de archivos | Pasa capturas y archivos directo de origen a destino | LocalSend | cotejo-sb2kdm |
 
 ## Cómo se abre
 
 - comando: `./dev app`
 - url:
-- qué esperar: abre un indicador pequeño (236 × 64) en la esquina inferior derecha que dice «activo» o «inactivo», y un halo sobre la pantalla sigue la mano: nada fuera del panel calibrado, suave dentro y encendido al agarrar. En Linux la L alterna el modo táctil y los gestos controlan scroll, zoom y diapositivas en la ventana con foco; en Windows conserva el modo de transferencia. La cámara queda encendida aunque su vista esté apagada y la app escucha en el puerto 53317; si se esconde la ventana, la cámara se detiene. El botón de cámara del indicador o `Ctrl+Mayús+C` abre la vista de cámara y los controles para acomodarse. Para el otro PC Windows: `./dev app win` desde este Linux.
+- qué esperar: abre un indicador pequeño (236 × 64) en la esquina inferior derecha que dice «activo» o «inactivo», y un halo sobre la pantalla sigue la mano solo cuando está delante del torso y dentro del panel calibrado: nada fuera, suave dentro y encendido al agarrar. En Linux la L alterna el modo táctil y los gestos controlan scroll, zoom y diapositivas en la ventana con foco; en Windows conserva el modo de transferencia. La cámara queda encendida aunque su vista esté apagada y la app escucha en el puerto 53317; si se esconde la ventana, la cámara se detiene. El botón de cámara del indicador o `Ctrl+Mayús+C` abre la vista con el torso permitido en verde, fps, CPU, costo de Hand + Pose y activaciones evitadas. Para el otro PC Windows: `./dev app win` desde este Linux.

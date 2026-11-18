@@ -14,16 +14,18 @@ import (
 
 // Tipos de línea del registro.
 const (
-	TipoInicio     = "inicio"     // la cámara empezó a dar cuadros (una sesión de uso)
-	TipoLatido     = "latido"     // cada LatidoCada mientras la cámara da cuadros
-	TipoFin        = "fin"        // la cámara se apagó o la app se cerró
-	TipoPose       = "pose"       // la pose estable cambió
-	TipoGesto      = "gesto"      // el clasificador reconoció un gesto
-	TipoActivacion = "activacion" // una activación terminó: Resultado dice en qué
-	TipoAccion     = "accion"     // lo que hizo el Enrutador con un gesto
-	TipoRecibido   = "recibido"   // una Orden que llegó a este equipo
-	TipoMarca      = "marca"      // la persona dice que la última activación fue sin querer (o no)
-	TipoPrueba     = "prueba"     // empieza o termina la prueba de trabajo normal
+	TipoInicio      = "inicio"      // la cámara empezó a dar cuadros (una sesión de uso)
+	TipoLatido      = "latido"      // cada LatidoCada mientras la cámara da cuadros
+	TipoFin         = "fin"         // la cámara se apagó o la app se cerró
+	TipoPose        = "pose"        // la pose estable cambió
+	TipoGesto       = "gesto"       // el clasificador reconoció un gesto
+	TipoActivacion  = "activacion"  // una activación terminó: Resultado dice en qué
+	TipoAccion      = "accion"      // lo que hizo el Enrutador con un gesto
+	TipoRecibido    = "recibido"    // una Orden que llegó a este equipo
+	TipoMarca       = "marca"       // la persona dice que la última activación fue sin querer (o no)
+	TipoPrueba      = "prueba"      // empieza o termina la prueba de trabajo normal
+	TipoEvitada     = "evitada"     // una mano quedó fuera de la zona; Resultado dice por qué
+	TipoRendimiento = "rendimiento" // muestra periódica de fps, CPU e inferencia
 )
 
 // Resultados de una activación.
@@ -65,10 +67,15 @@ type Linea struct {
 	Error      string `json:"error,omitempty"`
 	// App: en el gesto 4, el id del catálogo de la app mandada o
 	// "fuera_del_catalogo". Nunca nombres, ejecutables, URL ni rutas.
-	App     string `json:"app,omitempty"`
-	Ms      int64  `json:"ms,omitempty"`
-	Cuadros int    `json:"cuadros,omitempty"`
-	ConMano int    `json:"con_mano,omitempty"`
+	App      string  `json:"app,omitempty"`
+	Ms       int64   `json:"ms,omitempty"`
+	Cuadros  int     `json:"cuadros,omitempty"`
+	ConMano  int     `json:"con_mano,omitempty"`
+	FPS      float64 `json:"fps,omitempty"`
+	CPUCore  float64 `json:"cpu_core,omitempty"`
+	CPUTotal float64 `json:"cpu_total,omitempty"`
+	ManoMs   float64 `json:"mano_ms,omitempty"`
+	PoseMs   float64 `json:"pose_ms,omitempty"`
 	// Prueba: en la prueba de trabajo normal (toda activación cuenta como
 	// falsa y no se manda nada).
 	Prueba bool `json:"prueba,omitempty"`

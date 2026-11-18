@@ -283,7 +283,11 @@ APP=.dev/app
 APP_WIN='$HOME\Lazul'
 APP_TITULO_PRUEBA='Lazul prueba-agente'
 
-app_assets() { [ -f desktop/app/frontend/vendor/vision_bundle.mjs ] || desktop/app/traer-assets.sh; }
+app_assets() {
+	[ -f desktop/app/frontend/vendor/vision_bundle.mjs ] &&
+		[ -f desktop/app/frontend/vendor/hand_landmarker.task ] &&
+		[ -f desktop/app/frontend/vendor/pose_landmarker_lite.task ] || desktop/app/traer-assets.sh
+}
 app_linux() { app_assets && (cd desktop/app && go build -tags desktop,production,webkit2_41 -o ../../$APP/lazul .); }
 app_windows() { app_assets && (cd desktop/app && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags desktop,production -ldflags '-H windowsgui' -o ../../$APP/lazul.exe .); }
 
