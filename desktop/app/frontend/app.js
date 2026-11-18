@@ -16,6 +16,7 @@ async function esperarWails() {
 // ---------- indicador pequeño ----------
 let vistaCamara = false;
 let modoEntradaPanel = "";
+let panelUltimo = {};
 
 const FLECHAS = { arriba: "↑", abajo: "↓", izquierda: "←", derecha: "→", abrir: "+", cerrar: "−" };
 
@@ -31,9 +32,20 @@ function etiquetaGesto(ind) {
 function mostrarIndicador(ind) {
   const pill = $("indicador");
   if (!pill) return;
+  // Con el panel calibrado, lo que importa es el panel (no necesita la L):
+  // el indicador dice si la mano está dentro y si está tocando.
+  const p = panelUltimo;
+  if (p.calibrado && !p.calibrando) {
+    const tocando = p.fase === "agarrando";
+    pill.classList.toggle("activo", tocando || !!p.dentro);
+    let t = tocando ? (p.manos_armadas === 2 ? "2 dedos" : "tocando") : (p.dentro ? "mano en el panel" : "panel listo");
+    $("indicador-estado").textContent = t + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
+    $("indicador-gesto").textContent = "";
+    return;
+  }
   const activo = !!(ind && ind.activo);
   pill.classList.toggle("activo", activo);
-  $("indicador-estado").textContent = (activo ? "activo" : "inactivo") + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
+  $("indicador-estado").textContent = (p.calibrando ? "calibrando" : (activo ? "activo" : "inactivo")) + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
   // El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la
   // señal visual. Queda la etiqueta como recordatorio en la píldora.
   $("indicador-gesto").textContent = ind && ind.destello ? etiquetaGesto(ind) : "";
@@ -81,7 +93,7 @@ function mostrarVista(v) {
   $("ultimohora").textContent = v.ultimo_hora ? "a las " + v.ultimo_hora : "";
   mostrarIndicador(v.indicador);
   if (cfg && cfg.modo === "tactil") {
-    let aviso = "Haz la L para activar";
+    let aviso = panelUltimo.calibrado ? "El panel no necesita la L; la L solo enciende scroll y diapositivas por gestos" : "Haz la L para activar";
     if (v.modo === "activo") aviso = v.sin_mano ? `sin mano · se apaga en ${Math.max(1, Math.ceil((v.apaga_en_ms || 0) / 1000))} s` : "mano detectada";
     texto("apagatactil", aviso);
     texto("errtactil", v.error ? "No se pudo ejecutar: " + v.error : "");
@@ -217,6 +229,7 @@ function texto(id, t) { const el = $(id); if (el) el.textContent = t; }
 function pintarEstado(e) {
   const panel = e.panel || {};
 	modoEntradaPanel = panel.modo_entrada || "";
+	panelUltimo = panel;
 	mostrarIndicador(e.indicador);
 	texto("panelentrada", panel.modo_entrada === "tactil" ? "Entrada: pantalla táctil virtual" : "Entrada: respaldo de ratón y teclado");
 	texto("panelaviso", panel.aviso_entrada || "");

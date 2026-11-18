@@ -21,22 +21,55 @@ func centroPalma(m Mano) punto2 {
 	return p
 }
 
-func puntosTorso(c *Cuerpo) ([4]punto2, bool) {
+// largoTorso es cuánto baja el torso desde los hombros, en anchos de hombro,
+// cuando Pose no ve las caderas (sentado frente al PC las tapa el escritorio
+// o quedan fuera de cuadro). Un adulto mide de hombros a cadera ~1,25 veces
+// el ancho de hombros.
+const largoTorso = 1.25
+
+func puntosTorso(c *Cuerpo) ([4]punto2, bool) { return puntosTorsoAspecto(c, 0) }
+
+// puntosTorsoAspecto da el cuadrilátero hombros-caderas. Si las caderas no
+// son fiables pero los dos hombros sí, las estima bajando desde los hombros
+// en perpendicular, con el aspecto de la imagen para que el ángulo recto sea
+// en píxeles (4:3 si no se sabe).
+func puntosTorsoAspecto(c *Cuerpo, aspecto float32) ([4]punto2, bool) {
 	var q [4]punto2
 	if c == nil {
 		return q, false
 	}
+	fiable := func(i int) (punto2, bool) {
+		p := c.Puntos[i]
+		if p.Visibilidad < visibilidadTorsoMin || p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1 {
+			return punto2{}, false
+		}
+		return punto2{float64(p.X), float64(p.Y)}, true
+	}
+	hi, ok1 := fiable(HombroIzquierdo)
+	hd, ok2 := fiable(HombroDerecho)
+	if !ok1 || !ok2 {
+		return q, false
+	}
 	// El orden dibuja el cuadrilátero: hombro izq. → hombro der. → cadera
 	// der. → cadera izq. Funciona igual si la imagen está espejada.
-	indices := [...]int{HombroIzquierdo, HombroDerecho, CaderaDerecha, CaderaIzquierda}
-	for i, indice := range indices {
-		p := c.Puntos[indice]
-		if p.Visibilidad < visibilidadTorsoMin || p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1 {
-			return q, false
-		}
-		q[i] = punto2{float64(p.X), float64(p.Y)}
+	cd, ok3 := fiable(CaderaDerecha)
+	ci, ok4 := fiable(CaderaIzquierda)
+	if ok3 && ok4 {
+		return [4]punto2{hi, hd, cd, ci}, true
 	}
-	return q, true
+	a := float64(aspecto)
+	if a <= 0 {
+		a = 4.0 / 3.0
+	}
+	// En píxeles (x por el aspecto), la perpendicular a los hombros que
+	// apunta hacia abajo de la imagen.
+	wx, wy := (hd.x-hi.x)*a, hd.y-hi.y
+	nx, ny := -wy, wx
+	if ny < 0 {
+		nx, ny = -nx, -ny
+	}
+	nx, ny = nx*largoTorso/a, ny*largoTorso
+	return [4]punto2{hi, hd, {hd.x + nx, hd.y + ny}, {hi.x + nx, hi.y + ny}}, true
 }
 
 // TorsoFiable permite distinguir «Pose no encontró un cuerpo» de «sí hay
@@ -80,13 +113,15 @@ func ManoDelanteDelTorso(m Mano, cuerpo *Cuerpo) bool {
 }
 
 // FiltrarPorTorso devuelve una copia superficial del cuadro que conserva
-// solo las manos delante del torso y cuántas rechazó. Si Pose no ve un torso
-// fiable, rechaza todas las manos: una pérdida de Pose no puede activar nada.
+// solo las manos delante del torso y cuántas rechazó. Sin caderas fiables
+// (sentado), el torso se estima desde los hombros. Si Pose no ve los dos
+// hombros, rechaza todas las manos: una pérdida de Pose no puede activar nada.
 func FiltrarPorTorso(c Cuadro) (Cuadro, int) {
 	filtrado := c
 	filtrado.Manos = make([]Mano, 0, len(c.Manos))
+	torso, ok := puntosTorsoAspecto(c.Cuerpo, c.Aspecto)
 	for _, mano := range c.Manos {
-		if ManoDelanteDelTorso(mano, c.Cuerpo) {
+		if ok && dentroConvexo(centroPalma(mano), torso) {
 			filtrado.Manos = append(filtrado.Manos, mano)
 		}
 	}

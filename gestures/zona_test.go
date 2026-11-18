@@ -54,3 +54,23 @@ func TestFiltrarPorTorsoFallaCerradoSinPoseFiable(t *testing.T) {
 		t.Fatalf("pose dudosa: manos %d, rechazadas %d", len(filtrado.Manos), rechazadas)
 	}
 }
+
+// Sentado frente al PC, Pose no ve las caderas: el torso se estima bajando
+// desde los hombros y sigue rechazando la cabeza, los lados y el regazo.
+func TestFiltrarPorTorsoSentadoSinCaderas(t *testing.T) {
+	c := Cuadro{Aspecto: 4.0 / 3.0, Cuerpo: cuerpoPrueba(), Manos: []Mano{
+		manoEn(.50, .60), // delante del pecho
+		manoEn(.50, .10), // rascándose la cabeza
+		manoEn(.90, .45), // señalando a un lado
+		manoEn(.50, .98), // sobre el regazo, bajo el torso estimado
+	}}
+	c.Cuerpo.Puntos[CaderaIzquierda].Visibilidad = .1
+	c.Cuerpo.Puntos[CaderaDerecha].Y = 1.3 // fuera de cuadro
+	filtrado, rechazadas := FiltrarPorTorso(c)
+	if len(filtrado.Manos) != 1 || rechazadas != 3 || filtrado.Manos[0].Puntos[Muneca].Y != .60 {
+		t.Fatalf("manos dentro %d, rechazadas %d: %+v", len(filtrado.Manos), rechazadas, filtrado.Manos)
+	}
+	if !TorsoFiable(c.Cuerpo) {
+		t.Fatal("con los dos hombros el torso debe ser fiable")
+	}
+}
