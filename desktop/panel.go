@@ -19,6 +19,7 @@ const (
 	NombreCalibracionPanel = "panel.json"
 	muestrasParaEsquina    = 8
 	maxMuestrasEsquina     = 15
+	toleranciaQuieta       = .2 // en palmas, respecto a la media de las últimas muestras
 )
 
 // EstadoPanel es la parte del panel calibrado que pinta la ventana y lee el
@@ -171,10 +172,14 @@ func (p *Panel) muestraEstable() (gestures.MuestraPanel, error) {
 	}
 	n := float64(len(ultimas))
 	media.X, media.Y, media.Tamano = media.X/n, media.Y/n, media.Tamano/n
+	// Tolerancia en palmas: 0,2 de palma son ~10 px a 640 con la mano a un
+	// brazo de la cámara. MediaPipe tiembla 3–7 px por cuadro con la mano
+	// quieta (tomas reales), más con el brazo estirado hacia una esquina;
+	// con 0,07 (~3,5 px) solo se lograba con el codo apoyado.
 	qx, qy := media.X/media.Tamano, media.Y/media.Tamano
 	for _, m := range ultimas {
-		if math.Abs(m.X/m.Tamano-qx) > .07 || math.Abs(m.Y/m.Tamano-qy) > .07 ||
-			math.Abs(m.Tamano/media.Tamano-1) > .08 {
+		if math.Abs(m.X/m.Tamano-qx) > toleranciaQuieta || math.Abs(m.Y/m.Tamano-qy) > toleranciaQuieta ||
+			math.Abs(m.Tamano/media.Tamano-1) > .12 {
 			return gestures.MuestraPanel{}, errors.New("mantén la mano quieta un momento antes de capturar")
 		}
 	}

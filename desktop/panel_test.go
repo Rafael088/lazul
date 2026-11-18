@@ -358,13 +358,30 @@ func TestPanelExigeManoQuietaParaCapturar(t *testing.T) {
 	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
 	p.EmpezarCalibracion()
 	for i := 0; i < muestrasParaEsquina; i++ {
-		m := muestraPanelPrueba(-1+float64(i%2)*.3, -.8, .2)
+		m := muestraPanelPrueba(-1+float64(i%2)*.6, -.8, .2) // se mueve media palma por cuadro
 		p.mu.Lock()
 		p.observarMuestra(m, int64(i*33), false)
 		p.mu.Unlock()
 	}
 	if err := p.CapturarEsquina(); err == nil {
 		t.Fatal("capturó una mano que estaba temblando")
+	}
+}
+
+// Con el brazo estirado hacia una esquina la palma tiembla unos píxeles por
+// cuadro (en las tomas reales, 3–7 px a 640): eso tiene que poder capturarse.
+func TestPanelCapturaConElTemblorNormal(t *testing.T) {
+	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
+	p.EmpezarCalibracion()
+	for i := 0; i < muestrasParaEsquina; i++ {
+		d := float64(i%3-1) * .12
+		m := muestraPanelPrueba(-1+d, -.8-d, .2*(1+d/4))
+		p.mu.Lock()
+		p.observarMuestra(m, int64(i*33), false)
+		p.mu.Unlock()
+	}
+	if err := p.CapturarEsquina(); err != nil {
+		t.Fatalf("no capturó una mano quieta con temblor normal: %v", err)
 	}
 }
 
