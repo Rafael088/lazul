@@ -209,7 +209,23 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	rechazos := map[string]int{}
 	// Las grabaciones históricas no contienen Pose. -reproducir es una vía
 	// de prueba determinista, no cámara real; conserva su recorrido original.
-	if !a.cfg.Reproducir {
+	panelCalibrado := false
+	if a.panel != nil {
+		e := a.panel.Estado()
+		panelCalibrado = e.Calibrado && !e.Calibrando
+	}
+	if !a.cfg.Reproducir && panelCalibrado {
+		// Con el panel calibrado, el panel es la zona de intención: Pose
+		// solo confirma que hay una persona delante (los dos hombros). Exigir
+		// además la palma sobre el torso dejaba fuera la mitad de un panel
+		// ancho, sobre todo sentado.
+		if !gestures.TorsoFiable(c.Cuerpo) {
+			filtrado.Manos = nil
+			if len(c.Manos) > 0 {
+				rechazos["sin_torso"] = len(c.Manos)
+			}
+		}
+	} else if !a.cfg.Reproducir {
 		var fueraTorso int
 		filtrado, fueraTorso = gestures.FiltrarPorTorso(c)
 		if fueraTorso > 0 {

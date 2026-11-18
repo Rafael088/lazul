@@ -74,7 +74,8 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 En Linux, `./dev app` permite calibrar dos esquinas de un panel imaginario. La
 palma solo cuenta si está dentro del panel y del torso hombros-caderas que
 MediaPipe Pose ve en el mismo cuadro (sin caderas visibles, sentado, el torso se estima
-bajando 1,25 anchos de hombro; calibrando, la mano no pasa por este filtro); entonces mueve un puntero absoluto uinput
+bajando 1,25 anchos de hombro; calibrando, la mano no pasa por este filtro; con el panel
+ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonces mueve un puntero absoluto uinput
 sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
 y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`.
 El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
