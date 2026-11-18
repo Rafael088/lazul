@@ -416,6 +416,17 @@ func (a *App) crearAura() {
 	if a.cfg.Modo != "tactil" {
 		return
 	}
+	// LAZUL_SIN_AURA=1 la apaga: es una superficie a pantalla completa que
+	// se repinta en cada cuadro con la mano dentro y comparte la gráfica con
+	// MediaPipe (sospecha del lag del 18-nov: 60-140 ms por cuadro con la
+	// mano dentro contra 20 ms sin ella).
+	if os.Getenv("LAZUL_SIN_AURA") == "1" {
+		decir("aura apagada (LAZUL_SIN_AURA=1)")
+		if a.reg != nil {
+			a.reg.Anotar(desktop.Linea{Tipo: desktop.TipoPanel, Resultado: "sin_aura"})
+		}
+		return
+	}
 	html, err := fs.ReadFile(assets, "frontend/aura.html")
 	if err != nil {
 		decir("aviso: no se cargó el aura: %v", err)
