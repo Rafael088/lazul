@@ -2,8 +2,9 @@
 id: dec-yp1a
 fecha: 2026-11-18
 temas: [modo-tactil, interaccion, linux]
-estado: propuesta
+estado: aceptada
 autor: agente
+aceptada_el: 2026-11-18
 ---
 # El pellizco toca: táctil virtual en vez del botón del ratón
 
