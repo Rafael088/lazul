@@ -47,7 +47,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `core/cmd/receptor/`, `core/cmd/controlador/` | receptor y controlador de verdad para `./dev e2e` | `-permitir HUELLA` da el permiso solo a esa huella (para medir sin nadie) |
 | `platform/real/` | el adaptador del sistema en que corre | |
 | `docs/informes/` | informes de medición (punta a punta: `2026-11-08-punta-a-punta.md`) | |
-| `gestures/` | `PoseDe` (forma de la mano en un cuadro, `pose.go`), `Clasificar` (máquina de estados pura, `clasificador.go`), grabaciones y medición | formato en `grabacion.go`; umbrales provisionales hasta medir con las reales |
+| `gestures/` | `PoseDe` (forma de la mano en un cuadro, `pose.go`), `Clasificar` (máquina de estados pura, `clasificador.go`), `MedidorEmbrague` y `ToquesDe` (pellizco armado → dedos del táctil virtual, `toques.go`), grabaciones y medición | formato en `grabacion.go`; umbrales provisionales hasta medir con las reales |
 | `gestures/sintetica_test.go` | modelo sintético de la mano que genera `gestures/testdata/sinteticas` | tras cambiarlo: `go test ./gestures -run TestSinteticasAlDia -actualizar` |
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` de los gestos 0.1 | las sintéticas van en `gestures/testdata/sinteticas` |
