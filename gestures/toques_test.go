@@ -213,6 +213,28 @@ func TestToquesDeElPrefijoNoCambiaLosCuadros(t *testing.T) {
 	}
 }
 
+func TestTraductorToquesCuadroACuadroYParar(t *testing.T) {
+	resultados := []ResultadoEmbrague{
+		resultado(0, armada(izq(0), 0.20, 0.50)),
+		resultado(67, armada(izq(0), 0.25, 0.55), armada(der(0), 0.80, 0.50)),
+		resultado(134, armada(der(0), 0.80, 0.55)),
+	}
+	quiere := ToquesDe(resultados)
+	traductor := NuevoTraductorToques()
+	for i, r := range resultados {
+		if obtuvo := traductor.Cuadro(r); !reflect.DeepEqual(obtuvo, quiere[i]) {
+			t.Fatalf("cuadro %d: obtuvo %s, quiere %s", i, formatear([]CuadroToques{obtuvo}), formatear(quiere[i:i+1]))
+		}
+	}
+	levantado := traductor.Parar()
+	if len(levantado.Dedos) != 1 || levantado.Dedos[0].Ranura != 1 || levantado.Dedos[0].Apoyado {
+		t.Fatalf("Parar no levantó el dedo restante: %+v", levantado)
+	}
+	if despues := traductor.Cuadro(resultado(201)); len(despues.Dedos) != 0 {
+		t.Fatalf("Parar no olvidó las ranuras: %+v", despues)
+	}
+}
+
 func formatear(cuadros []CuadroToques) string {
 	s := ""
 	for _, c := range cuadros {

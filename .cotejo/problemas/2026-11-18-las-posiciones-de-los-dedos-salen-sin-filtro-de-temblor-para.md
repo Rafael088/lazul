@@ -2,7 +2,9 @@
 id: pro-7176
 fecha: 2026-11-18
 temas: [modo-tactil, gestos]
-estado: abierto
+estado: resuelto
+solucion: desktop.Panel mantiene un FiltroOneEuroPanel por ranura, lo reinicia al apoyar/levantar y hace coincidir el primer contacto de un dedo con el puntero filtrado visible. TestPanelTactilMuevePunteroSinBotonFiltraYLevanta comprueba temblor sintético y el punto inicial.
+resuelto_el: 2026-11-18
 ---
 # Las posiciones de los dedos salen sin filtro de temblor (para cotejo-8fufqk)
 

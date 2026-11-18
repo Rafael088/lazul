@@ -22,8 +22,8 @@ const (
 )
 
 // EstadoPanel es la parte del panel calibrado que pinta la ventana y lee el
-// aura. Fase es fuera, dentro o agarrando; mientras está agarrando, el botón
-// virtual del ratón está pulsado y el pellizco actúa de embrague.
+// aura. Fase es fuera, dentro o agarrando; mientras está agarrando, el
+// pellizco apoya un dedo táctil (o pulsa el botón en modo de respaldo).
 type EstadoPanel struct {
 	Calibrado     bool    `json:"calibrado"`
 	Calibrando    bool    `json:"calibrando"`
@@ -35,20 +35,25 @@ type EstadoPanel struct {
 	ManosArmadas  int     `json:"manos_armadas,omitempty"`
 	Arrastre      string  `json:"arrastre,omitempty"`
 	Zoom          string  `json:"zoom,omitempty"`
+	ModoEntrada   string  `json:"modo_entrada"` // tactil | respaldo
+	AvisoEntrada  string  `json:"aviso_entrada,omitempty"`
 	X             float64 `json:"x,omitempty"`
 	Y             float64 `json:"y,omitempty"`
 	Error         string  `json:"error,omitempty"`
 }
 
 // Panel toma las muestras de la mano, guía la calibración, mueve el puntero
-// absoluto y traduce el pellizco en el botón del ratón (el embrague). El
+// absoluto y traduce el pellizco en dedos de la pantalla táctil. Si esta no
+// se puede preparar, conserva el botón del ratón y el zoom por teclado. El
 // archivo solo guarda las dos muestras agregadas, nunca cuadros ni puntos de
 // MediaPipe.
 type Panel struct {
 	mu      sync.Mutex
 	Puntero platform.AbsolutePointer
+	Tactil  platform.TouchScreen
+	Reg     *Registro
 	ruta    string
-	// Acciones ejecuta el zoom de dos manos (Ctrl+ más/menos). Es opcional.
+	// Acciones ejecuta el zoom de respaldo (Ctrl+ más/menos). Es opcional.
 	Acciones platform.TactileActions
 
 	calibracion gestures.CalibracionPanel
@@ -65,6 +70,12 @@ type Panel struct {
 	arrastre    string
 	zoom        string
 	presionado  bool
+	tactilListo bool
+	avisoTactil string
+	traductor   *gestures.TraductorToques
+	filtrosDedo [2]gestures.FiltroOneEuroPanel
+	dedosAbajo  [2]bool
+	ultimaDedo  [2]gestures.PuntoPanel
 	x, y        float64
 	err         string
 }
@@ -73,7 +84,10 @@ type Panel struct {
 // devuelve un panel utilizable (sin calibrar) junto con el error para que la
 // app lo muestre y permita repetirla.
 func NuevoPanel(ruta string, puntero platform.AbsolutePointer) (*Panel, error) {
-	p := &Panel{Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel()}
+	p := &Panel{Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques()}
+	for i := range p.filtrosDedo {
+		p.filtrosDedo[i] = gestures.NuevoFiltroOneEuroPanel()
+	}
 	c, err := LeerCalibracionPanel(ruta)
 	if err != nil {
 		p.err = err.Error()
@@ -133,6 +147,7 @@ func (p *Panel) EmpezarCalibracion() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.soltarBoton()
+	p.levantarDedos()
 	p.calibrando, p.paso = true, 1
 	p.muestras = nil
 	p.dentro = false
@@ -260,9 +275,9 @@ func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, int) {
 	return filtrado, len(c.Manos) - len(filtrado.Manos)
 }
 
-// Cuadro pasa el cuadro por el embrague: mueve el puntero, pulsa o suelta el
-// botón y ejecuta el zoom. mover permite a la prueba de trabajo normal
-// observar el panel sin tocar el ratón real.
+// Cuadro pasa el cuadro por el embrague: mueve el puntero y manda los dedos
+// al táctil (o el botón y zoom de respaldo). mover permite a la prueba de
+// trabajo normal observar el panel sin tocar el sistema real.
 func (p *Panel) Cuadro(c gestures.Cuadro, mover bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -322,9 +337,15 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 		p.filtro.Reiniciar()
 	}
 
-	// Dos manos pellizcando son zoom; una sola pulsa el botón. Nunca las dos
-	// cosas a la vez.
-	debePresionar := mover && p.Puntero != nil && r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1
+	if mover && p.tactilListo {
+		if err := p.enviarToques(r, tMs); err != nil {
+			p.desactivarTactil(err)
+		}
+	}
+
+	// Con la pantalla táctil, el puntero solo anticipa dónde caerá el dedo:
+	// nunca pulsa el botón. En respaldo conserva el embrague anterior.
+	debePresionar := mover && !p.tactilListo && p.Puntero != nil && r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1
 	if debePresionar != p.presionado {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		err := p.Puntero.Button(ctx, debePresionar)
@@ -336,7 +357,7 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 		}
 	}
 
-	if r.Zoom != nil && mover && p.Acciones != nil {
+	if r.Zoom != nil && mover && !p.tactilListo && p.Acciones != nil {
 		p.zoom = string(r.Zoom.Direccion)
 		dir := platform.ZoomIn
 		if r.Zoom.Direccion == gestures.ZoomAlejar {
@@ -349,6 +370,71 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 			p.err = "zoom: " + err.Error()
 		}
 	}
+}
+
+func (p *Panel) enviarToques(r gestures.ResultadoEmbrague, tMs int64) error {
+	cuadro := p.traductor.Cuadro(r)
+	if len(cuadro.Dedos) == 0 {
+		return nil
+	}
+	puntos := make([]platform.TouchPoint, 0, len(cuadro.Dedos))
+	nuevoAbajo := p.dedosAbajo
+	for _, d := range cuadro.Dedos {
+		pos := gestures.PuntoPanel{X: d.X, Y: d.Y}
+		if d.Apoyado {
+			if !p.dedosAbajo[d.Ranura] {
+				p.filtrosDedo[d.Ranura].Reiniciar()
+				// Con un solo dedo, el primer contacto coincide exactamente con
+				// el puntero que la palma venía moviendo.
+				if r.ManosArmadas == 1 && r.TienePos {
+					pos = gestures.PuntoPanel{X: p.x, Y: p.y}
+				}
+			}
+			pos = p.filtrosDedo[d.Ranura].Filtrar(tMs, pos)
+			p.ultimaDedo[d.Ranura] = pos
+			nuevoAbajo[d.Ranura] = true
+		} else {
+			pos = p.ultimaDedo[d.Ranura]
+			nuevoAbajo[d.Ranura] = false
+			p.filtrosDedo[d.Ranura].Reiniciar()
+		}
+		puntos = append(puntos, platform.TouchPoint{Slot: d.Ranura, X: limitar01(pos.X), Y: limitar01(pos.Y), Down: d.Apoyado})
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	err := p.Tactil.Frame(ctx, puntos)
+	cancel()
+	if err != nil {
+		return err
+	}
+	antes, despues := contarDedos(p.dedosAbajo), contarDedos(nuevoAbajo)
+	p.dedosAbajo = nuevoAbajo
+	if antes != despues {
+		resultado := "levanta"
+		if despues > antes {
+			resultado = "apoya"
+		}
+		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: resultado, Dedos: despues})
+	}
+	return nil
+}
+
+func contarDedos(d [2]bool) int {
+	n := 0
+	for _, abajo := range d {
+		if abajo {
+			n++
+		}
+	}
+	return n
+}
+
+func (p *Panel) desactivarTactil(err error) {
+	p.tactilListo = false
+	p.avisoTactil = "No se pudo crear el táctil virtual; uso botón del ratón y Ctrl +/-."
+	p.err = err.Error()
+	p.traductor = gestures.NuevoTraductorToques()
+	p.dedosAbajo = [2]bool{}
+	p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "respaldo", Error: ClaseError(err)})
 }
 
 func limitar01(v float64) float64 {
@@ -378,25 +464,64 @@ func (p *Panel) soltarBoton() {
 	p.presionado = false
 }
 
+// levantarDedos manda el cuadro final antes de apagar o recalibrar. Aunque
+// no haya dedos, reinicia el traductor y los filtros para la sesión siguiente.
+func (p *Panel) levantarDedos() {
+	cuadro := p.traductor.Parar()
+	if p.tactilListo && p.Tactil != nil && len(cuadro.Dedos) > 0 {
+		puntos := make([]platform.TouchPoint, 0, len(cuadro.Dedos))
+		for _, d := range cuadro.Dedos {
+			pos := p.ultimaDedo[d.Ranura]
+			puntos = append(puntos, platform.TouchPoint{Slot: d.Ranura, X: limitar01(pos.X), Y: limitar01(pos.Y), Down: false})
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		err := p.Tactil.Frame(ctx, puntos)
+		cancel()
+		if err != nil {
+			p.desactivarTactil(err)
+		} else {
+			p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "levanta", Dedos: 0})
+		}
+	}
+	p.dedosAbajo = [2]bool{}
+	for i := range p.filtrosDedo {
+		p.filtrosDedo[i].Reiniciar()
+	}
+}
+
 func (p *Panel) Preparar() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if !p.calibrado || p.Puntero == nil {
-		return nil
+	var errPuntero error
+	if p.calibrado && p.Puntero != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		errPuntero = p.Puntero.Prepare(ctx)
+		cancel()
+		if errPuntero != nil {
+			p.err = errPuntero.Error()
+		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	if err := p.Puntero.Prepare(ctx); err != nil {
-		p.err = err.Error()
-		return err
+	if p.Tactil == nil {
+		p.desactivarTactil(platform.ErrNoImplementado)
+		return errPuntero
 	}
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	errTactil := p.Tactil.Prepare(ctx)
+	cancel()
+	if errTactil != nil {
+		p.desactivarTactil(errTactil)
+		return errors.Join(errPuntero, errTactil)
+	}
+	p.tactilListo, p.avisoTactil = true, ""
+	p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "tactil"})
+	return errPuntero
 }
 
 func (p *Panel) Parar() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.soltarBoton()
+	p.levantarDedos()
 	if p.embrague != nil {
 		p.embrague.Parar()
 	}
@@ -415,7 +540,11 @@ func (p *Panel) Estado() EstadoPanel {
 	}
 	e := EstadoPanel{Calibrado: p.calibrado, Calibrando: p.calibrando, Paso: p.paso,
 		Dentro: p.dentro, Fase: string(fase), ManosArmadas: p.armadas,
-		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err}
+		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err,
+		ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil}
+	if p.tactilListo {
+		e.ModoEntrada = "tactil"
+	}
 	switch {
 	case p.calibrando && p.paso == 1:
 		e.Instruccion = "Pon la palma en la esquina superior izquierda del panel imaginario, mantenla quieta y captura la esquina."
@@ -424,9 +553,17 @@ func (p *Panel) Estado() EstadoPanel {
 	case !p.calibrado:
 		e.Instruccion = "Calibra dos esquinas para crear el panel delante de ti."
 	case p.armadas == 2:
-		e.Instruccion = "Dos manos pellizcando: sepáralas o júntalas para hacer zoom."
+		if p.tactilListo {
+			e.Instruccion = "Dos manos pellizcando: dos dedos hacen zoom directamente en la app."
+		} else {
+			e.Instruccion = "Dos manos pellizcando: sepáralas o júntalas para hacer zoom."
+		}
 	case p.armadas == 1:
-		e.Instruccion = "Pellizco agarrado: el botón del ratón está pulsado. Suelta para soltar."
+		if p.tactilListo {
+			e.Instruccion = "Pellizco apoyado como dedo. Abre para levantarlo."
+		} else {
+			e.Instruccion = "Pellizco agarrado: el botón del ratón está pulsado. Suelta para soltar."
+		}
 	case p.dentro:
 		e.Instruccion = "Mano dentro del panel: el puntero sigue la palma. Pellizca para agarrar."
 	default:

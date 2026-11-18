@@ -31,9 +31,9 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `proto/go/lazulv1/` | tipos de Go generados | no editar a mano; `compat_test.go` fija los bytes |
 | `proto/ts/` | tipos de TS generados (`src/`) y prueba de compatibilidad con Go | no editar `src/` a mano |
 | `proto/testdata/sobre_v1.bin` | el mismo Sobre que leen y escriben Go y TS | regenerar con `go test ./proto/go/lazulv1 -actualizar` |
-| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer y errores | pequeñas; una por capacidad |
+| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen y errores | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
-| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles de Hyprland y un puntero absoluto uinput; terminados cuando `./dev contrato` / `./dev win contrato` pasan |
+| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles, puntero absoluto y pantalla táctil multitoque uinput; Windows deja TouchScreen como no soportado para activar el respaldo; terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
 | `platform/internal/documento/` | nivel 2: elige el documento abierto (nombre en el título, mismos tipos que `core/seguro.go`) | una prueba exige las mismas extensiones que el receptor |
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |
@@ -52,7 +52,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` de los gestos 0.1 | las sintéticas van en `gestures/testdata/sinteticas` |
 | `fixtures/pellizco/` | tomas reales del modelo nuevo: cabecera con `toma` (y `panel` si hay calibración) y el estado del pellizco de cada mano por cuadro | se graban con `./dev grabar`; los puntos crudos de las dos manos van siempre |
-| `desktop/` | lógica de la app de escritorio, con pruebas: zona de torso MediaPipe Pose + `Panel` (calibración persistente y puntero absoluto), `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (activaciones falsas/evitadas y costo fps/CPU, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
+| `desktop/` | lógica de la app de escritorio, con pruebas: zona de torso MediaPipe Pose + `Panel` (calibración persistente, puntero absoluto y pellizco → TouchScreen, con respaldo de botón/teclado), `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (activaciones falsas/evitadas y costo fps/CPU, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, posiciones, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
 | `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); abre como indicador pequeño y la vista de cámara es opcional; cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
@@ -73,12 +73,15 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 
 En Linux, `./dev app` permite calibrar dos esquinas de un panel imaginario. La
 palma solo cuenta si está dentro del panel y del torso hombros-caderas que
-MediaPipe Pose ve en el mismo cuadro; entonces mueve un puntero absoluto uinput. Su tamaño aparente
-compensa la profundidad y un filtro One Euro quita temblor. La calibración se
-guarda en `panel.json`. El pellizco pulgar-índice es el embrague del botón
-principal (empieza dentro del panel y se suelta con 3 cuadros/200 ms abierto,
-para que el parpadeo no corte el arrastre); dos manos pellizcando y
-separándose o juntándose hacen zoom. Además, cada cuadro pasa por `ClasificarTactil`: la L
+MediaPipe Pose ve en el mismo cuadro; entonces mueve un puntero absoluto uinput
+sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
+y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`.
+El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
+mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
+la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen
+no se prepara, `Panel` conserva el botón principal y Ctrl +/-, lo muestra y lo
+registra sin coordenadas. Parar o recalibrar levanta todas las ranuras. Además,
+cada cuadro pasa por `ClasificarTactil`: la L
 sostenida alterna el modo; el agarre (pulgar, índice y medio con las puntas
 juntas) hace scroll continuo con la rueda virtual mientras se sostiene, según
 cuánto se aleje la mano del punto de agarre; una pinza que abre/cierra

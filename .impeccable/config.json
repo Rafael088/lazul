@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "desktop/app/frontend/index.html"
+        ],
+        "createdAt": "2026-11-18T19:19:18.141Z",
+        "reason": "Codex verificó los cuatro colores de texto del archivo contra sus fondos: contrastes 5.71:1 a 9.13:1, todos cumplen WCAG AA; el fondo transparente del indicador produce el falso positivo"
+      }
+    ]
+  }
+}
