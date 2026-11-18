@@ -51,12 +51,23 @@ func AperturaPellizco(m Mano, aspecto float32) (float64, bool) {
 	return dist(pulgar, indice) / palma, true
 }
 
-// claveMano identifica una mano entre cuadros: el lado que da MediaPipe y,
+// ClaveMano identifica una mano entre cuadros: el lado que da MediaPipe y,
 // si aparecen dos del mismo lado, el orden. Así la histéresis sigue a la
-// misma mano y una mano nueva empieza abierta.
-type claveMano struct {
-	derecha bool
-	n       int
+// misma mano y una mano nueva empieza abierta. Es también la clave que
+// publica el embrague, para que quien lea sus resultados pueda atar la
+// posición de una mano a la misma mano del cuadro anterior.
+type ClaveMano struct {
+	Derecha bool `json:"derecha"`
+	N       int  `json:"n"`
+}
+
+// String da una forma legible de la clave ("izquierda-0", "derecha-1").
+func (c ClaveMano) String() string {
+	lado := "izquierda"
+	if c.Derecha {
+		lado = "derecha"
+	}
+	return fmt.Sprintf("%s-%d", lado, c.N)
 }
 
 // MedidorPellizco calcula el estado de cada mano cuadro a cuadro, con
@@ -64,12 +75,12 @@ type claveMano struct {
 // la que muestra en vivo la página de grabar.
 type MedidorPellizco struct {
 	Ajustes AjustesPellizco
-	estado  map[claveMano]bool
+	estado  map[ClaveMano]bool
 }
 
 // NuevoMedidorPellizco arranca con todas las manos abiertas.
 func NuevoMedidorPellizco(aj AjustesPellizco) *MedidorPellizco {
-	return &MedidorPellizco{Ajustes: aj, estado: map[claveMano]bool{}}
+	return &MedidorPellizco{Ajustes: aj, estado: map[ClaveMano]bool{}}
 }
 
 // Cuadro avanza el estado con las manos de un cuadro. Devuelve un estado por
@@ -77,7 +88,7 @@ func NuevoMedidorPellizco(aj AjustesPellizco) *MedidorPellizco {
 // descarta: al volver empieza abierta.
 func (m *MedidorPellizco) Cuadro(manos []Mano, aspecto float32) []EstadoPellizco {
 	if m.estado == nil {
-		m.estado = map[claveMano]bool{}
+		m.estado = map[ClaveMano]bool{}
 	}
 	aj := m.Ajustes
 	if aj == (AjustesPellizco{}) {
@@ -85,9 +96,9 @@ func (m *MedidorPellizco) Cuadro(manos []Mano, aspecto float32) []EstadoPellizco
 	}
 	estados := make([]EstadoPellizco, len(manos))
 	vistos := map[bool]int{}
-	presentes := make(map[claveMano]bool, len(manos))
+	presentes := make(map[ClaveMano]bool, len(manos))
 	for i, mano := range manos {
-		clave := claveMano{derecha: mano.Derecha, n: vistos[mano.Derecha]}
+		clave := ClaveMano{Derecha: mano.Derecha, N: vistos[mano.Derecha]}
 		vistos[mano.Derecha]++
 		presentes[clave] = true
 		apertura, ok := AperturaPellizco(mano, aspecto)

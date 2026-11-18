@@ -1,6 +1,9 @@
 package gestures
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // Embrague (modelo de manipulación directa, dec-fa72): el pellizco pulgar-
 // índice es el botón del ratón. Mientras está cerrado se agarra; al abrirlo
@@ -84,26 +87,42 @@ type Zoom struct {
 	Separacion float64       `json:"separacion"`
 }
 
+// ManoArmada es una mano con el pellizco agarrado en este cuadro. Clave la
+// identifica entre cuadros (el lado y, si hay dos del mismo lado, el orden),
+// así que la misma clave en dos resultados es la misma mano; X e Y son su
+// posición en el panel (puede salirse del rectángulo mientras el pellizco
+// sigue armado).
+type ManoArmada struct {
+	Clave ClaveMano `json:"clave"`
+	X     float64   `json:"x"`
+	Y     float64   `json:"y"`
+}
+
 // ResultadoEmbrague es el estado de un cuadro y los gestos que terminaron en
 // él.
 type ResultadoEmbrague struct {
+	TMs      int64        `json:"t_ms"`
 	Fase     FaseEmbrague `json:"fase"`
 	Dentro   bool         `json:"dentro"`
 	TienePos bool         `json:"tiene_pos"`
 	// ManosArmadas es cuántas manos tienen el pellizco agarrado. Con una, el
 	// botón virtual se pulsa; con dos, el gesto es zoom y no se arrastra.
-	ManosArmadas int       `json:"manos_armadas"`
-	X            float64   `json:"x"`
-	Y            float64   `json:"y"`
-	Arrastre     *Arrastre `json:"arrastre,omitempty"`
-	Zoom         *Zoom     `json:"zoom,omitempty"`
+	ManosArmadas int `json:"manos_armadas"`
+	// Armadas es cada una de esas manos con su clave y su posición, ordenadas
+	// por clave para que el orden no cambie entre cuadros. ToquesDe las usa
+	// para mantener un dedo por mano.
+	Armadas  []ManoArmada `json:"armadas,omitempty"`
+	X        float64      `json:"x"`
+	Y        float64      `json:"y"`
+	Arrastre *Arrastre    `json:"arrastre,omitempty"`
+	Zoom     *Zoom        `json:"zoom,omitempty"`
 }
 
 // estadoManoEmbrague sigue una mano entre cuadros. La clave es la misma que
 // usa MedidorPellizco (lado y orden), así la histéresis y el embrague hablan
 // de la misma mano.
 type estadoManoEmbrague struct {
-	clave         claveMano
+	clave         ClaveMano
 	cerrada       bool
 	armada        bool // el pellizco empezó dentro del panel
 	inicio        PuntoPanel
@@ -116,7 +135,7 @@ type estadoManoEmbrague struct {
 
 type estadoZoom struct {
 	activo     bool
-	claves     [2]claveMano
+	claves     [2]ClaveMano
 	referencia float64
 	ultima     float64
 }
@@ -128,7 +147,7 @@ type MedidorEmbrague struct {
 	Ajustes     AjustesEmbrague
 
 	pellizco *MedidorPellizco
-	manos    map[claveMano]*estadoManoEmbrague
+	manos    map[ClaveMano]*estadoManoEmbrague
 	zoom     estadoZoom
 }
 
@@ -145,12 +164,12 @@ func NuevoMedidorEmbragueCon(c CalibracionPanel, aj AjustesEmbrague) *MedidorEmb
 		Calibracion: c,
 		Ajustes:     aj,
 		pellizco:    NuevoMedidorPellizco(aj.Pellizco),
-		manos:       map[claveMano]*estadoManoEmbrague{},
+		manos:       map[ClaveMano]*estadoManoEmbrague{},
 	}
 }
 
 type manoMedida struct {
-	clave  claveMano
+	clave  ClaveMano
 	estado EstadoPellizco
 	pos    PuntoPanel
 	dentro bool
@@ -164,9 +183,9 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 
 	vistos := map[bool]int{}
 	medidas := make([]manoMedida, len(c.Manos))
-	presentes := make(map[claveMano]bool, len(c.Manos))
+	presentes := make(map[ClaveMano]bool, len(c.Manos))
 	for i, mano := range c.Manos {
-		clave := claveMano{derecha: mano.Derecha, n: vistos[mano.Derecha]}
+		clave := ClaveMano{Derecha: mano.Derecha, N: vistos[mano.Derecha]}
 		vistos[mano.Derecha]++
 		presentes[clave] = true
 		md := manoMedida{clave: clave, estado: estados[i]}
@@ -200,8 +219,20 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 			armadas = append(armadas, est)
 		}
 	}
+	// m.manos es un mapa: sin ordenar, dos manos que empiezan a la vez
+	// cambiarían de orden entre cuadros (y de ranura en ToquesDe).
+	sort.Slice(armadas, func(i, j int) bool {
+		return antesQue(armadas[i].clave, armadas[j].clave)
+	})
 
-	r := ResultadoEmbrague{ManosArmadas: len(armadas)}
+	r := ResultadoEmbrague{TMs: c.TMs, ManosArmadas: len(armadas)}
+	for _, est := range armadas {
+		r.Armadas = append(r.Armadas, ManoArmada{
+			Clave: est.clave,
+			X:     est.ultima.X,
+			Y:     est.ultima.Y,
+		})
+	}
 	m.resolverZoom(armadas, soltadas, &r)
 	for _, est := range soltadas {
 		if est.sinArrastre {
@@ -320,15 +351,24 @@ func (m *MedidorEmbrague) resolverZoom(armadas []*estadoManoEmbrague, soltadas [
 	}
 }
 
-func clavesDe(ests []*estadoManoEmbrague) [2]claveMano {
-	var c [2]claveMano
+// antesQue ordena las claves: primero la izquierda de la persona y, dentro
+// del mismo lado, por orden de aparición.
+func antesQue(a, b ClaveMano) bool {
+	if a.Derecha != b.Derecha {
+		return !a.Derecha
+	}
+	return a.N < b.N
+}
+
+func clavesDe(ests []*estadoManoEmbrague) [2]ClaveMano {
+	var c [2]ClaveMano
 	for i := 0; i < 2 && i < len(ests); i++ {
 		c[i] = ests[i].clave
 	}
 	return c
 }
 
-func separacion(claves [2]claveMano, manos map[claveMano]*estadoManoEmbrague) (float64, bool) {
+func separacion(claves [2]ClaveMano, manos map[ClaveMano]*estadoManoEmbrague) (float64, bool) {
 	a, b := manos[claves[0]], manos[claves[1]]
 	if a == nil || b == nil || !a.tienePos || !b.tienePos {
 		return 0, false
@@ -401,6 +441,6 @@ func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*es
 // recalibrar, para no dejar el botón pulsado.
 func (m *MedidorEmbrague) Parar() {
 	m.pellizco = NuevoMedidorPellizco(m.Ajustes.Pellizco)
-	m.manos = map[claveMano]*estadoManoEmbrague{}
+	m.manos = map[ClaveMano]*estadoManoEmbrague{}
 	m.zoom = estadoZoom{}
 }

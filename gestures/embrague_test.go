@@ -289,7 +289,7 @@ func direccionCruda(g Grabacion, cal CalibracionPanel) (DireccionArrastre, float
 		hay             bool
 		abiertos        int
 	}
-	actual := map[claveMano]*corrida{}
+	actual := map[ClaveMano]*corrida{}
 	var corridas []corrida
 	cerrar := func(c *corrida) {
 		if c.hay {
@@ -298,9 +298,9 @@ func direccionCruda(g Grabacion, cal CalibracionPanel) (DireccionArrastre, float
 	}
 	for _, c := range g.Cuadros {
 		vistos := map[bool]int{}
-		presentes := make(map[claveMano]bool, len(c.Manos))
+		presentes := make(map[ClaveMano]bool, len(c.Manos))
 		for _, m := range c.Manos {
-			clave := claveMano{derecha: m.Derecha, n: vistos[m.Derecha]}
+			clave := ClaveMano{Derecha: m.Derecha, N: vistos[m.Derecha]}
 			vistos[m.Derecha]++
 			presentes[clave] = true
 			abierto := m.Pellizco == nil || !m.Pellizco.Cerrado
