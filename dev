@@ -396,6 +396,15 @@ cmd_app() {
 		;;
 	*)
 		paso app-linux app_linux || return 1
+		# Con gráfica NVIDIA, MediaPipe corre en ella (EGL de NVIDIA para
+		# WebKit): la Intel la comparte con Hyprland, el cursor y el navegador,
+		# y con la mano en el panel bajaba a 6-10 fps (informe del 18-nov).
+		# LAZUL_GPU=intel la deja en la integrada.
+		local egl_nv=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+		if [ "${LAZUL_GPU:-}" != intel ] && [ -f "$egl_nv" ] && command -v nvidia-smi >/dev/null; then
+			export __EGL_VENDOR_LIBRARY_FILENAMES=$egl_nv __NV_PRIME_RENDER_OFFLOAD=1
+			echo "gráfica: NVIDIA (LAZUL_GPU=intel para la integrada)"
+		fi
 		exec $APP/lazul "$@"
 		;;
 	esac
