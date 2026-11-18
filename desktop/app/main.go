@@ -223,6 +223,14 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	if a.panel != nil {
 		var fueraPanel int
 		cuadroPanel := filtrado
+		// Calibrando, la mano va cruda al asistente: las esquinas del panel
+		// pueden caer fuera del torso, y sentado frente al PC Pose no suele
+		// ver las caderas (sin_torso), así que nunca llegaría una muestra.
+		if a.panel.Estado().Calibrando {
+			cuadroPanel = c
+			delete(rechazos, "sin_torso")
+			delete(rechazos, "fuera_torso")
+		}
 		cuadroPanel, fueraPanel = a.panel.Filtrar(cuadroPanel)
 		paraPanel = &cuadroPanel
 		if fueraPanel > 0 {
