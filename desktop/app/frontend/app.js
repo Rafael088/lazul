@@ -17,6 +17,7 @@ async function esperarWails() {
 let vistaCamara = false;
 let modoEntradaPanel = "";
 let panelUltimo = {};
+let delegadoMP = "";
 
 const FLECHAS = { arriba: "↑", abajo: "↓", izquierda: "←", derecha: "→", abrir: "+", cerrar: "−" };
 
@@ -39,7 +40,7 @@ function mostrarIndicador(ind) {
     const tocando = p.fase === "agarrando";
     pill.classList.toggle("activo", tocando || !!p.dentro);
     let t = tocando ? (p.manos_armadas === 2 ? "2 dedos" : "tocando") : (p.dentro ? "mano en el panel" : "panel listo");
-    $("indicador-estado").textContent = t + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
+    $("indicador-estado").textContent = t + (modoEntradaPanel === "respaldo" ? " · respaldo" : "") + (delegadoMP === "CPU" ? " · CPU lenta" : "");
     $("indicador-gesto").textContent = "";
     return;
   }
@@ -155,9 +156,21 @@ async function cargarMediaPipe() {
 			throw e;
 		}
 	};
-  let delegado = "GPU";
-  try { [lm, pm] = await crear("GPU"); } catch (e) { log("GPU falló, uso CPU: " + e); delegado = "CPU"; [lm, pm] = await crear("CPU"); }
+  // En CPU va a ~7 fps: se reintenta la GPU antes de rendirse (el contexto
+  // WebGL puede fallar de forma pasajera con la gráfica ocupada).
+  let delegado = "GPU", fallos = 0, detalle = "";
+  for (;;) {
+    try { [lm, pm] = await crear("GPU"); break; }
+    catch (e) {
+      fallos++; detalle = String(e && e.message || e).slice(0, 200);
+      log("GPU falló (" + fallos + "): " + detalle);
+      if (fallos >= 3) { delegado = "CPU"; [lm, pm] = await crear("CPU"); break; }
+      await new Promise((r) => setTimeout(r, 700));
+    }
+  }
+  delegadoMP = delegado;
   log("MediaPipe Hands + Pose listo (" + delegado + ")");
+  try { await go().MediaPipeListo(delegado, fallos, detalle); } catch {}
 }
 
 async function encender() {

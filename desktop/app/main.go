@@ -154,6 +154,20 @@ func (a *App) Config() Config { return a.cfg }
 // Log deja en la salida lo que la página quiera contar.
 func (a *App) Log(s string) { decir("[web] %s", s) }
 
+// MediaPipeListo anota con qué delegado arrancó MediaPipe. En CPU va a
+// ~7 fps (123 ms por cuadro con 2 manos y Pose) contra ~26 en GPU, así que
+// el registro tiene que decirlo. El detalle del fallo solo va a la terminal.
+func (a *App) MediaPipeListo(delegado string, fallosGPU int, detalle string) {
+	if detalle != "" {
+		decir("MediaPipe: la GPU falló %d vez/veces: %s", fallosGPU, detalle)
+	}
+	l := desktop.Linea{Tipo: desktop.TipoMediaPipe, Resultado: delegado, Cuadros: fallosGPU}
+	if fallosGPU > 0 {
+		l.Error = "gpu_fallo"
+	}
+	a.reg.Anotar(l)
+}
+
 // CuadroJS es un cuadro como lo manda la página (el formato de las grabaciones).
 type CuadroJS struct {
 	T     int64 `json:"t"`

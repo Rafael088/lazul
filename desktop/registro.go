@@ -27,6 +27,7 @@ const (
 	TipoEvitada     = "evitada"     // una mano quedó fuera de la zona; Resultado dice por qué
 	TipoRendimiento = "rendimiento" // muestra periódica de fps, CPU e inferencia
 	TipoPanel       = "panel"       // modo de entrada y apoyar/levantar dedos, nunca posiciones
+	TipoMediaPipe   = "mediapipe"   // con qué delegado arrancó (GPU o CPU) y si la GPU falló
 )
 
 // Resultados de una activación.
