@@ -580,3 +580,33 @@ func (p *Panel) Estado() EstadoPanel {
 	}
 	return e
 }
+
+// VistaPanelCamara es lo que dibuja la vista de cámara para comprobar el
+// panel: el rectángulo calibrado y, por cada mano, el panel a su escala y por
+// qué cuenta o no. Solo para la pantalla: nunca va al registro.
+type VistaPanelCamara struct {
+	Calibrado [4]float64                  `json:"calibrado"` // x0, y0, x1, y1 en la imagen
+	Manos     []gestures.DiagnosticoPanel `json:"manos"`
+}
+
+// Diagnostico usa las manos crudas del cuadro (antes de los filtros de torso
+// y panel), para que también se vean las que el panel rechaza.
+func (p *Panel) Diagnostico(c gestures.Cuadro) *VistaPanelCamara {
+	p.mu.Lock()
+	cal, ok := p.calibracion, p.calibrado && !p.calibrando
+	p.mu.Unlock()
+	if !ok || c.Aspecto <= 0 {
+		return nil
+	}
+	a := float64(c.Aspecto)
+	v := &VistaPanelCamara{}
+	v.Calibrado[0], v.Calibrado[1], v.Calibrado[2], v.Calibrado[3] = cal.RectanguloCalibrado(a)
+	for _, m := range c.Manos {
+		if mu, ok := gestures.MuestraPanelDe(m, c.Aspecto); ok {
+			if d, ok := cal.Diagnosticar(mu, a); ok {
+				v.Manos = append(v.Manos, d)
+			}
+		}
+	}
+	return v
+}

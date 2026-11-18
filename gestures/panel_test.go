@@ -96,3 +96,37 @@ func TestOneEuroReduceTemblorSinPerderElMovimiento(t *testing.T) {
 		t.Fatalf("el filtro no siguió un movimiento real en 300 ms: %.3f", p.X)
 	}
 }
+
+func TestDiagnosticarDiceElMotivo(t *testing.T) {
+	cal, err := NuevaCalibracionPanel(
+		MuestraPanel{X: -.2, Y: -.2, Tamano: .1},
+		MuestraPanel{X: .2, Y: .2, Tamano: .1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := 4.0 / 3.0
+	casos := []struct {
+		m      MuestraPanel
+		motivo string
+	}{
+		{MuestraPanel{X: 0, Y: 0, Tamano: .1}, "dentro"},
+		{MuestraPanel{X: .35, Y: 0, Tamano: .1}, "fuera_borde"},
+		{MuestraPanel{X: 0, Y: 0, Tamano: .16}, "cerca"},
+		{MuestraPanel{X: 0, Y: 0, Tamano: .05}, "lejos"},
+	}
+	for _, c := range casos {
+		d, ok := cal.Diagnosticar(c.m, a)
+		if !ok || d.Motivo != c.motivo {
+			t.Errorf("%+v: motivo %q (ok %v), quería %q", c.m, d.Motivo, ok, c.motivo)
+		}
+		if _, dentro := cal.Mapear(c.m); dentro != d.Dentro {
+			t.Errorf("%+v: Dentro %v distinto de Mapear %v", c.m, d.Dentro, dentro)
+		}
+	}
+	// A la distancia de la calibración, el rectángulo coincide con las esquinas.
+	d, _ := cal.Diagnosticar(MuestraPanel{X: 0, Y: 0, Tamano: .1}, a)
+	x0, y0, x1, y1 := cal.RectanguloCalibrado(a)
+	if math.Abs(d.X0-x0) > 1e-9 || math.Abs(d.Y0-y0) > 1e-9 || math.Abs(d.X1-x1) > 1e-9 || math.Abs(d.Y1-y1) > 1e-9 {
+		t.Fatalf("rectángulo %v,%v,%v,%v contra calibrado %v,%v,%v,%v", d.X0, d.Y0, d.X1, d.Y1, x0, y0, x1, y1)
+	}
+}

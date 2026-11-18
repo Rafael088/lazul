@@ -294,6 +294,12 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	}
 	vi := a.ind.Vista(ahora)
 	v.Indicador = &vi
+	a.mu.Lock()
+	verCamara := a.vistaCamara
+	a.mu.Unlock()
+	if verCamara && a.panel != nil {
+		v.PanelCamara = a.panel.Diagnostico(c)
+	}
 
 	a.mu.Lock()
 	a.vista = v

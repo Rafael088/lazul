@@ -187,3 +187,60 @@ func (f *FiltroOneEuroPanel) Filtrar(tMs int64, p PuntoPanel) PuntoPanel {
 }
 
 func (f *FiltroOneEuroPanel) Reiniciar() { *f = NuevoFiltroOneEuroPanel() }
+
+// DiagnosticoPanel explica, para la vista de cámara, dónde está el panel y
+// por qué una mano cuenta o no. Las coordenadas X0..Y1 y ManoX/ManoY están en
+// la imagen (0..1, sin espejar) para dibujarlas sobre el cuadro.
+type DiagnosticoPanel struct {
+	// Rectángulo del panel en la imagen a la escala de la mano actual: el
+	// panel se mide en palmas, así que crece al acercar la mano.
+	X0, Y0, X1, Y1 float64
+	ManoX, ManoY   float64
+	Dentro         bool
+	// Motivo: dentro, fuera_borde, cerca o lejos.
+	Motivo string
+	// Profundidad es el tamaño de la palma contra el esperado en el plano
+	// calibrado: 1 es la misma distancia; cuenta entre 0,65 y 1,35.
+	Profundidad float64
+}
+
+// RectanguloCalibrado da las dos esquinas tal como se capturaron, en la
+// imagen (0..1): es el panel visto a la distancia de la calibración.
+func (c CalibracionPanel) RectanguloCalibrado(aspecto float64) (x0, y0, x1, y1 float64) {
+	if aspecto <= 0 {
+		aspecto = 4.0 / 3.0
+	}
+	a, b := c.SuperiorIzquierda, c.InferiorDerecha
+	return a.X/aspecto + .5, a.Y + .5, b.X/aspecto + .5, b.Y + .5
+}
+
+// Diagnosticar usa la misma cuenta que Mapear y dice el motivo.
+func (c CalibracionPanel) Diagnosticar(m MuestraPanel, aspecto float64) (DiagnosticoPanel, bool) {
+	if aspecto <= 0 || c.Valida() != nil || !muestraPanelValida(m) {
+		return DiagnosticoPanel{}, false
+	}
+	a, b, q := proyectarPanel(c.SuperiorIzquierda), proyectarPanel(c.InferiorDerecha), proyectarPanel(m)
+	d := DiagnosticoPanel{
+		X0: a.X*m.Tamano/aspecto + .5, Y0: a.Y*m.Tamano + .5,
+		X1: b.X*m.Tamano/aspecto + .5, Y1: b.Y*m.Tamano + .5,
+		ManoX: m.X/aspecto + .5, ManoY: m.Y + .5,
+	}
+	p := PuntoPanel{X: (q.X - a.X) / (b.X - a.X), Y: (q.Y - a.Y) / (b.Y - a.Y)}
+	avance := (acotar01(p.X) + acotar01(p.Y)) / 2
+	esperado := c.SuperiorIzquierda.Tamano + avance*(c.InferiorDerecha.Tamano-c.SuperiorIzquierda.Tamano)
+	if esperado > 0 {
+		d.Profundidad = m.Tamano / esperado
+	}
+	_, d.Dentro = c.Mapear(m)
+	switch {
+	case d.Dentro:
+		d.Motivo = "dentro"
+	case p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1:
+		d.Motivo = "fuera_borde"
+	case d.Profundidad > 1+toleranciaProfundidadPanel:
+		d.Motivo = "cerca"
+	default:
+		d.Motivo = "lejos"
+	}
+	return d, true
+}

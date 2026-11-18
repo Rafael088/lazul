@@ -87,8 +87,35 @@ function pintar(manos, cuerpo) {
   }
 }
 
+// Panel sobre la cámara: punteado = como se calibró; sólido = el panel a la
+// escala de cada mano (verde si cuenta, naranja si no) y el motivo.
+const MOTIVOS = { dentro: "dentro", fuera_borde: "fuera del borde", cerca: "muy cerca", lejos: "muy lejos" };
+function pintarPanel(pc) {
+  if (!pc) return;
+  const c = puntos(), W = 640, H = 480;
+  const [x0, y0, x1, y1] = pc.calibrado;
+  c.save();
+  c.setLineDash([8, 6]); c.lineWidth = 2; c.strokeStyle = "rgba(232,236,255,.75)";
+  c.strokeRect(Math.min(x0, x1) * W, Math.min(y0, y1) * H, Math.abs(x1 - x0) * W, Math.abs(y1 - y0) * H);
+  c.setLineDash([]);
+  for (const m of pc.manos || []) {
+    const color = m.Dentro ? "#4fd18b" : "#ff9f43";
+    c.strokeStyle = color; c.lineWidth = 3;
+    c.strokeRect(Math.min(m.X0, m.X1) * W, Math.min(m.Y0, m.Y1) * H, Math.abs(m.X1 - m.X0) * W, Math.abs(m.Y1 - m.Y0) * H);
+    c.fillStyle = color;
+    c.beginPath(); c.arc(m.ManoX * W, m.ManoY * H, 9, 0, 7); c.fill();
+    const t = `${MOTIVOS[m.Motivo] || m.Motivo} · distancia ${Math.round(100 * m.Profundidad)} %`;
+    c.font = "bold 15px system-ui, sans-serif";
+    const tx = Math.min(W - c.measureText(t).width - 6, Math.max(6, m.ManoX * W + 14)), ty = Math.max(18, m.ManoY * H - 12);
+    c.lineWidth = 4; c.strokeStyle = "rgba(16,20,40,.85)"; c.strokeText(t, tx, ty);
+    c.fillText(t, tx, ty);
+  }
+  c.restore();
+}
+
 function mostrarVista(v) {
   if (!v) return;
+  if (vistaCamara) pintarPanel(v.panel_camara);
   $("pose").textContent = v.pose || "-";
   $("modo").textContent = (v.modo || "-").toUpperCase();
   $("modo").className = "grande modo-" + (v.modo || "reposo");

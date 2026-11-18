@@ -30,6 +30,9 @@ type Vista struct {
 
 	// Indicador lo rellena la app con el modo táctil; Vivo solo no lo toca.
 	Indicador *VistaIndicador `json:"indicador,omitempty"`
+
+	// PanelCamara lo rellena la app solo con la vista de cámara abierta.
+	PanelCamara *VistaPanelCamara `json:"panel_camara,omitempty"`
 }
 
 // Disparo es un gesto que el núcleo tiene que convertir en Órdenes.
