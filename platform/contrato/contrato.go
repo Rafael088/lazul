@@ -40,6 +40,8 @@ type Opciones struct {
 	// TactileActions indica que este sistema ofrece acciones táctiles. Se
 	// mantiene opcional mientras no todos los sistemas tengan adaptador.
 	TactileActions bool
+	// TouchScreen indica que el sistema puede inyectar toques multidedo.
+	TouchScreen bool
 }
 
 // ErrOmitida marca una prueba que no aplica con estas Opciones.
@@ -94,7 +96,63 @@ func Pruebas(s platform.Sistema, op Opciones) []Prueba {
 	if op.TactileActions {
 		ps = append(ps, pruebasTactileActions(s.TactileActions, op)...)
 	}
+	if op.TouchScreen {
+		ps = append(ps, pruebasTouchScreen(s.TouchScreen, op)...)
+	}
 	return ps
+}
+
+func pruebasTouchScreen(ts platform.TouchScreen, op Opciones) []Prueba {
+	if ts == nil {
+		return falta("TouchScreen")
+	}
+	return []Prueba{
+		{"TouchScreen/cuadros_invalidos", func(ctx context.Context) error {
+			casos := [][]platform.TouchPoint{
+				{{Slot: 0}, {Slot: 1}, {Slot: 0}},
+				{{Slot: -1, X: .5, Y: .5, Down: true}},
+				{{Slot: 2, X: .5, Y: .5, Down: true}},
+				{{Slot: 0}, {Slot: 0}},
+				{{Slot: 0, X: -.01, Y: .5, Down: true}},
+				{{Slot: 0, X: .5, Y: 1.01, Down: true}},
+			}
+			for _, points := range casos {
+				if err := ts.Frame(ctx, points); !errors.Is(err, platform.ErrAccionInvalida) {
+					return fmt.Errorf("Frame(%+v) debe devolver ErrAccionInvalida; devolvió %v", points, err)
+				}
+			}
+			return nil
+		}},
+		{"TouchScreen/contexto_cancelado", func(context.Context) error {
+			ctx := cancelado()
+			if err := exigirCancelado(ts.Prepare(ctx)); err != nil {
+				return fmt.Errorf("Prepare: %w", err)
+			}
+			if err := exigirCancelado(ts.Frame(ctx, nil)); err != nil {
+				return fmt.Errorf("Frame: %w", err)
+			}
+			return nil
+		}},
+		{"TouchScreen/dos_dedos", func(ctx context.Context) error {
+			if !op.Abrir {
+				return fmt.Errorf("%w: inyecta toques; LAZUL_CONTRATO_ABRIR=1", ErrOmitida)
+			}
+			if err := ts.Prepare(ctx); err != nil {
+				return fmt.Errorf("Prepare: %w", err)
+			}
+			cuadros := [][]platform.TouchPoint{
+				{{Slot: 0, X: .45, Y: .5, Down: true}},
+				{{Slot: 0, X: .4, Y: .5, Down: true}, {Slot: 1, X: .6, Y: .5, Down: true}},
+				nil,
+			}
+			for _, points := range cuadros {
+				if err := ts.Frame(ctx, points); err != nil {
+					return fmt.Errorf("Frame(%+v): %w", points, err)
+				}
+			}
+			return nil
+		}},
+	}
 }
 
 func cancelado() context.Context {

@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"math"
 	"os"
 	"sync"
 
@@ -23,6 +24,7 @@ type Falso struct {
 	instaladas  map[string]bool
 	archivos    map[string]bool
 	abiertas    []platform.AppRef
+	cuadros     [][]platform.TouchPoint
 	ancho, alto int
 }
 
@@ -43,7 +45,7 @@ func New(nombre string, instaladas ...string) *Falso {
 
 // Sistema devuelve f como platform.Sistema.
 func (f *Falso) Sistema() platform.Sistema {
-	return platform.Sistema{Screenshot: f, Clipboard: f, ActiveApp: f, LaunchApp: f, TactileActions: f}
+	return platform.Sistema{Screenshot: f, Clipboard: f, ActiveApp: f, LaunchApp: f, TactileActions: f, TouchScreen: f}
 }
 
 // PonerApp cambia la ventana con el foco.
@@ -58,6 +60,42 @@ func (f *Falso) Abiertas() []platform.AppRef {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]platform.AppRef(nil), f.abiertas...)
+}
+
+// CuadrosTactiles devuelve copias de los cuadros enviados a la pantalla
+// táctil falsa, en el mismo orden en que llegaron.
+func (f *Falso) CuadrosTactiles() [][]platform.TouchPoint {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r := make([][]platform.TouchPoint, len(f.cuadros))
+	for i := range f.cuadros {
+		r[i] = append([]platform.TouchPoint(nil), f.cuadros[i]...)
+	}
+	return r
+}
+
+func (f *Falso) Prepare(ctx context.Context) error { return ctx.Err() }
+
+func (f *Falso) Frame(ctx context.Context, points []platform.TouchPoint) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(points) > 2 {
+		return platform.ErrAccionInvalida
+	}
+	var slots [2]bool
+	for _, p := range points {
+		if p.Slot < 0 || p.Slot >= len(slots) || slots[p.Slot] ||
+			math.IsNaN(p.X) || math.IsNaN(p.Y) || math.IsInf(p.X, 0) || math.IsInf(p.Y, 0) ||
+			p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1 {
+			return platform.ErrAccionInvalida
+		}
+		slots[p.Slot] = true
+	}
+	f.mu.Lock()
+	f.cuadros = append(f.cuadros, append([]platform.TouchPoint(nil), points...))
+	f.mu.Unlock()
+	return nil
 }
 
 func (f *Falso) Capture(ctx context.Context) (platform.Imagen, error) {
