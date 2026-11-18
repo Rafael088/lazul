@@ -2,7 +2,7 @@
 // positivos. Por defecto mide las reales (fixtures/gestos) y las sintéticas
 // (gestures/testdata/sinteticas), cada una por su lado.
 //
-//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer] [-tactil]
+//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer] [-tactil] [-toques]
 package main
 
 import (
@@ -19,13 +19,21 @@ import (
 func main() {
 	const dirsPredeterminados = "fixtures/gestos,gestures/testdata/sinteticas"
 	dirs := flag.String("dir", dirsPredeterminados, "carpetas con grabaciones *.jsonl, separadas por comas")
-	detalle := flag.Bool("v", false, "una línea por grabación fallida")
+	detalle := flag.Bool("v", false, "una línea por grabación fallida (con -toques, una por toque)")
 	tactil := flag.Bool("tactil", false, "mide modo táctil: L, scroll, zoom y barrido")
+	toques := flag.Bool("toques", false, "mide los toques de fixtures/pellizco: embrague y ToquesDe")
 	sostenerL := flag.Int64("sostener-l", gestures.AjustesPorDefecto.SostenerL, "ms que se sostiene la L para activar")
 	barrer := flag.Bool("barrer", false, "mide la L con varios tiempos de sostén (200 a 800 ms)")
 	flag.Parse()
+	if *tactil && *toques {
+		fmt.Fprintln(os.Stderr, "error: -tactil y -toques miden cosas distintas; elige una")
+		os.Exit(2)
+	}
 	if *tactil && *dirs == dirsPredeterminados {
 		*dirs += ",gestures/testdata/tactiles"
+	}
+	if *toques && *dirs == dirsPredeterminados {
+		*dirs = "fixtures/pellizco"
 	}
 	aj := gestures.AjustesPorDefecto
 	aj.SostenerL = *sostenerL
@@ -41,18 +49,51 @@ func main() {
 			fmt.Printf("%s: sin grabaciones (se graban con ./dev grabar, tarea cotejo-x2hyu0)\n", dir)
 			continue
 		}
-		if *tactil {
+		if *toques {
+			informeToques(dir, gs, *detalle)
+		} else if *tactil {
 			informeTactil(dir, gs, *detalle)
 		} else {
 			informe(dir, gs, aj, *detalle)
 		}
-		if *barrer && !*tactil {
+		if *barrer && !*tactil && !*toques {
 			barrido(gs, aj)
 		}
 	}
 	if fallo {
 		os.Exit(1)
 	}
+}
+
+// informeToques: una línea por toma con los toques que salen y cómo se
+// reparten, más el total. "fuera" son los pellizcos que empiezan con la mano
+// fuera del panel: el embrague los descarta, así que no son toque.
+func informeToques(dir string, gs []gestures.Grabacion, detalle bool) {
+	tomas, err := gestures.MedirToques(gs)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return
+	}
+	total := gestures.ContarToques(tomas)
+	fmt.Printf("%s: %d tomas · %d toques (tap < %d ms · larga > %d ms · quieto ≤ %.2f del panel)\n",
+		dir, len(tomas), total.Toques, gestures.ToqueTapMs, gestures.ToqueLargaMs, gestures.ToqueQuieto)
+	fmt.Printf("  %-36s %6s %4s %5s %8s %9s %6s\n", "toma", "toques", "tap", "larga", "arrastre", "sin clase", "fuera")
+	for _, t := range tomas {
+		c := gestures.ContarToques([]gestures.TomaToques{t})
+		fmt.Printf("  %-36s %6d %4d %5d %8d %9d %6d\n",
+			t.Archivo, c.Toques, c.Tap, c.Larga, c.Arrastre, c.SinClase, c.FueraDelPanel)
+		if detalle {
+			for _, toque := range t.Toques {
+				fmt.Printf("      ranura %d: %s %d ms, recorrido %.3f del panel\n",
+					toque.Ranura, toque.Tipo, toque.DuracionMs(), toque.Recorrido)
+			}
+		}
+	}
+	fmt.Printf("  %-36s %6d %4d %5d %8d %9d %6d\n",
+		"TOTAL", total.Toques, total.Tap, total.Larga, total.Arrastre, total.SinClase, total.FueraDelPanel)
+	fmt.Printf("  sin clase = 250-500 ms quieto · fuera = pellizcos que empiezan fuera del panel y no son toque\n")
+	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (3 cuadros/200 ms) dentro\n")
+	fmt.Printf("  toques en %d de %d tomas\n", total.TomasConToques, total.Tomas)
 }
 
 func informeTactil(dir string, gs []gestures.Grabacion, detalle bool) {
