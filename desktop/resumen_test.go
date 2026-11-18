@@ -97,3 +97,37 @@ func TestResumenPruebaDeTrabajoNormal(t *testing.T) {
 		t.Errorf("texto:\n%s", r.Texto())
 	}
 }
+
+func TestResumenCuentaActivacionesEvitadasPorZona(t *testing.T) {
+	ls := uso("a", 0, 35)
+	ls = append(ls,
+		Linea{T: en(6), Tipo: TipoEvitada, Sesion: "a", Resultado: "sin_torso"},
+		Linea{T: en(10), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_torso"},
+		Linea{T: en(10.5), Tipo: TipoPrueba, Sesion: "a", Resultado: "empieza", Prueba: true},
+		Linea{T: en(11), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel", Prueba: true},
+		Linea{T: en(12), Tipo: TipoPrueba, Sesion: "a", Resultado: "termina"},
+	)
+	r := Resumir(ls)
+	if r.Evitadas != 3 || r.EvitadasPorMotivo["fuera_torso"] != 1 || r.PruebaEvitadas != 1 {
+		t.Fatalf("evitadas %+v", r)
+	}
+	texto := r.Texto()
+	if !strings.Contains(texto, "Activaciones evitadas por la zona: 3") || !strings.Contains(texto, "fuera_panel 1") {
+		t.Fatalf("texto:\n%s", texto)
+	}
+}
+
+func TestResumenPromediaCostoDePose(t *testing.T) {
+	ls := uso("a", 0, 35)
+	ls = append(ls,
+		Linea{T: en(6), Tipo: TipoRendimiento, Sesion: "a", FPS: 25, CPUCore: 80, CPUTotal: 10, ManoMs: 12, PoseMs: 18},
+		Linea{T: en(7), Tipo: TipoRendimiento, Sesion: "a", FPS: 27, CPUCore: 100, CPUTotal: 12, ManoMs: 10, PoseMs: 20},
+	)
+	r := Resumir(ls)
+	if r.MuestrasRendimiento != 2 || r.FPSPromedio != 26 || r.CPUCorePromedio != 90 || r.PoseMsPromedio != 19 {
+		t.Fatalf("rendimiento: %+v", r)
+	}
+	if texto := r.Texto(); !strings.Contains(texto, "26.0 cuadros/s") || !strings.Contains(texto, "Pose 19.0 ms") {
+		t.Fatalf("texto:\n%s", texto)
+	}
+}

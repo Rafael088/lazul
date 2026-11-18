@@ -1,6 +1,6 @@
-// Indicador de Lazul: la cámara y MediaPipe aquí; todo lo demás (clasificar,
-// emparejar, mandar) en Go. Los cuadros no salen de esta página: a Go solo
-// le llegan los 21 puntos de la mano. Por defecto solo se ve el indicador;
+// Indicador de Lazul: la cámara y MediaPipe aquí; todo lo demás (filtrar,
+// clasificar, emparejar, mandar) queda en Go. Los cuadros no salen de esta
+// página: a Go llegan puntos de manos y Pose. Por defecto solo se ve el indicador;
 // la vista de cámara se abre para acomodarse y se cierra al terminar.
 const $ = (id) => document.getElementById(id);
 const hayGo = () => !!(window.go && window.go.main);
@@ -50,12 +50,19 @@ async function alternarAjuste(on = !vistaCamara) {
 }
 
 // ---------- cámara + MediaPipe ----------
-let cfg, lm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
+let cfg, lm = null, pm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
 const puntos = () => $("puntos").getContext("2d");
 
-function pintar(manos) {
+function pintar(manos, cuerpo) {
   const c = puntos();
   c.clearRect(0, 0, 640, 480);
+	if (cuerpo && cuerpo.p.length === 33) {
+		c.strokeStyle = "#4fd18b"; c.lineWidth = 3;
+		const torso = [11, 12, 24, 23, 11];
+		c.beginPath();
+		torso.forEach((i, n) => { const p = cuerpo.p[i]; if (n) c.lineTo(p[0] * 640, p[1] * 480); else c.moveTo(p[0] * 640, p[1] * 480); });
+		c.stroke();
+	}
   for (const m of manos) {
     c.strokeStyle = "#7fa8ff"; c.lineWidth = 2;
     for (const [a, b] of CONEXIONES) { c.beginPath(); c.moveTo(m.p[a][0] * 640, m.p[a][1] * 480); c.lineTo(m.p[b][0] * 640, m.p[b][1] * 480); c.stroke(); }
@@ -82,13 +89,20 @@ function mostrarVista(v) {
 
 function procesar(fuente, w, h) {
   let ts = performance.now(); if (ts <= ultimoTs) ts = ultimoTs + 0.01; ultimoTs = ts;
+	const inicioMano = performance.now();
   const r = lm.detectForVideo(fuente, ts);
+	const manoMs = performance.now() - inicioMano;
+	const inicioPose = performance.now();
+	const rp = pm.detectForVideo(fuente, ts);
+	const poseMs = performance.now() - inicioPose;
   const manos = r.landmarks.map((pts, i) => {
     const hd = (r.handedness || r.handednesses || [])[i];
     return { derecha: !!(hd && hd[0] && hd[0].categoryName === "Right"), p: pts.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]) };
   });
-  if (vistaCamara) pintar(manos);
-  const cuadro = { t: Math.round(ts - t0), manos, ancho: w, alto: h };
+	const pose = (rp.landmarks || [])[0];
+	const cuerpo = pose ? { p: pose.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5), +(p.visibility ?? 1).toFixed(4)]) } : null;
+  if (vistaCamara) pintar(manos, cuerpo);
+  const cuadro = { t: Math.round(ts - t0), manos, cuerpo, mano_ms: manoMs, pose_ms: poseMs, ancho: w, alto: h };
   // En orden y sin amontonar: si Go se atrasa, se salta el cuadro.
   if (pendientes > 4) return;
   pendientes++;
@@ -96,19 +110,31 @@ function procesar(fuente, w, h) {
 }
 
 async function cargarMediaPipe() {
-  if (lm) return;
+  if (lm && pm) return;
   $("sincamara").textContent = "cargando MediaPipe…";
-  const { FilesetResolver, HandLandmarker } = await import("./vendor/vision_bundle.mjs");
+  const { FilesetResolver, HandLandmarker, PoseLandmarker } = await import("./vendor/vision_bundle.mjs");
   const fileset = await FilesetResolver.forVisionTasks("./vendor/wasm");
   let offscreen = false;
   try { offscreen = typeof OffscreenCanvas !== "undefined" && !!new OffscreenCanvas(8, 8).getContext("webgl2"); } catch {}
   // WebKitGTK no da WebGL2 en OffscreenCanvas (lo que MediaPipe usa por defecto): se le pasa un canvas normal.
-  const crear = (delegate) => HandLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate }, runningMode: "VIDEO", numHands: 1,
-    canvas: offscreen ? undefined : document.createElement("canvas") });
+  const crear = async (delegate) => {
+		const canvas = () => offscreen ? undefined : document.createElement("canvas");
+		const mano = await HandLandmarker.createFromOptions(fileset, {
+			baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate }, runningMode: "VIDEO", numHands: 2,
+			canvas: canvas() });
+		try {
+			const pose = await PoseLandmarker.createFromOptions(fileset, {
+				baseOptions: { modelAssetPath: "./vendor/pose_landmarker_lite.task", delegate }, runningMode: "VIDEO", numPoses: 1,
+				minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5, canvas: canvas() });
+			return [mano, pose];
+		} catch (e) {
+			if (mano.close) mano.close();
+			throw e;
+		}
+	};
   let delegado = "GPU";
-  try { lm = await crear("GPU"); } catch (e) { log("GPU falló, uso CPU: " + e); delegado = "CPU"; lm = await crear("CPU"); }
-  log("MediaPipe listo (" + delegado + ")");
+  try { [lm, pm] = await crear("GPU"); } catch (e) { log("GPU falló, uso CPU: " + e); delegado = "CPU"; [lm, pm] = await crear("CPU"); }
+  log("MediaPipe Hands + Pose listo (" + delegado + ")");
 }
 
 async function encender() {
@@ -224,7 +250,8 @@ function pintarEstado(e) {
   $("prueba").textContent = e.prueba ? "Terminar prueba de trabajo normal" : "Empezar prueba de trabajo normal";
   $("prueba").dataset.on = e.prueba ? "1" : "";
   if (cfg && cfg.reproducir) mostrarVista(e.vista);
-  const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano en ${(100 * e.con_mano).toFixed(0)} %` : "";
+  const evitadas = Object.values(e.evitadas || {}).reduce((a, b) => a + b, 0);
+  const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano ${(100 * e.con_mano).toFixed(0)} % · zona ${(100 * e.en_zona).toFixed(0)} % · CPU ${e.cpu_core.toFixed(0)} % núcleo / ${e.cpu_total.toFixed(1)} % total · mano ${e.mano_ms.toFixed(1)} ms + Pose ${e.pose_ms.toFixed(1)} ms · evitadas ${evitadas}` : "";
   texto("fps", (e.camara ? "Cámara: " + e.camara + " " : "") + fps);
 }
 

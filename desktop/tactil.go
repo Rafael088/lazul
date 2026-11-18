@@ -378,3 +378,13 @@ func (t *Tactil) Marcar(falsa bool, ahora time.Time) (int, error) {
 	t.Reg.Anotar(Linea{T: ahora, Tipo: TipoMarca, Sesion: t.sesion, Activacion: t.act, Falsa: &falsa})
 	return t.act, nil
 }
+
+// Sesion de uso actual ("" si la cámara no da cuadros).
+func (t *Tactil) Sesion() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.enUso {
+		return ""
+	}
+	return t.sesion
+}

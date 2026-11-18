@@ -231,6 +231,35 @@ func (p *Panel) observarMuestra(m gestures.MuestraPanel, tMs int64, mover bool) 
 	}
 }
 
+// Filtrar conserva solo las manos que caen dentro del panel calibrado. Sin
+// calibración no deja pasar ninguna; durante el asistente sí devuelve las
+// muestras que van a definir el rectángulo, pero la app las entrega solo al
+// Panel y no al flujo de gestos. La zona corporal se aplica antes.
+func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.calibrando {
+		return c, 0
+	}
+	if !p.calibrado {
+		filtrado := c
+		filtrado.Manos = nil
+		return filtrado, len(c.Manos)
+	}
+	filtrado := c
+	filtrado.Manos = make([]gestures.Mano, 0, len(c.Manos))
+	for _, mano := range c.Manos {
+		muestra, ok := gestures.MuestraPanelDe(mano, c.Aspecto)
+		if ok {
+			_, ok = p.calibracion.Mapear(muestra)
+		}
+		if ok {
+			filtrado.Manos = append(filtrado.Manos, mano)
+		}
+	}
+	return filtrado, len(c.Manos) - len(filtrado.Manos)
+}
+
 // Cuadro pasa el cuadro por el embrague: mueve el puntero, pulsa o suelta el
 // botón y ejecuta el zoom. mover permite a la prueba de trabajo normal
 // observar el panel sin tocar el ratón real.

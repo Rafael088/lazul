@@ -174,6 +174,26 @@ func TestPanelNoMueveFueraNiDuranteLaPrueba(t *testing.T) {
 	}
 }
 
+func TestPanelFiltraManosFueraDelRectanguloCalibrado(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	c, _ := gestures.NuevaCalibracionPanel(muestraPanelPrueba(-1, -1, .2), muestraPanelPrueba(1, 1, .2))
+	if err := GuardarCalibracionPanel(ruta, c); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := NuevoPanel(ruta, &punteroPanelPrueba{})
+	cuadro := cuadroPanelPrueba(0, manoPanelPrueba(0, 0, .2, false), manoPanelPrueba(1.5, 0, .2, false))
+	filtrado, rechazadas := p.Filtrar(cuadro)
+	if len(filtrado.Manos) != 1 || rechazadas != 1 {
+		t.Fatalf("manos dentro %d, rechazadas %d", len(filtrado.Manos), rechazadas)
+	}
+
+	p.EmpezarCalibracion()
+	filtrado, rechazadas = p.Filtrar(cuadro)
+	if len(filtrado.Manos) != 2 || rechazadas != 0 {
+		t.Fatalf("durante calibración no debe filtrar: manos %d, rechazadas %d", len(filtrado.Manos), rechazadas)
+	}
+}
+
 func TestPanelExigeManoQuietaParaCapturar(t *testing.T) {
 	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
 	p.EmpezarCalibracion()
@@ -185,5 +205,14 @@ func TestPanelExigeManoQuietaParaCapturar(t *testing.T) {
 	}
 	if err := p.CapturarEsquina(); err == nil {
 		t.Fatal("capturó una mano que estaba temblando")
+	}
+}
+
+func TestPanelSinCalibrarNoDejaPasarManos(t *testing.T) {
+	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
+	cuadro := cuadroPanelPrueba(0, manoPanelPrueba(0, 0, .2, false))
+	filtrado, rechazadas := p.Filtrar(cuadro)
+	if len(filtrado.Manos) != 0 || rechazadas != 1 {
+		t.Fatalf("sin calibrar: manos %d, rechazadas %d", len(filtrado.Manos), rechazadas)
 	}
 }

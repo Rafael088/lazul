@@ -7,10 +7,11 @@
 // el modo de transferencia anterior sigue disponible con -modo transferencia.
 //
 // La webview abre la cámara (Windows: getUserMedia; Linux: ffmpeg en un
-// proceso aparte, dec-7tgj), corre MediaPipe Hand Landmarker y le pasa los
-// puntos a Go: gestures.Clasificar (modo táctil) y el Enrutador (0.1.0). La
-// lógica está en el paquete desktop (con pruebas); esto es solo la ventana y
-// los enlaces con la página. Cómo usarla: desktop/README.md.
+// proceso aparte, dec-7tgj), corre MediaPipe Hand y Pose Landmarker y le pasa
+// los puntos a Go. La zona torso+panel filtra antes de gestures.Clasificar
+// (modo táctil) y el Enrutador (0.1.0). La lógica está en desktop (con
+// pruebas); esto es solo la ventana y los enlaces. Cómo usarla:
+// desktop/README.md.
 //
 //	lazul [-nombre N] [-camara auto|webview|proceso|no] [-dispositivo /dev/video0]
 //	      [-modo auto|tactil|transferencia]
@@ -30,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -89,8 +91,14 @@ type Estado struct {
 	Permiso   *Solicitud             `json:"permiso"`
 	Prueba    bool                   `json:"prueba"`
 	FPS       float64                `json:"fps"`
-	ConMano   float64                `json:"con_mano"` // fracción de cuadros con mano (últimos 5 s)
-	Camara    string                 `json:"camara"`   // error de la cámara, si hay
+	ConMano   float64                `json:"con_mano"`  // fracción de cuadros con mano (últimos 5 s)
+	EnZona    float64                `json:"en_zona"`   // fracción con una mano aceptada por torso y panel
+	CPUCore   float64                `json:"cpu_core"`  // 100 = un núcleo entero (app y descendientes)
+	CPUTotal  float64                `json:"cpu_total"` // porcentaje como el monitor del sistema
+	ManoMs    float64                `json:"mano_ms"`
+	PoseMs    float64                `json:"pose_ms"`
+	Evitadas  map[string]int         `json:"evitadas"`
+	Camara    string                 `json:"camara"` // error de la cámara, si hay
 }
 
 type App struct {
@@ -103,16 +111,27 @@ type App struct {
 	panel  *desktop.Panel
 	aura   *Aura
 
-	mu       sync.Mutex
-	permiso  *Solicitud
-	vista    desktop.Vista
-	cuadros  int
-	conMano  int
-	fps      float64
-	fracMano float64
-	errCam   string
-	tactil   gestures.EstadoTactil
-	ind      *desktop.Indicador
+	mu            sync.Mutex
+	permiso       *Solicitud
+	vista         desktop.Vista
+	cuadros       int
+	conMano       int
+	enZona        int
+	fps           float64
+	fracMano      float64
+	fracZona      float64
+	cpuCore       float64
+	cpuTotal      float64
+	manoMs        float64
+	poseMs        float64
+	sumaManoMs    float64
+	sumaPoseMs    float64
+	metricas      int
+	evitadas      map[string]int
+	rechazoActivo map[string]bool
+	errCam        string
+	tactil        gestures.EstadoTactil
+	ind           *desktop.Indicador
 
 	vistaCamara       bool
 	posIndicadorX     int
@@ -126,6 +145,7 @@ type flujoCamara interface {
 	Prueba(bool, time.Time)
 	EnPrueba() bool
 	Marcar(bool, time.Time) (int, error)
+	Sesion() string
 }
 
 func (a *App) Config() Config { return a.cfg }
@@ -140,8 +160,13 @@ type CuadroJS struct {
 		Derecha bool         `json:"derecha"`
 		P       [][3]float32 `json:"p"`
 	} `json:"manos"`
-	Ancho int `json:"ancho"`
-	Alto  int `json:"alto"`
+	Cuerpo *struct {
+		P [][4]float32 `json:"p"`
+	} `json:"cuerpo"`
+	ManoMs float64 `json:"mano_ms"`
+	PoseMs float64 `json:"pose_ms"`
+	Ancho  int     `json:"ancho"`
+	Alto   int     `json:"alto"`
 }
 
 // Cuadro pasa un cuadro de la cámara por el clasificador.
@@ -160,15 +185,62 @@ func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
 		}
 		c.Manos = append(c.Manos, mano)
 	}
+	if cj.Cuerpo != nil && len(cj.Cuerpo.P) == gestures.NumPuntosCuerpo {
+		cuerpo := &gestures.Cuerpo{}
+		for i, p := range cj.Cuerpo.P {
+			cuerpo.Puntos[i] = gestures.PuntoCuerpo{X: p[0], Y: p[1], Z: p[2], Visibilidad: p[3]}
+		}
+		c.Cuerpo = cuerpo
+	}
+	a.mu.Lock()
+	a.sumaManoMs += cj.ManoMs
+	a.sumaPoseMs += cj.PoseMs
+	a.metricas++
+	a.mu.Unlock()
 	return a.cuadro(c)
 }
 
 func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	ahora := time.Now()
-	v := a.flujo.Cuadro(c, ahora)
-	if a.panel != nil {
-		a.panel.Cuadro(c, !a.flujo.EnPrueba())
+	crudoConMano := len(c.Manos) > 0
+	filtrado := c
+	var paraPanel *gestures.Cuadro
+	rechazos := map[string]int{}
+	// Las grabaciones históricas no contienen Pose. -reproducir es una vía
+	// de prueba determinista, no cámara real; conserva su recorrido original.
+	if !a.cfg.Reproducir {
+		var fueraTorso int
+		filtrado, fueraTorso = gestures.FiltrarPorTorso(c)
+		if fueraTorso > 0 {
+			motivo := "fuera_torso"
+			if !gestures.TorsoFiable(c.Cuerpo) {
+				motivo = "sin_torso"
+			}
+			rechazos[motivo] = fueraTorso
+		}
 	}
+	if a.panel != nil {
+		var fueraPanel int
+		cuadroPanel := filtrado
+		cuadroPanel, fueraPanel = a.panel.Filtrar(cuadroPanel)
+		paraPanel = &cuadroPanel
+		if fueraPanel > 0 {
+			rechazos["fuera_panel"] = fueraPanel
+		}
+		// El asistente necesita ver la mano que define las esquinas, pero esa
+		// mano todavía no está dentro de un panel válido y no llega al flujo
+		// de gestos. Solo la consume Panel.Cuadro más abajo.
+		if a.panel.Estado().Calibrando {
+			filtrado.Manos = nil
+		} else {
+			filtrado = cuadroPanel
+		}
+	}
+	v := a.flujo.Cuadro(filtrado, ahora)
+	if paraPanel != nil {
+		a.panel.Cuadro(*paraPanel, !a.flujo.EnPrueba())
+	}
+	a.registrarEvitadas(rechazos, ahora)
 	a.actualizarAura()
 
 	// En modo táctil el indicador lo alimenta desktop.Tactil (AlEvento), que
@@ -177,7 +249,7 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	var evT gestures.EventoTactil
 	if a.cfg.Modo != "tactil" {
 		a.mu.Lock()
-		a.tactil, evT = gestures.ClasificarTactil(a.tactil, c)
+		a.tactil, evT = gestures.ClasificarTactil(a.tactil, filtrado)
 		a.mu.Unlock()
 		a.ind.Aplicar(evT, ahora)
 	}
@@ -187,8 +259,11 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	a.mu.Lock()
 	a.vista = v
 	a.cuadros++
-	if len(c.Manos) > 0 {
+	if crudoConMano {
 		a.conMano++
+	}
+	if len(filtrado.Manos) > 0 {
+		a.enZona++
 	}
 	a.mu.Unlock()
 	if v.Gesto != "" {
@@ -198,6 +273,35 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 		decir("táctil %s %s (activo %v)", evT.Accion, evT.Direccion, evT.Activo)
 	}
 	return v
+}
+
+// registrarEvitadas anota una sola línea al entrar en cada motivo de rechazo.
+// Mientras la mano siga fuera, los cuadros siguientes no inflan el contador.
+func (a *App) registrarEvitadas(rechazos map[string]int, ahora time.Time) {
+	a.mu.Lock()
+	if a.rechazoActivo == nil {
+		a.rechazoActivo = map[string]bool{}
+	}
+	if a.evitadas == nil {
+		a.evitadas = map[string]int{}
+	}
+	var nuevas []string
+	for _, motivo := range []string{"sin_torso", "fuera_torso", "fuera_panel"} {
+		presente := rechazos[motivo] > 0
+		if presente && !a.rechazoActivo[motivo] {
+			a.evitadas[motivo]++
+			nuevas = append(nuevas, motivo)
+		}
+		a.rechazoActivo[motivo] = presente
+	}
+	a.mu.Unlock()
+	if len(nuevas) == 0 {
+		return
+	}
+	sesion, prueba := a.flujo.Sesion(), a.flujo.EnPrueba()
+	for _, motivo := range nuevas {
+		a.reg.Anotar(desktop.Linea{T: ahora, Tipo: desktop.TipoEvitada, Sesion: sesion, Resultado: motivo, Prueba: prueba})
+	}
 }
 
 // CamaraEncender: en Linux arranca ffmpeg (la página pide los cuadros por
@@ -230,6 +334,7 @@ func (a *App) CamaraApagar() {
 	}
 	a.mu.Lock()
 	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
+	a.rechazoActivo = nil
 	a.mu.Unlock()
 	a.ind.Apagar()
 	a.actualizarAura()
@@ -247,7 +352,9 @@ func (a *App) CamaraError(s string) {
 func (a *App) Estado() Estado {
 	vi := a.ind.Vista(time.Now())
 	a.mu.Lock()
-	e := Estado{Vista: a.vista, Indicador: vi, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano, Camara: a.errCam}
+	e := Estado{Vista: a.vista, Indicador: vi, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano,
+		EnZona: a.fracZona, CPUCore: a.cpuCore, CPUTotal: a.cpuTotal, ManoMs: a.manoMs, PoseMs: a.poseMs,
+		Evitadas: maps.Clone(a.evitadas), Camara: a.errCam}
 	a.mu.Unlock()
 	e.Red = a.nucleo.Estado()
 	e.Prueba = a.flujo.EnPrueba()
@@ -507,6 +614,7 @@ func (a *App) pedirPermiso(permitir string) func(context.Context, core.Solicitud
 func (a *App) medir(ctx context.Context) {
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+	cpuAnterior, paredAnterior := cpuArbol(), time.Now()
 	for {
 		select {
 		case <-ctx.Done():
@@ -514,16 +622,33 @@ func (a *App) medir(ctx context.Context) {
 		case <-t.C:
 		}
 		a.mu.Lock()
-		n, m := a.cuadros, a.conMano
-		a.cuadros, a.conMano = 0, 0
+		n, m, z := a.cuadros, a.conMano, a.enZona
+		sumaMano, sumaPose, nm := a.sumaManoMs, a.sumaPoseMs, a.metricas
+		a.cuadros, a.conMano, a.enZona = 0, 0, 0
+		a.sumaManoMs, a.sumaPoseMs, a.metricas = 0, 0, 0
 		a.fps = float64(n) / 5
-		a.fracMano = 0
+		a.fracMano, a.fracZona = 0, 0
 		if n > 0 {
 			a.fracMano = float64(m) / float64(n)
+			a.fracZona = float64(z) / float64(n)
 		}
+		if nm > 0 {
+			a.manoMs, a.poseMs = sumaMano/float64(nm), sumaPose/float64(nm)
+		}
+		cpuAhora, paredAhora := cpuArbol(), time.Now()
+		seg := paredAhora.Sub(paredAnterior).Seconds()
+		if delta := cpuAhora - cpuAnterior; delta >= 0 && seg > 0 {
+			a.cpuCore = 100 * delta / seg
+			a.cpuTotal = a.cpuCore / float64(runtime.NumCPU())
+		}
+		cpuAnterior, paredAnterior = cpuAhora, paredAhora
+		core, total, manoMs, poseMs := a.cpuCore, a.cpuTotal, a.manoMs, a.poseMs
 		a.mu.Unlock()
 		if n > 0 {
-			decir("cámara: %.1f cuadros/s, mano en %d de %d", float64(n)/5, m, n)
+			decir("cámara: %.1f cuadros/s, mano en %d de %d, zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms",
+				float64(n)/5, m, n, z, core, total, manoMs, poseMs)
+			a.reg.Anotar(desktop.Linea{Tipo: desktop.TipoRendimiento, Sesion: a.flujo.Sesion(), Prueba: a.flujo.EnPrueba(),
+				FPS: float64(n) / 5, CPUCore: core, CPUTotal: total, ManoMs: manoMs, PoseMs: poseMs})
 		}
 	}
 }

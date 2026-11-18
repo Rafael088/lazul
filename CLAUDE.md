@@ -52,7 +52,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `gestures/cmd/replay/`, `gestures/cmd/grabar/` | `./dev replay` y `./dev grabar` | |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` de los gestos 0.1 | las sintéticas van en `gestures/testdata/sinteticas` |
 | `fixtures/pellizco/` | tomas reales del modelo nuevo: cabecera con `toma` (y `panel` si hay calibración) y el estado del pellizco de cada mano por cuadro | se graban con `./dev grabar`; los puntos crudos de las dos manos van siempre |
-| `desktop/` | lógica de la app de escritorio, con pruebas: `Panel` (calibración persistente y puntero absoluto), `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (prueba de activaciones falsas, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
+| `desktop/` | lógica de la app de escritorio, con pruebas: zona de torso MediaPipe Pose + `Panel` (calibración persistente y puntero absoluto), `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (activaciones falsas/evitadas y costo fps/CPU, JSONL en la carpeta de estado), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, puntos, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
 | `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); abre como indicador pequeño y la vista de cámara es opcional; cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
@@ -72,7 +72,8 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 ## Modo táctil (dec-gzgl)
 
 En Linux, `./dev app` permite calibrar dos esquinas de un panel imaginario. La
-palma dentro del panel mueve un puntero absoluto uinput; su tamaño aparente
+palma solo cuenta si está dentro del panel y del torso hombros-caderas que
+MediaPipe Pose ve en el mismo cuadro; entonces mueve un puntero absoluto uinput. Su tamaño aparente
 compensa la profundidad y un filtro One Euro quita temblor. La calibración se
 guarda en `panel.json`. El pellizco pulgar-índice es el embrague del botón
 principal (empieza dentro del panel y se suelta con 3 cuadros/200 ms abierto,
@@ -88,7 +89,7 @@ resultado se anota en `factibilidad.jsonl`, sin contenido de cámara o pantalla.
 
 ## Cómo se habla todo
 
-webview (MediaPipe) → puntos → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
+webview (MediaPipe Hands + Pose) → filtro torso+panel → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
 `Sobre{Orden}` por WebSocket sobre TLS 1.3 (huella fijada en los dos lados) →
 receptor → `platform` → `Sobre{Respuesta}`. Antes, una vez por par de equipos:
 mDNS → `/pareja` con el código de 6 dígitos → la persona en el receptor permite.

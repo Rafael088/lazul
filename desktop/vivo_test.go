@@ -155,7 +155,8 @@ func TestRegistroSinDatosDeCamaraNiPantalla(t *testing.T) {
 	}
 	permitidas := map[string]bool{"t": true, "tipo": true, "sesion": true, "pose": true, "modo": true, "gesto": true, "dir": true,
 		"conf": true, "act": true, "resultado": true, "que": true, "destino": true, "error": true, "ms": true, "cuadros": true,
-		"con_mano": true, "prueba": true, "falsa": true}
+		"con_mano": true, "prueba": true, "falsa": true, "fps": true, "cpu_core": true, "cpu_total": true,
+		"mano_ms": true, "pose_ms": true}
 	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		var m map[string]any
 		if err := json.Unmarshal([]byte(l), &m); err != nil {
