@@ -15,9 +15,11 @@ import (
 //     de movimiento normal hubo 16 pellizcos involuntarios y los 16 empezaron
 //     fuera; uno que empieza fuera y entra se ignora hasta soltarlo.
 //   - El pellizco parpadea: 29 veces se abrió uno o dos cuadros en medio de un
-//     arrastre a 15 fps. Para soltar se exigen 3 cuadros abiertos y 200 ms
+//     arrastre a 15 fps. Para soltar se exigen 3 cuadros abiertos y 250 ms
 //     (las dos cosas: a fps bajos manda el tiempo y a fps altos, los cuadros),
-//     así un parpadeo no corta el arrastre.
+//     así un parpadeo no corta el arrastre. Para apoyar, 3 cuadros cerrados
+//     seguidos: un cierre de uno o dos cuadros no es un toque. Y el dedo cae
+//     en el ancla, donde apuntaba la mano abierta (cotejo-uy84og).
 //   - Dos manos pellizcando y separándose o juntándose son un zoom; el resto
 //     de los casos es un arrastre, con la dirección del eje que más se movió.
 //
@@ -75,7 +77,7 @@ type AjustesEmbrague struct {
 var AjustesEmbraguePorDefecto = AjustesEmbrague{
 	Pellizco:          AjustesPellizcoPorDefecto,
 	CuadrosParaSoltar: 3,
-	MsParaSoltar:      200,
+	MsParaSoltar:      250,
 	CuadrosParaApoyar: 3,
 	MsAncla:           400,
 	// Un arrastre tiene que mover al menos un 15 % del panel: así un

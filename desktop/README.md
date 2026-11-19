@@ -139,7 +139,9 @@ otro también pueda mandarte, empareja al revés.
   pellizco se apoya un dedo táctil, al moverlo se arrastra y al abrirlo se
   levanta. Solo cuenta si empieza dentro del panel; uno que empieza fuera se
   ignora hasta soltarlo. Para que el parpadeo no corte el contacto, al soltar se
-  exigen unos cuadros y 200 ms abierto. Dos manos pellizcando son dos dedos:
+  exigen unos cuadros y 250 ms abierto; para apoyar, 3 cuadros cerrados seguidos.
+  Mientras se cierra el pellizco el puntero se queda donde apuntaba la mano
+  abierta (hasta 400 ms) y el dedo cae ahí, no donde la palma se movió al cerrar. Dos manos pellizcando son dos dedos:
   el navegador, PDF u otra app reconoce directamente su zoom. Cada dedo lleva
   su propio filtro contra el temblor.
 - Al arrancar, la vista de cámara dice **Entrada: pantalla táctil virtual**. Si

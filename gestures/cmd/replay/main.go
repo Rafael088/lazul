@@ -92,7 +92,8 @@ func informeToques(dir string, gs []gestures.Grabacion, detalle bool) {
 	fmt.Printf("  %-36s %6d %4d %5d %8d %9d %6d\n",
 		"TOTAL", total.Toques, total.Tap, total.Larga, total.Arrastre, total.SinClase, total.FueraDelPanel)
 	fmt.Printf("  sin clase = 250-500 ms quieto · fuera = pellizcos que empiezan fuera del panel y no son toque\n")
-	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (3 cuadros/200 ms) dentro\n")
+	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (%d cuadros/%d ms) dentro\n",
+		gestures.AjustesEmbraguePorDefecto.CuadrosParaSoltar, gestures.AjustesEmbraguePorDefecto.MsParaSoltar)
 	fmt.Printf("  toques en %d de %d tomas\n", total.TomasConToques, total.Tomas)
 	fmt.Println(lineaPrecision(gestures.PrecisionDe(tomas)))
 }
