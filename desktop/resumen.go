@@ -19,21 +19,24 @@ const VentanaResumen = 30 * time.Minute
 // ningún gesto (salvo que la persona la marcara «a propósito»). Una que
 // terminó en captura o gesto 4 cuenta como buscada, salvo marca «sin querer».
 type Resumen struct {
-	Desde               time.Time     // empieza la ventana (la hora en que se completan 30 min de uso hacia atrás)
-	Uso                 time.Duration // uso dentro de la ventana (hasta 30 min)
-	UsoTotal            time.Duration // uso en todo el registro
-	Activaciones        int
-	PorResultado        map[string]int
-	Falsas              int
-	Buscadas            int
-	Evitadas            int
-	EvitadasPorMotivo   map[string]int
-	MuestrasRendimiento int
-	FPSPromedio         float64
-	CPUCorePromedio     float64
-	CPUTotalPromedio    float64
-	ManoMsPromedio      float64
-	PoseMsPromedio      float64
+	Desde             time.Time     // empieza la ventana (la hora en que se completan 30 min de uso hacia atrás)
+	Uso               time.Duration // uso dentro de la ventana (hasta 30 min)
+	UsoTotal          time.Duration // uso en todo el registro
+	Activaciones      int
+	PorResultado      map[string]int
+	Falsas            int
+	Buscadas          int
+	Evitadas          int
+	EvitadasPorMotivo map[string]int
+	// EvitadasPanelPorMotivo: de las manos que quedaron fuera del panel, por
+	// qué (fuera_borde, cerca, lejos, sin_palma o sin_panel).
+	EvitadasPanelPorMotivo map[string]int
+	MuestrasRendimiento    int
+	FPSPromedio            float64
+	CPUCorePromedio        float64
+	CPUTotalPromedio       float64
+	ManoMsPromedio         float64
+	PoseMsPromedio         float64
 	// La última prueba de trabajo normal (cero si no hubo).
 	PruebaDesde        time.Time
 	PruebaUso          time.Duration
@@ -93,7 +96,7 @@ func Resumir(ls []Linea) Resumen {
 	ls = slices.Clone(ls)
 	slices.SortStableFunc(ls, func(a, b Linea) int { return a.T.Compare(b.T) })
 	ts := tramosDeUso(ls)
-	r := Resumen{PorResultado: map[string]int{}, EvitadasPorMotivo: map[string]int{}}
+	r := Resumen{PorResultado: map[string]int{}, EvitadasPorMotivo: map[string]int{}, EvitadasPanelPorMotivo: map[string]int{}}
 	for _, t := range ts {
 		r.UsoTotal += t.hasta.Sub(t.desde)
 	}
@@ -145,6 +148,9 @@ func Resumir(ls []Linea) Resumen {
 			if len(ts) > 0 && !l.T.Before(r.Desde) {
 				r.Evitadas++
 				r.EvitadasPorMotivo[l.Resultado]++
+				if l.Resultado == "fuera_panel" && l.Motivo != "" {
+					r.EvitadasPanelPorMotivo[l.Motivo]++
+				}
 			}
 			continue
 		}
@@ -219,28 +225,13 @@ func (r Resumen) Texto() string {
 			minutos(r.Uso), r.Desde.Local().Format("15:04 del 02/01"), r.Activaciones, r.Falsas, r.Buscadas)
 	}
 	if len(r.PorResultado) > 0 {
-		var ks []string
-		for k := range r.PorResultado {
-			ks = append(ks, k)
-		}
-		slices.Sort(ks)
-		var partes []string
-		for _, k := range ks {
-			partes = append(partes, fmt.Sprintf("%s %d", k, r.PorResultado[k]))
-		}
-		fmt.Fprintf(&b, "En qué terminaron: %s\n", strings.Join(partes, ", "))
+		fmt.Fprintf(&b, "En qué terminaron: %s\n", conteo(r.PorResultado))
 	}
 	if r.Evitadas > 0 {
-		var ks []string
-		for k := range r.EvitadasPorMotivo {
-			ks = append(ks, k)
-		}
-		slices.Sort(ks)
-		partes := make([]string, 0, len(ks))
-		for _, k := range ks {
-			partes = append(partes, fmt.Sprintf("%s %d", k, r.EvitadasPorMotivo[k]))
-		}
-		fmt.Fprintf(&b, "Activaciones evitadas por la zona: %d (%s)\n", r.Evitadas, strings.Join(partes, ", "))
+		fmt.Fprintf(&b, "Activaciones evitadas por la zona: %d (%s)\n", r.Evitadas, conteo(r.EvitadasPorMotivo))
+	}
+	if len(r.EvitadasPanelPorMotivo) > 0 {
+		fmt.Fprintf(&b, "Salidas del panel: %s\n", conteo(r.EvitadasPanelPorMotivo))
 	}
 	if r.MuestrasRendimiento > 0 {
 		fmt.Fprintf(&b, "Rendimiento (%d muestras): %.1f cuadros/s, CPU %.1f%% de un núcleo (%.1f%% total), mano %.1f ms + Pose %.1f ms\n",
@@ -256,4 +247,18 @@ func (r Resumen) Texto() string {
 	}
 	fmt.Fprintf(&b, "Uso total registrado: %s", minutos(r.UsoTotal))
 	return b.String()
+}
+
+// conteo ordena un mapa de recuentos como «clave n, clave n».
+func conteo(m map[string]int) string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	slices.Sort(ks)
+	partes := make([]string, 0, len(ks))
+	for _, k := range ks {
+		partes = append(partes, fmt.Sprintf("%s %d", k, m[k]))
+	}
+	return strings.Join(partes, ", ")
 }

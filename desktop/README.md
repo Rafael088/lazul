@@ -206,6 +206,13 @@ milisegundos de Hand y Pose y cuántos episodios quedaron bloqueados por falta
 de torso, fuera del torso o fuera del panel. El resumen guarda esas
 activaciones evitadas por motivo junto a las activaciones falsas.
 
+Cuando el panel deja una mano fuera, el registro dice también **por qué**:
+`fuera_borde` (la palma rebasó el rectángulo), `cerca` o `lejos` (está a otra
+distancia del plano que se calibró), `sin_palma` (la palma salía cortada del
+cuadro) o `sin_panel` (todavía no hay panel calibrado). Nunca guarda dónde
+estaba. `./dev app resumen` los cuenta en la línea **Salidas del panel**, por
+ejemplo `Salidas del panel: cerca 4, fuera_borde 92, lejos 8`.
+
 Fuera de la prueba también se cuenta: si se activa sola, pulsa **La última
 activación fue sin querer**; si la activaste tú y no hiciste nada después,
 **Fue a propósito**. Desde el Linux también: `./dev app resumen`.

@@ -22,6 +22,25 @@ const (
 	toleranciaQuieta       = .2 // en palmas, respecto a la media de las últimas muestras
 )
 
+// motivos con que el registro anota una mano que el panel dejó fuera. Los
+// tres primeros son los del diagnóstico del panel (gestures); los otros dos
+// dicen por qué no hubo diagnóstico.
+const (
+	MotivoFueraBorde = gestures.PanelFueraBorde
+	MotivoCerca      = gestures.PanelCerca
+	MotivoLejos      = gestures.PanelLejos
+	MotivoSinPalma   = "sin_palma" // la palma no se pudo medir (sale cortada del cuadro)
+	MotivoSinPanel   = "sin_panel" // todavía no hay un panel calibrado
+)
+
+// RechazoPanel dice qué manos dejó fuera el panel calibrado en un cuadro y
+// por qué, para anotarlo en el registro. Solo cuenta y clasifica: nunca
+// guarda una posición.
+type RechazoPanel struct {
+	Total     int
+	PorMotivo map[string]int // MotivoFueraBorde, MotivoCerca, MotivoLejos, MotivoSinPalma o MotivoSinPanel
+}
+
 // EstadoPanel es la parte del panel calibrado que pinta la ventana y lee el
 // aura. Fase es fuera, dentro o agarrando; mientras está agarrando, el
 // pellizco apoya un dedo táctil (o pulsa el botón en modo de respaldo).
@@ -276,29 +295,36 @@ func (p *Panel) observarMuestra(m gestures.MuestraPanel, tMs int64, mover bool) 
 	}
 }
 
-// Filtrar conserva solo las manos que caen dentro del panel calibrado. Sin
-// calibración no deja pasar ninguna; durante el asistente sí devuelve las
-// muestras que van a definir el rectángulo, pero la app las entrega solo al
-// Panel y no al flujo de gestos. La zona corporal se aplica antes.
-func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, int) {
+// Filtrar conserva solo las manos que caen dentro del panel calibrado y dice
+// por qué dejó fuera las demás. Sin calibración no deja pasar ninguna;
+// durante el asistente sí devuelve las muestras que van a definir el
+// rectángulo, pero la app las entrega solo al Panel y no al flujo de gestos.
+// La zona corporal se aplica antes.
+func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, RechazoPanel) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.calibrando {
-		return c, 0
+		return c, RechazoPanel{}
 	}
 	if !p.calibrado {
 		filtrado := c
 		filtrado.Manos = nil
-		return filtrado, len(c.Manos)
+		rechazo := RechazoPanel{Total: len(c.Manos)}
+		if rechazo.Total > 0 {
+			rechazo.PorMotivo = map[string]int{MotivoSinPanel: rechazo.Total}
+		}
+		return filtrado, rechazo
 	}
 	filtrado := c
 	filtrado.Manos = make([]gestures.Mano, 0, len(c.Manos))
 	vistos := map[bool]int{}
 	presentes := map[gestures.ClaveMano]bool{}
+	var rechazo RechazoPanel
 	for _, mano := range c.Manos {
 		clave := gestures.ClaveMano{Derecha: mano.Derecha, N: vistos[mano.Derecha]}
 		vistos[mano.Derecha]++
 		presentes[clave] = true
+		motivo := MotivoSinPalma
 		muestra, ok := gestures.MuestraPanelDe(mano, c.Aspecto)
 		if ok {
 			mapa := p.mapeadores[clave]
@@ -306,18 +332,37 @@ func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, int) {
 				mapa = gestures.NuevoMapeadorPanel(p.calibracion)
 				p.mapeadores[clave] = mapa
 			}
-			_, ok = mapa.Mapear(muestra)
+			if _, ok = mapa.Mapear(muestra); !ok {
+				motivo = motivoFueraPanel(p.calibracion, muestra, c.Aspecto)
+			}
 		}
 		if ok {
 			filtrado.Manos = append(filtrado.Manos, mano)
+			continue
 		}
+		if rechazo.PorMotivo == nil {
+			rechazo.PorMotivo = map[string]int{}
+		}
+		rechazo.Total++
+		rechazo.PorMotivo[motivo]++
 	}
 	for clave := range p.mapeadores {
 		if !presentes[clave] {
 			delete(p.mapeadores, clave)
 		}
 	}
-	return filtrado, len(c.Manos) - len(filtrado.Manos)
+	return filtrado, rechazo
+}
+
+// motivoFueraPanel pregunta al diagnóstico del panel por qué una mano que el
+// mapeador rechazó no cuenta: rebasó el borde o está a otra distancia. Se
+// consulta solo al rechazar: el diagnóstico no tiene memoria, y una mano que
+// sigue en la banda exterior no debe salir como si hubiera salido.
+func motivoFueraPanel(cal gestures.CalibracionPanel, m gestures.MuestraPanel, aspecto float32) string {
+	if d, ok := cal.Diagnosticar(m, float64(aspecto)); ok && d.Motivo != gestures.PanelDentro {
+		return d.Motivo
+	}
+	return MotivoSinPalma
 }
 
 // Cuadro pasa el cuadro por el embrague: mueve el puntero y manda los dedos
