@@ -52,3 +52,25 @@ Esta microprueba separa cuadro hacia Go y vista hacia la webview; no sustituye
 la medida del árbol WebKit/MediaPipe en la NVIDIA. En el i5-11300H del sandbox,
 con dos manos y Pose, dio 13,1 µs y 1.632 B por cuadro hacia Go; la vista de
 vuelta dio 2,2 µs y 530 B. El puente y las superficies no están incluidos.
+
+## Medida en la NVIDIA (maestro, fuera del sandbox, 19-nov)
+
+`./dev camara-cpu 20 19nov` (banco `-modo imagen`, 20 s por variante, delegado GPU):
+
+| variante  | fps  | CPU % núcleo |
+|-----------|------|--------------|
+| base      | 54,9 | 148,9 (primera corrida, con calentamiento de compilación) |
+| envio     | 45,2 | 81,5 |
+| respuesta | 49,7 | 86,7 |
+| indicador | 53,6 | 96,5 |
+| aura      | 60,0 | 97,5 |
+| copia     | 60,0 | 95,9 |
+| antes     | 53,2 | 94,2 |
+| despues   | 53,1 | 93,1 |
+
+Lectura: en el banco, antes y después quedan iguales (~94 % de un núcleo a
+~53 fps, el doble de cuadros que la app real). Ninguna de las partes aisladas
+explica por sí sola los 130-180 % de la app: el grueso parece estar en
+WebKit + MediaPipe, no en el puente ni en el aura. Los cambios no empeoran
+nada, pero el ahorro real solo se sabrá con la app y la cámara (`./dev app`,
+mano dentro, y la línea de CPU del indicador o `./dev app resumen`).
