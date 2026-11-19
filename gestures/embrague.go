@@ -76,7 +76,7 @@ var AjustesEmbraguePorDefecto = AjustesEmbrague{
 	Pellizco:          AjustesPellizcoPorDefecto,
 	CuadrosParaSoltar: 3,
 	MsParaSoltar:      200,
-	CuadrosParaApoyar: 2,
+	CuadrosParaApoyar: 3,
 	MsAncla:           400,
 	// Un arrastre tiene que mover al menos un 15 % del panel: así un
 	// pellizco involuntario que apenas se desplaza no cuenta.

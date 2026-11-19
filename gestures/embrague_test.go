@@ -83,8 +83,10 @@ func TestEmbragueArmadoUsaLaBandaDelPanel(t *testing.T) {
 	for i, caso := range casos {
 		t.Run(caso.nombre, func(t *testing.T) {
 			if i == 0 {
-				// El pellizco se arma al segundo cuadro cerrado (CuadrosParaApoyar).
-				med.Cuadro(cuadroPanel(-33, manoEnPanel(caso.x, 0, .2, true)))
+				// El pellizco se arma tras CuadrosParaApoyar cuadros cerrados.
+				for k := 1; k < AjustesEmbraguePorDefecto.CuadrosParaApoyar; k++ {
+					med.Cuadro(cuadroPanel(int64(k-10)*33, manoEnPanel(caso.x, 0, .2, true)))
+				}
 			}
 			r := med.Cuadro(cuadroPanel(int64(i)*67, manoEnPanel(caso.x, 0, .2, true)))
 			if r.Dentro != caso.dentro {
@@ -532,21 +534,23 @@ func TestEmbragueNormalNoArrastra(t *testing.T) {
 	}
 }
 
-// Un cierre de un solo cuadro (el pellizco que parpadea) no apoya el dedo:
-// en las tomas reales salía como un tap de 200 ms que nadie pidió.
-func TestEmbragueNoArmaConUnSoloCuadroCerrado(t *testing.T) {
+// Un cierre corto (el pellizco que parpadea) no apoya el dedo: en las tomas
+// reales salía como un tap de 200 ms que nadie pidió.
+func TestEmbragueNoArmaConUnCierreCorto(t *testing.T) {
 	med := NuevoMedidorEmbrague(panelCuadrado(t))
-	cerrado := []bool{false, true, false, false, false, false}
+	cerrado := []bool{false, true, true, false, false, false, false}
 	for i, c := range cerrado {
 		r := med.Cuadro(cuadroPanel(int64(i)*67, manoEnPanel(0, 0, .2, c)))
 		if r.ManosArmadas != 0 {
 			t.Fatalf("cuadro %d: armó con un solo cuadro cerrado: %+v", i, r)
 		}
 	}
-	r := med.Cuadro(cuadroPanel(500, manoEnPanel(0, 0, .2, true)))
-	r = med.Cuadro(cuadroPanel(567, manoEnPanel(0, 0, .2, true)))
+	var r ResultadoEmbrague
+	for k := 0; k < AjustesEmbraguePorDefecto.CuadrosParaApoyar; k++ {
+		r = med.Cuadro(cuadroPanel(500+int64(k)*67, manoEnPanel(0, 0, .2, true)))
+	}
 	if r.ManosArmadas != 1 {
-		t.Fatalf("dos cuadros cerrados dentro deberían armar: %+v", r)
+		t.Fatalf("%d cuadros cerrados dentro deberían armar: %+v", AjustesEmbraguePorDefecto.CuadrosParaApoyar, r)
 	}
 }
 
@@ -555,11 +559,14 @@ func TestEmbragueNoArmaConUnSoloCuadroCerrado(t *testing.T) {
 func TestEmbragueApoyaEnElAncla(t *testing.T) {
 	med := NuevoMedidorEmbrague(panelCuadrado(t))
 	abierta := med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
-	cerrando := med.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
-	if cerrando.ManosArmadas != 0 || cerrando.X != abierta.X || cerrando.Y != abierta.Y {
-		t.Fatalf("cerrando, el puntero debe quedarse en el ancla %.3f,%.3f: %+v", abierta.X, abierta.Y, cerrando)
+	n := AjustesEmbraguePorDefecto.CuadrosParaApoyar
+	for k := 1; k < n; k++ {
+		cerrando := med.Cuadro(cuadroPanel(int64(k)*67, manoEnPanel(0.08, 0.04, .2, true)))
+		if cerrando.ManosArmadas != 0 || cerrando.X != abierta.X || cerrando.Y != abierta.Y {
+			t.Fatalf("cerrando, el puntero debe quedarse en el ancla %.3f,%.3f: %+v", abierta.X, abierta.Y, cerrando)
+		}
 	}
-	r := med.Cuadro(cuadroPanel(134, manoEnPanel(0.08, 0.04, .2, true)))
+	r := med.Cuadro(cuadroPanel(int64(n)*67, manoEnPanel(0.08, 0.04, .2, true)))
 	if r.ManosArmadas != 1 {
 		t.Fatalf("no armó: %+v", r)
 	}
@@ -569,11 +576,14 @@ func TestEmbragueApoyaEnElAncla(t *testing.T) {
 	}
 	sin := NuevoMedidorEmbragueCon(panelCuadrado(t), func() AjustesEmbrague { aj := AjustesEmbraguePorDefecto; aj.MsAncla = 0; return aj }())
 	sin.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
-	sin.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
-	rs := sin.Cuadro(cuadroPanel(134, manoEnPanel(0.08, 0.04, .2, true)))
+	var rs ResultadoEmbrague
+	for k := 1; k <= n; k++ {
+		rs = sin.Cuadro(cuadroPanel(int64(k)*67, manoEnPanel(0.08, 0.04, .2, true)))
+	}
 	dx := rs.Armadas[0].X - a.X
-	r2 := med.Cuadro(cuadroPanel(201, manoEnPanel(0.28, 0.04, .2, true)))
-	rs2 := sin.Cuadro(cuadroPanel(201, manoEnPanel(0.28, 0.04, .2, true)))
+	tSig := int64(n+1) * 67
+	r2 := med.Cuadro(cuadroPanel(tSig, manoEnPanel(0.28, 0.04, .2, true)))
+	rs2 := sin.Cuadro(cuadroPanel(tSig, manoEnPanel(0.28, 0.04, .2, true)))
 	if math.Abs((r2.Armadas[0].X-a.X)-(rs2.Armadas[0].X-rs.Armadas[0].X)) > 1e-9 || dx == 0 {
 		t.Fatalf("el ancla cambió el recorrido del arrastre o no movió el apoyo: con %+v, sin %+v", r2.Armadas, rs2.Armadas)
 	}
