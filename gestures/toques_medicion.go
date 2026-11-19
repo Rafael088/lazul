@@ -73,6 +73,9 @@ type TomaToques struct {
 	Toma          string
 	Toques        []Toque
 	FueraDelPanel int // pellizcos que empezaron fuera y el embrague descartó
+	// Alcance y salto al apoyar (precision_toques.go).
+	Bordes, BordesPosibles int
+	Saltos                 []float64
 }
 
 // ConteoToques resume una o varias tomas.
@@ -136,12 +139,18 @@ func ToquesDeToma(g Grabacion, tamano float64) (TomaToques, error) {
 		return TomaToques{}, err
 	}
 	med := NuevoMedidorEmbrague(cal)
+	filtro := filtroPanelApp{cal: cal}
+	puntero := punteroApp{filtro: NuevoFiltroOneEuroPanel()}
+	seg := seguimientoPrecision{cal: cal}
 	resultados := make([]ResultadoEmbrague, 0, len(g.Cuadros)+toqueCuadrosApartar)
 	var tUltimo int64
 	var aspecto float32
 	for _, c := range g.Cuadros {
 		tUltimo, aspecto = c.TMs, c.Aspecto
-		resultados = append(resultados, med.Cuadro(c))
+		r := med.Cuadro(filtro.cuadro(c))
+		puntero.cuadro(r)
+		seg.cuadro(c, r, &puntero)
+		resultados = append(resultados, r)
 	}
 	// Se aparta la mano de la toma, como en la prueba de las tomas reales.
 	for i := 0; i < toqueCuadrosApartar && len(resultados) > 0 &&
@@ -150,10 +159,13 @@ func ToquesDeToma(g Grabacion, tamano float64) (TomaToques, error) {
 		resultados = append(resultados, med.Cuadro(Cuadro{TMs: tUltimo, Aspecto: aspecto}))
 	}
 	return TomaToques{
-		Archivo:       g.Archivo,
-		Toma:          g.Cabecera.Toma,
-		Toques:        toquesDeCuadros(ToquesDe(resultados)),
-		FueraDelPanel: pellizcosFueraDelPanel(g, cal),
+		Archivo:        g.Archivo,
+		Toma:           g.Cabecera.Toma,
+		Toques:         toquesDeCuadros(ToquesDe(resultados)),
+		FueraDelPanel:  pellizcosFueraDelPanel(g, cal),
+		Bordes:         seg.bordes,
+		BordesPosibles: seg.posibles,
+		Saltos:         seg.saltos,
 	}, nil
 }
 
