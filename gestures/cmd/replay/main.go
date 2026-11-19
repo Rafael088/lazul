@@ -92,8 +92,26 @@ func informeToques(dir string, gs []gestures.Grabacion, detalle bool) {
 	fmt.Printf("  %-36s %6d %4d %5d %8d %9d %6d\n",
 		"TOTAL", total.Toques, total.Tap, total.Larga, total.Arrastre, total.SinClase, total.FueraDelPanel)
 	fmt.Printf("  sin clase = 250-500 ms quieto · fuera = pellizcos que empiezan fuera del panel y no son toque\n")
-	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (3 cuadros/200 ms) dentro\n")
+	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (%d cuadros/%d ms) dentro\n",
+		gestures.AjustesEmbraguePorDefecto.CuadrosParaSoltar, gestures.AjustesEmbraguePorDefecto.MsParaSoltar)
 	fmt.Printf("  toques en %d de %d tomas\n", total.TomasConToques, total.Tomas)
+	fmt.Println(lineaPrecision(gestures.PrecisionDe(tomas)))
+}
+
+// lineaPrecision es la métrica de cotejo-uy84og en una línea: aciertos en
+// las tomas que piden un gesto, toques falsos en las que no, toques de más,
+// alcance de bordes y el salto del puntero al apoyar (mediana y p90, en
+// unidades del panel).
+func lineaPrecision(p gestures.PrecisionToques) string {
+	pct := func(a, b int) float64 {
+		if b == 0 {
+			return 0
+		}
+		return 100 * float64(a) / float64(b)
+	}
+	return fmt.Sprintf("PRECISIÓN aciertos %d/%d (%.0f %%) · falsos %d en %d tomas sin pellizco · de más %d · bordes %d/%d · salto al apoyar p50 %.4f p90 %.4f (n=%d)",
+		p.Aciertos, p.Intentos, pct(p.Aciertos, p.Intentos), p.Falsos, p.SinPellizco, p.DeMas,
+		p.Bordes, p.BordesPosibles, p.SaltoPercentil(0.5), p.SaltoPercentil(0.9), len(p.Saltos))
 }
 
 func informeTactil(dir string, gs []gestures.Grabacion, detalle bool) {

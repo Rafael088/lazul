@@ -15,9 +15,11 @@ import (
 //     de movimiento normal hubo 16 pellizcos involuntarios y los 16 empezaron
 //     fuera; uno que empieza fuera y entra se ignora hasta soltarlo.
 //   - El pellizco parpadea: 29 veces se abrió uno o dos cuadros en medio de un
-//     arrastre a 15 fps. Para soltar se exigen 3 cuadros abiertos y 200 ms
+//     arrastre a 15 fps. Para soltar se exigen 3 cuadros abiertos y 250 ms
 //     (las dos cosas: a fps bajos manda el tiempo y a fps altos, los cuadros),
-//     así un parpadeo no corta el arrastre.
+//     así un parpadeo no corta el arrastre. Para apoyar, 3 cuadros cerrados
+//     seguidos: un cierre de uno o dos cuadros no es un toque. Y el dedo cae
+//     en el ancla, donde apuntaba la mano abierta (cotejo-uy84og).
 //   - Dos manos pellizcando y separándose o juntándose son un zoom; el resto
 //     de los casos es un arrastre, con la dirección del eje que más se movió.
 //
@@ -59,14 +61,25 @@ type AjustesEmbrague struct {
 	Pellizco          AjustesPellizco
 	CuadrosParaSoltar int
 	MsParaSoltar      int64
-	DistanciaMinima   float64 // en unidades del panel (0 a 1)
-	ZoomMinimo        float64 // cambio de separación entre manos
+	// CuadrosParaApoyar es cuántos cuadros seguidos tiene que estar cerrado
+	// un pellizco que empezó dentro para armarse: un cierre de un solo
+	// cuadro (el parpadeo) no apoya el dedo.
+	CuadrosParaApoyar int
+	// MsAncla: el dedo cae donde estaba el puntero en el último cuadro con
+	// la mano abierta, si fue hace como mucho este tiempo. Cerrar el
+	// pellizco mueve la palma y el puntero; sin ancla, el dedo cae donde
+	// quedó la palma al cerrar y no donde se apuntaba. 0 lo apaga.
+	MsAncla         int64
+	DistanciaMinima float64 // en unidades del panel (0 a 1)
+	ZoomMinimo      float64 // cambio de separación entre manos
 }
 
 var AjustesEmbraguePorDefecto = AjustesEmbrague{
 	Pellizco:          AjustesPellizcoPorDefecto,
 	CuadrosParaSoltar: 3,
-	MsParaSoltar:      200,
+	MsParaSoltar:      250,
+	CuadrosParaApoyar: 3,
+	MsAncla:           400,
 	// Un arrastre tiene que mover al menos un 15 % del panel: así un
 	// pellizco involuntario que apenas se desplaza no cuenta.
 	DistanciaMinima: 0.15,
@@ -125,6 +138,8 @@ type estadoManoEmbrague struct {
 	clave         ClaveMano
 	cerrada       bool
 	armada        bool // el pellizco empezó dentro del panel
+	pendiente     bool // empezó dentro y espera CuadrosParaApoyar
+	cerrados      int  // cuadros seguidos cerrado
 	inicio        PuntoPanel
 	ultima        PuntoPanel
 	inicioGesto   PuntoPanel
@@ -133,6 +148,12 @@ type estadoManoEmbrague struct {
 	abiertos      int
 	ultimoCerrado int64
 	sinArrastre   bool // participó en un zoom: al soltar no es arrastre
+	// ancla: posición con la mano abierta del todo y su tiempo; desfase:
+	// lo que se suma a la palma mientras el dedo está apoyado.
+	ancla    PuntoPanel
+	tAncla   int64
+	hayAncla bool
+	desfase  PuntoPanel
 }
 
 type estadoZoom struct {
@@ -242,8 +263,8 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 	for _, est := range armadas {
 		r.Armadas = append(r.Armadas, ManoArmada{
 			Clave: est.clave,
-			X:     est.ultima.X,
-			Y:     est.ultima.Y,
+			X:     est.ultima.X + est.desfase.X,
+			Y:     est.ultima.Y + est.desfase.Y,
 		})
 	}
 	m.resolverZoom(armadas, soltadas, &r)
@@ -271,20 +292,26 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	}
 	if md.estado.Cerrado {
 		if !est.cerrada {
-			// Empieza un pellizco. Solo se arma dentro del panel; si empieza
-			// fuera, se queda sin agarrar hasta que se suelte.
+			// Empieza un pellizco. Solo se arma si empieza dentro del panel;
+			// si empieza fuera, se queda sin agarrar hasta que se suelte.
 			est.cerrada = true
 			est.abiertos = 0
-			if !est.armada {
-				if md.dentroReal {
-					est.armada = true
-					est.inicio = md.pos
-					est.ultima = md.pos
-					est.inicioGesto = md.gesto
-					est.ultimaGesto = md.gesto
-					est.tienePos = true
-					est.sinArrastre = false
-				}
+			est.cerrados = 0
+			est.pendiente = !est.armada && md.dentroReal
+		}
+		est.cerrados++
+		if est.pendiente && est.cerrados >= m.Ajustes.CuadrosParaApoyar {
+			est.pendiente = false
+			est.armada = true
+			est.inicio = md.pos
+			est.ultima = md.pos
+			est.inicioGesto = md.gesto
+			est.ultimaGesto = md.gesto
+			est.tienePos = md.ok
+			est.sinArrastre = false
+			est.desfase = PuntoPanel{}
+			if md.ok && m.anclaVigente(est, t) {
+				est.desfase = PuntoPanel{X: est.ancla.X - md.pos.X, Y: est.ancla.Y - md.pos.Y}
 			}
 		}
 		if est.armada && md.ok {
@@ -299,8 +326,17 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	// La mano está abierta (o trae una apertura suficiente para la
 	// histéresis): cuenta para soltar, pero no borra la posición del último
 	// cuadro agarrado, que es la que cierra el arrastre.
+	if md.ok && md.dentro && float64(md.estado.Apertura) >= m.Ajustes.Pellizco.UmbralAbrir {
+		est.ancla, est.tAncla, est.hayAncla = md.pos, t, true
+	}
 	est.cerrada = false
+	est.pendiente = false
 	return m.abrir(est, t)
+}
+
+// anclaVigente dice si la mano tiene un ancla reciente (MsAncla).
+func (m *MedidorEmbrague) anclaVigente(est *estadoManoEmbrague, t int64) bool {
+	return m.Ajustes.MsAncla > 0 && est.hayAncla && t-est.tAncla <= m.Ajustes.MsAncla
 }
 
 // abrir suma un cuadro abierto y suelta cuando se cumplen los dos umbrales.
@@ -425,6 +461,7 @@ func (m *MedidorEmbrague) arrastreDe(est *estadoManoEmbrague) *Arrastre {
 // deja la fase que lee el aura.
 func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*estadoManoEmbrague, r *ResultadoEmbrague) {
 	var elegida *manoMedida
+	var desfase PuntoPanel
 	for i := range medidas {
 		if elegida == nil {
 			elegida = &medidas[i]
@@ -432,18 +469,28 @@ func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*es
 		for _, est := range armadas {
 			if est.clave == medidas[i].clave {
 				elegida = &medidas[i]
+				desfase = est.desfase
 			}
 		}
 	}
 	if elegida != nil {
 		r.Dentro = elegida.dentro
 		if elegida.ok {
-			r.TienePos, r.X, r.Y = true, elegida.pos.X, elegida.pos.Y
+			// Agarrando, el puntero es el dedo: palma más el desfase del ancla.
+			r.TienePos, r.X, r.Y = true, elegida.pos.X+desfase.X, elegida.pos.Y+desfase.Y
+			// Cerrando el pellizco (ya no abierta del todo y sin armar), el
+			// puntero se queda en el ancla: lo que se mueve la palma al
+			// cerrar no mueve lo que la persona apuntó.
+			if est := m.manos[elegida.clave]; est != nil && len(armadas) == 0 && m.anclaVigente(est, r.TMs) &&
+				float64(elegida.estado.Apertura) < m.Ajustes.Pellizco.UmbralAbrir {
+				r.X, r.Y = est.ancla.X, est.ancla.Y
+			}
 		}
 	} else if len(armadas) == 1 && armadas[0].tienePos {
 		// La mano que agarra desapareció: el puntero se queda donde estaba y
 		// el botón sigue pulsado hasta que se cumpla el soltar.
-		r.TienePos, r.X, r.Y = true, armadas[0].ultima.X, armadas[0].ultima.Y
+		a := armadas[0]
+		r.TienePos, r.X, r.Y = true, a.ultima.X+a.desfase.X, a.ultima.Y+a.desfase.Y
 	}
 	if len(armadas) > 0 {
 		r.Fase = EmbragueAgarrando
