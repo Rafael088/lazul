@@ -549,3 +549,29 @@ func TestEmbragueNoArmaConUnSoloCuadroCerrado(t *testing.T) {
 		t.Fatalf("dos cuadros cerrados dentro deberían armar: %+v", r)
 	}
 }
+
+// Cerrar el pellizco mueve la palma: el dedo cae donde apuntaba la mano
+// abierta (el ancla) y el arrastre sigue desde ahí con el mismo recorrido.
+func TestEmbragueApoyaEnElAncla(t *testing.T) {
+	med := NuevoMedidorEmbrague(panelCuadrado(t))
+	abierta := med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	med.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
+	r := med.Cuadro(cuadroPanel(134, manoEnPanel(0.08, 0.04, .2, true)))
+	if r.ManosArmadas != 1 {
+		t.Fatalf("no armó: %+v", r)
+	}
+	a := r.Armadas[0]
+	if math.Abs(a.X-abierta.X) > 1e-9 || math.Abs(a.Y-abierta.Y) > 1e-9 || r.X != a.X || r.Y != a.Y {
+		t.Fatalf("apoyó en %.3f,%.3f (puntero %.3f,%.3f), quería el ancla %.3f,%.3f", a.X, a.Y, r.X, r.Y, abierta.X, abierta.Y)
+	}
+	sin := NuevoMedidorEmbragueCon(panelCuadrado(t), func() AjustesEmbrague { aj := AjustesEmbraguePorDefecto; aj.MsAncla = 0; return aj }())
+	sin.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	sin.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
+	rs := sin.Cuadro(cuadroPanel(134, manoEnPanel(0.08, 0.04, .2, true)))
+	dx := rs.Armadas[0].X - a.X
+	r2 := med.Cuadro(cuadroPanel(201, manoEnPanel(0.28, 0.04, .2, true)))
+	rs2 := sin.Cuadro(cuadroPanel(201, manoEnPanel(0.28, 0.04, .2, true)))
+	if math.Abs((r2.Armadas[0].X-a.X)-(rs2.Armadas[0].X-rs.Armadas[0].X)) > 1e-9 || dx == 0 {
+		t.Fatalf("el ancla cambió el recorrido del arrastre o no movió el apoyo: con %+v, sin %+v", r2.Armadas, rs2.Armadas)
+	}
+}
