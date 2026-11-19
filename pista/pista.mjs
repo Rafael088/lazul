@@ -1,5 +1,4 @@
 const $ = (id) => document.getElementById(id);
-const { calcularResumen } = globalThis.LazulResumen;
 const ICONO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 15 9l7 .7-5.3 4.7 1.6 7.1L12 17.8l-6.3 3.7 1.6-7.1L2 9.7 9 9z"/></svg>';
 const blancos = [
   { id: "enlace-28", tipo: "enlace", tamanoPx: 28, posicion: "centro arriba" },
