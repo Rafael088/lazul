@@ -308,7 +308,7 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 			est.tienePos = md.ok
 			est.sinArrastre = false
 			est.desfase = PuntoPanel{}
-			if m.Ajustes.MsAncla > 0 && est.hayAncla && md.ok && t-est.tAncla <= m.Ajustes.MsAncla {
+			if md.ok && m.anclaVigente(est, t) {
 				est.desfase = PuntoPanel{X: est.ancla.X - md.pos.X, Y: est.ancla.Y - md.pos.Y}
 			}
 		}
@@ -330,6 +330,11 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	est.cerrada = false
 	est.pendiente = false
 	return m.abrir(est, t)
+}
+
+// anclaVigente dice si la mano tiene un ancla reciente (MsAncla).
+func (m *MedidorEmbrague) anclaVigente(est *estadoManoEmbrague, t int64) bool {
+	return m.Ajustes.MsAncla > 0 && est.hayAncla && t-est.tAncla <= m.Ajustes.MsAncla
 }
 
 // abrir suma un cuadro abierto y suelta cuando se cumplen los dos umbrales.
@@ -471,6 +476,13 @@ func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*es
 		if elegida.ok {
 			// Agarrando, el puntero es el dedo: palma más el desfase del ancla.
 			r.TienePos, r.X, r.Y = true, elegida.pos.X+desfase.X, elegida.pos.Y+desfase.Y
+			// Cerrando el pellizco (ya no abierta del todo y sin armar), el
+			// puntero se queda en el ancla: lo que se mueve la palma al
+			// cerrar no mueve lo que la persona apuntó.
+			if est := m.manos[elegida.clave]; est != nil && len(armadas) == 0 && m.anclaVigente(est, r.TMs) &&
+				float64(elegida.estado.Apertura) < m.Ajustes.Pellizco.UmbralAbrir {
+				r.X, r.Y = est.ancla.X, est.ancla.Y
+			}
 		}
 	} else if len(armadas) == 1 && armadas[0].tienePos {
 		// La mano que agarra desapareció: el puntero se queda donde estaba y

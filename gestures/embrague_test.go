@@ -555,7 +555,10 @@ func TestEmbragueNoArmaConUnSoloCuadroCerrado(t *testing.T) {
 func TestEmbragueApoyaEnElAncla(t *testing.T) {
 	med := NuevoMedidorEmbrague(panelCuadrado(t))
 	abierta := med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
-	med.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
+	cerrando := med.Cuadro(cuadroPanel(67, manoEnPanel(0.08, 0.04, .2, true)))
+	if cerrando.ManosArmadas != 0 || cerrando.X != abierta.X || cerrando.Y != abierta.Y {
+		t.Fatalf("cerrando, el puntero debe quedarse en el ancla %.3f,%.3f: %+v", abierta.X, abierta.Y, cerrando)
+	}
 	r := med.Cuadro(cuadroPanel(134, manoEnPanel(0.08, 0.04, .2, true)))
 	if r.ManosArmadas != 1 {
 		t.Fatalf("no armó: %+v", r)
