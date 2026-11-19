@@ -354,6 +354,56 @@ func TestPanelFiltraManosFueraDelRectanguloCalibrado(t *testing.T) {
 	}
 }
 
+func TestPanelFiltraConLaMismaBandaDeHisteresis(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	c, _ := gestures.NuevaCalibracionPanel(muestraPanelPrueba(-1, -1, .2), muestraPanelPrueba(1, 1, .2))
+	if err := GuardarCalibracionPanel(ruta, c); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := NuevoPanel(ruta, &punteroPanelPrueba{})
+	casos := []struct {
+		nombre string
+		x      float64
+		pasa   bool
+	}{
+		{"no entra desde fuera", 1.10, false},
+		{"entra por el borde", 1.00, true},
+		{"permanece en la banda", 1.20, true},
+		{"sale de la banda", 1.31, false},
+		{"no reentra desde fuera", 1.10, false},
+		{"reentra por el borde", 1.00, true},
+	}
+	for i, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			filtrado, rechazadas := p.Filtrar(cuadroPanelPrueba(int64(i), manoPanelPrueba(caso.x, 0, .2, false)))
+			pasa := len(filtrado.Manos) == 1 && rechazadas == 0
+			if pasa != caso.pasa {
+				t.Fatalf("x %.2f: pasa %v, rechazadas %d; quería pasa %v", caso.x, pasa, rechazadas, caso.pasa)
+			}
+		})
+	}
+}
+
+func TestAvisoEsquinaCercaDelBordeDeImagen(t *testing.T) {
+	casos := []struct {
+		nombre string
+		m      gestures.MuestraPanel
+		avisa  bool
+	}{
+		{"centro seguro", gestures.MuestraPanel{X: 0, Y: 0, Tamano: .2}, false},
+		{"cerca de izquierda", gestures.MuestraPanel{X: -.55, Y: 0, Tamano: .2}, true},
+		{"cerca de abajo", gestures.MuestraPanel{X: 0, Y: .45, Tamano: .2}, true},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			avisa := avisoEsquinaCercaDelBorde("La esquina", caso.m, 4.0/3.0) != ""
+			if avisa != caso.avisa {
+				t.Fatalf("avisa %v, quería %v", avisa, caso.avisa)
+			}
+		})
+	}
+}
+
 func TestPanelExigeManoQuietaParaCapturar(t *testing.T) {
 	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
 	p.EmpezarCalibracion()

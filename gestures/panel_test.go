@@ -59,6 +59,44 @@ func TestPanelRechazaFueraDelRectanguloYDeLaProfundidad(t *testing.T) {
 	}
 }
 
+func TestMapeadorPanelBandaHistéresisYGanancia(t *testing.T) {
+	c, err := NuevaCalibracionPanel(muestraProyectada(-1, -1, .2), muestraProyectada(1, 1, .2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// x está en la proyección [-1,1] del panel: -0,9 y 0,9 son el 5 % y
+	// 95 %, que con la ganancia deben llegar exactamente a la pantalla.
+	casos := []struct {
+		nombre         string
+		x              float64
+		dentro         bool
+		pantallaX      float64
+		reiniciarAntes bool
+	}{
+		{"no entra desde la banda", -1.10, false, 0, false},
+		{"entra por el borde real", -1.00, true, 0, false},
+		{"cinco por ciento llega a cero", -0.90, true, 0, false},
+		{"noventa y cinco por ciento llega a uno", 0.90, true, 1, false},
+		{"permanece diez por ciento fuera", 1.20, true, 1, false},
+		{"sale más allá del quince por ciento", 1.31, false, 1, false},
+		{"no reentra por la banda", 1.10, false, 1, false},
+		{"reentra al cruzar el borde", 1.00, true, 1, false},
+		{"reiniciada tampoco entra por la banda", -1.10, false, 0, true},
+	}
+	mapa := NuevoMapeadorPanel(c)
+	for _, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			if caso.reiniciarAntes {
+				mapa.Reiniciar()
+			}
+			p, dentro := mapa.Mapear(muestraProyectada(caso.x, 0, .2))
+			if dentro != caso.dentro || math.Abs(p.X-caso.pantallaX) > 1e-9 {
+				t.Fatalf("x %.2f: punto %+v, dentro %v; quería x %.2f, dentro %v", caso.x, p, dentro, caso.pantallaX, caso.dentro)
+			}
+		})
+	}
+}
+
 func TestPanelValidaLaOrientacionDeLasEsquinas(t *testing.T) {
 	_, err := NuevaCalibracionPanel(muestraProyectada(-.1, -.1, .2), muestraProyectada(.1, .1, .2))
 	if err == nil {
@@ -97,6 +135,26 @@ func TestOneEuroReduceTemblorSinPerderElMovimiento(t *testing.T) {
 	}
 }
 
+func TestOneEuroAlcanzaLosExtremos(t *testing.T) {
+	f := NuevoFiltroOneEuroPanel()
+	f.Filtrar(0, PuntoPanel{X: .5, Y: .5})
+	for _, caso := range []struct {
+		nombre string
+		t      int64
+		p      PuntoPanel
+	}{
+		{"cero", 33, PuntoPanel{X: 0, Y: 0}},
+		{"uno", 66, PuntoPanel{X: 1, Y: 1}},
+	} {
+		t.Run(caso.nombre, func(t *testing.T) {
+			obtuvo := f.Filtrar(caso.t, caso.p)
+			if obtuvo != caso.p {
+				t.Fatalf("el filtro dejó corto el extremo: obtuvo %+v, quería %+v", obtuvo, caso.p)
+			}
+		})
+	}
+}
+
 func TestDiagnosticarDiceElMotivo(t *testing.T) {
 	cal, err := NuevaCalibracionPanel(
 		MuestraPanel{X: -.2, Y: -.2, Tamano: .1},
@@ -128,5 +186,8 @@ func TestDiagnosticarDiceElMotivo(t *testing.T) {
 	x0, y0, x1, y1 := cal.RectanguloCalibrado(a)
 	if math.Abs(d.X0-x0) > 1e-9 || math.Abs(d.Y0-y0) > 1e-9 || math.Abs(d.X1-x1) > 1e-9 || math.Abs(d.Y1-y1) > 1e-9 {
 		t.Fatalf("rectángulo %v,%v,%v,%v contra calibrado %v,%v,%v,%v", d.X0, d.Y0, d.X1, d.Y1, x0, y0, x1, y1)
+	}
+	if !(d.BX0 < d.X0 && d.BY0 < d.Y0 && d.BX1 > d.X1 && d.BY1 > d.Y1) {
+		t.Fatalf("la banda no rodea el panel: %+v", d)
 	}
 }

@@ -26,21 +26,22 @@ const (
 // aura. Fase es fuera, dentro o agarrando; mientras está agarrando, el
 // pellizco apoya un dedo táctil (o pulsa el botón en modo de respaldo).
 type EstadoPanel struct {
-	Calibrado     bool    `json:"calibrado"`
-	Calibrando    bool    `json:"calibrando"`
-	Paso          int     `json:"paso,omitempty"`
-	ListoCapturar bool    `json:"listo_capturar"`
-	Instruccion   string  `json:"instruccion"`
-	Dentro        bool    `json:"dentro"`
-	Fase          string  `json:"fase"` // fuera | dentro | agarrando
-	ManosArmadas  int     `json:"manos_armadas,omitempty"`
-	Arrastre      string  `json:"arrastre,omitempty"`
-	Zoom          string  `json:"zoom,omitempty"`
-	ModoEntrada   string  `json:"modo_entrada"` // tactil | respaldo
-	AvisoEntrada  string  `json:"aviso_entrada,omitempty"`
-	X             float64 `json:"x,omitempty"`
-	Y             float64 `json:"y,omitempty"`
-	Error         string  `json:"error,omitempty"`
+	Calibrado        bool    `json:"calibrado"`
+	Calibrando       bool    `json:"calibrando"`
+	Paso             int     `json:"paso,omitempty"`
+	ListoCapturar    bool    `json:"listo_capturar"`
+	Instruccion      string  `json:"instruccion"`
+	Dentro           bool    `json:"dentro"`
+	Fase             string  `json:"fase"` // fuera | dentro | agarrando
+	ManosArmadas     int     `json:"manos_armadas,omitempty"`
+	Arrastre         string  `json:"arrastre,omitempty"`
+	Zoom             string  `json:"zoom,omitempty"`
+	ModoEntrada      string  `json:"modo_entrada"` // tactil | respaldo
+	AvisoEntrada     string  `json:"aviso_entrada,omitempty"`
+	AvisoCalibracion string  `json:"aviso_calibracion,omitempty"`
+	X                float64 `json:"x,omitempty"`
+	Y                float64 `json:"y,omitempty"`
+	Error            string  `json:"error,omitempty"`
 }
 
 // Panel toma las muestras de la mano, guía la calibración, mueve el puntero
@@ -57,35 +58,38 @@ type Panel struct {
 	// Acciones ejecuta el zoom de respaldo (Ctrl+ más/menos). Es opcional.
 	Acciones platform.TactileActions
 
-	calibracion gestures.CalibracionPanel
-	calibrado   bool
-	calibrando  bool
-	paso        int
-	primera     gestures.MuestraPanel
-	muestras    []gestures.MuestraPanel
-	filtro      gestures.FiltroOneEuroPanel
-	embrague    *gestures.MedidorEmbrague
-	dentro      bool
-	fase        gestures.FaseEmbrague
-	armadas     int
-	arrastre    string
-	zoom        string
-	presionado  bool
-	tactilListo bool
-	avisoTactil string
-	traductor   *gestures.TraductorToques
-	filtrosDedo [2]gestures.FiltroOneEuroPanel
-	dedosAbajo  [2]bool
-	ultimaDedo  [2]gestures.PuntoPanel
-	x, y        float64
-	err         string
+	calibracion      gestures.CalibracionPanel
+	calibrado        bool
+	calibrando       bool
+	paso             int
+	primera          gestures.MuestraPanel
+	muestras         []gestures.MuestraPanel
+	aspecto          float64
+	avisoCalibracion string
+	filtro           gestures.FiltroOneEuroPanel
+	mapeadores       map[gestures.ClaveMano]*gestures.MapeadorPanel
+	embrague         *gestures.MedidorEmbrague
+	dentro           bool
+	fase             gestures.FaseEmbrague
+	armadas          int
+	arrastre         string
+	zoom             string
+	presionado       bool
+	tactilListo      bool
+	avisoTactil      string
+	traductor        *gestures.TraductorToques
+	filtrosDedo      [2]gestures.FiltroOneEuroPanel
+	dedosAbajo       [2]bool
+	ultimaDedo       [2]gestures.PuntoPanel
+	x, y             float64
+	err              string
 }
 
 // NuevoPanel carga la calibración anterior. Si el archivo está dañado,
 // devuelve un panel utilizable (sin calibrar) junto con el error para que la
 // app lo muestre y permita repetirla.
 func NuevoPanel(ruta string, puntero platform.AbsolutePointer) (*Panel, error) {
-	p := &Panel{Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques()}
+	p := &Panel{Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques(), mapeadores: map[gestures.ClaveMano]*gestures.MapeadorPanel{}}
 	for i := range p.filtrosDedo {
 		p.filtrosDedo[i] = gestures.NuevoFiltroOneEuroPanel()
 	}
@@ -155,7 +159,9 @@ func (p *Panel) EmpezarCalibracion() {
 	p.fase = gestures.EmbragueFuera
 	p.armadas = 0
 	p.err = ""
+	p.avisoCalibracion = ""
 	p.filtro.Reiniciar()
+	p.mapeadores = map[gestures.ClaveMano]*gestures.MapeadorPanel{}
 	p.embrague = nil
 }
 
@@ -201,6 +207,7 @@ func (p *Panel) CapturarEsquina() error {
 	}
 	if p.paso == 1 {
 		p.primera, p.paso, p.muestras, p.err = m, 2, nil, ""
+		p.avisoCalibracion = avisoEsquinaCercaDelBorde("La esquina superior izquierda", m, p.aspecto)
 		return nil
 	}
 	c, err := gestures.NuevaCalibracionPanel(p.primera, m)
@@ -214,9 +221,27 @@ func (p *Panel) CapturarEsquina() error {
 	}
 	p.calibracion, p.calibrado = c, true
 	p.embrague = gestures.NuevoMedidorEmbrague(c)
+	if aviso := avisoEsquinaCercaDelBorde("La esquina inferior derecha", m, p.aspecto); aviso != "" {
+		if p.avisoCalibracion != "" {
+			p.avisoCalibracion += " "
+		}
+		p.avisoCalibracion += aviso
+	}
 	p.calibrando, p.paso, p.muestras, p.err = false, 0, nil, ""
 	p.filtro.Reiniciar()
+	p.mapeadores = map[gestures.ClaveMano]*gestures.MapeadorPanel{}
 	return nil
+}
+
+func avisoEsquinaCercaDelBorde(nombre string, m gestures.MuestraPanel, aspecto float64) string {
+	if aspecto <= 0 {
+		return ""
+	}
+	x, y := m.X/aspecto+.5, m.Y+.5
+	if x < .1 || x > .9 || y < .1 || y > .9 {
+		return nombre + " está a menos del 10 % del borde de la imagen; la mano puede cortarse y perderse. Recalibra un poco más hacia el centro."
+	}
+	return ""
 }
 
 func (p *Panel) observarMuestra(m gestures.MuestraPanel, tMs int64, mover bool) {
@@ -268,13 +293,28 @@ func (p *Panel) Filtrar(c gestures.Cuadro) (gestures.Cuadro, int) {
 	}
 	filtrado := c
 	filtrado.Manos = make([]gestures.Mano, 0, len(c.Manos))
+	vistos := map[bool]int{}
+	presentes := map[gestures.ClaveMano]bool{}
 	for _, mano := range c.Manos {
+		clave := gestures.ClaveMano{Derecha: mano.Derecha, N: vistos[mano.Derecha]}
+		vistos[mano.Derecha]++
+		presentes[clave] = true
 		muestra, ok := gestures.MuestraPanelDe(mano, c.Aspecto)
 		if ok {
-			_, ok = p.calibracion.Mapear(muestra)
+			mapa := p.mapeadores[clave]
+			if mapa == nil {
+				mapa = gestures.NuevoMapeadorPanel(p.calibracion)
+				p.mapeadores[clave] = mapa
+			}
+			_, ok = mapa.Mapear(muestra)
 		}
 		if ok {
 			filtrado.Manos = append(filtrado.Manos, mano)
+		}
+	}
+	for clave := range p.mapeadores {
+		if !presentes[clave] {
+			delete(p.mapeadores, clave)
 		}
 	}
 	return filtrado, len(c.Manos) - len(filtrado.Manos)
@@ -287,6 +327,7 @@ func (p *Panel) Cuadro(c gestures.Cuadro, mover bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.calibrando {
+		p.aspecto = float64(c.Aspecto)
 		if len(c.Manos) == 0 {
 			p.muestras = nil
 			return
@@ -546,7 +587,7 @@ func (p *Panel) Estado() EstadoPanel {
 	e := EstadoPanel{Calibrado: p.calibrado, Calibrando: p.calibrando, Paso: p.paso,
 		Dentro: p.dentro, Fase: string(fase), ManosArmadas: p.armadas,
 		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err,
-		ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil}
+		ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil, AvisoCalibracion: p.avisoCalibracion}
 	if p.tactilListo {
 		e.ModoEntrada = "tactil"
 	}

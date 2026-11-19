@@ -127,6 +127,8 @@ type estadoManoEmbrague struct {
 	armada        bool // el pellizco empezó dentro del panel
 	inicio        PuntoPanel
 	ultima        PuntoPanel
+	inicioGesto   PuntoPanel
+	ultimaGesto   PuntoPanel
 	tienePos      bool
 	abiertos      int
 	ultimoCerrado int64
@@ -148,6 +150,7 @@ type MedidorEmbrague struct {
 
 	pellizco *MedidorPellizco
 	manos    map[ClaveMano]*estadoManoEmbrague
+	panel    map[ClaveMano]*MapeadorPanel
 	zoom     estadoZoom
 }
 
@@ -165,15 +168,18 @@ func NuevoMedidorEmbragueCon(c CalibracionPanel, aj AjustesEmbrague) *MedidorEmb
 		Ajustes:     aj,
 		pellizco:    NuevoMedidorPellizco(aj.Pellizco),
 		manos:       map[ClaveMano]*estadoManoEmbrague{},
+		panel:       map[ClaveMano]*MapeadorPanel{},
 	}
 }
 
 type manoMedida struct {
-	clave  ClaveMano
-	estado EstadoPellizco
-	pos    PuntoPanel
-	dentro bool
-	ok     bool
+	clave      ClaveMano
+	estado     EstadoPellizco
+	pos        PuntoPanel
+	gesto      PuntoPanel
+	dentro     bool
+	dentroReal bool
+	ok         bool
 }
 
 // Cuadro avanza el embrague con las manos de un cuadro. Devuelve la fase y
@@ -190,7 +196,13 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 		presentes[clave] = true
 		md := manoMedida{clave: clave, estado: estados[i]}
 		if muestra, ok := MuestraPanelDe(mano, c.Aspecto); ok {
-			md.pos, md.dentro = m.Calibracion.Mapear(muestra)
+			mapa := m.panel[clave]
+			if mapa == nil {
+				mapa = NuevoMapeadorPanel(m.Calibracion)
+				m.panel[clave] = mapa
+			}
+			md.pos, md.gesto, md.dentro = mapa.mapear(muestra)
+			_, md.dentroReal = m.Calibracion.Mapear(muestra)
 			md.ok = true
 		}
 		medidas[i] = md
@@ -207,6 +219,7 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 	// botón se suelta para que no quede pulsado.
 	for clave, est := range m.manos {
 		if !presentes[clave] {
+			delete(m.panel, clave)
 			if soltada := m.abrir(est, c.TMs); soltada != nil {
 				soltadas = append(soltadas, soltada)
 			}
@@ -263,10 +276,12 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 			est.cerrada = true
 			est.abiertos = 0
 			if !est.armada {
-				if md.dentro {
+				if md.dentroReal {
 					est.armada = true
 					est.inicio = md.pos
 					est.ultima = md.pos
+					est.inicioGesto = md.gesto
+					est.ultimaGesto = md.gesto
 					est.tienePos = true
 					est.sinArrastre = false
 				}
@@ -274,6 +289,7 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 		}
 		if est.armada && md.ok {
 			est.ultima = md.pos
+			est.ultimaGesto = md.gesto
 			est.tienePos = true
 		}
 		est.ultimoCerrado = t
@@ -332,6 +348,7 @@ func (m *MedidorEmbrague) resolverZoom(armadas []*estadoManoEmbrague, soltadas [
 		for _, est := range armadas {
 			est.sinArrastre = false
 			est.inicio = est.ultima
+			est.inicioGesto = est.ultimaGesto
 		}
 		for _, est := range soltadas {
 			if est.clave == involucradas[0] || est.clave == involucradas[1] {
@@ -373,7 +390,7 @@ func separacion(claves [2]ClaveMano, manos map[ClaveMano]*estadoManoEmbrague) (f
 	if a == nil || b == nil || !a.tienePos || !b.tienePos {
 		return 0, false
 	}
-	return math.Hypot(b.ultima.X-a.ultima.X, b.ultima.Y-a.ultima.Y), true
+	return math.Hypot(b.ultimaGesto.X-a.ultimaGesto.X, b.ultimaGesto.Y-a.ultimaGesto.Y), true
 }
 
 // arrastreDe clasifica el desplazamiento agarrado de una mano soltada.
@@ -381,8 +398,8 @@ func (m *MedidorEmbrague) arrastreDe(est *estadoManoEmbrague) *Arrastre {
 	if !est.tienePos {
 		return nil
 	}
-	dx := est.ultima.X - est.inicio.X
-	dy := est.ultima.Y - est.inicio.Y
+	dx := est.ultimaGesto.X - est.inicioGesto.X
+	dy := est.ultimaGesto.Y - est.inicioGesto.Y
 	d := math.Hypot(dx, dy)
 	if d < m.Ajustes.DistanciaMinima {
 		return nil
@@ -442,5 +459,6 @@ func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*es
 func (m *MedidorEmbrague) Parar() {
 	m.pellizco = NuevoMedidorPellizco(m.Ajustes.Pellizco)
 	m.manos = map[ClaveMano]*estadoManoEmbrague{}
+	m.panel = map[ClaveMano]*MapeadorPanel{}
 	m.zoom = estadoZoom{}
 }

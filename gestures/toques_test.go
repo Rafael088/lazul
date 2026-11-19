@@ -258,10 +258,11 @@ func TestEmbraguePublicaCadaManoArmada(t *testing.T) {
 	if m.Clave != izq(0) {
 		t.Fatalf("clave %v, quiere %v", m.Clave, izq(0))
 	}
-	// El panel de prueba es [-1,1]² y la posición de la mano va de -1 a 1:
-	// -0,5 y 0,2 quedan en 0,25 y 0,6 del panel.
-	if math.Abs(m.X-0.25) > 1e-6 || math.Abs(m.Y-0.6) > 1e-6 {
-		t.Fatalf("posición (%v,%v), quiere (0.25,0.6)", m.X, m.Y)
+	// El 90 % central cubre toda la pantalla: 0,25 y 0,6 geométricos se
+	// publican con la ganancia de bordes.
+	quiereX, quiereY := (0.25-0.05)/0.90, (0.6-0.05)/0.90
+	if math.Abs(m.X-quiereX) > 1e-6 || math.Abs(m.Y-quiereY) > 1e-6 {
+		t.Fatalf("posición (%v,%v), quiere (%v,%v)", m.X, m.Y, quiereX, quiereY)
 	}
 	if r.TMs != 3*67 {
 		t.Fatalf("TMs %d, quiere %d", r.TMs, 3*67)

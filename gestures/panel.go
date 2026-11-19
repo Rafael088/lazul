@@ -33,6 +33,13 @@ type CalibracionPanel struct {
 
 const (
 	versionCalibracionPanel = 1
+	// BandaExteriorPanel permite terminar un movimiento aunque el centro de
+	// la palma rebase el rectángulo. Para volver a entrar sí se exige cruzar
+	// el borde real: la diferencia evita parpadeos justo en el límite.
+	BandaExteriorPanel = 0.15
+	// MargenGananciaPanel hace que el 90 % central del panel recorra toda la
+	// pantalla. Así no hace falta llevar la palma hasta el borde calibrado.
+	MargenGananciaPanel = 0.05
 	// La mano puede variar un 35 % de tamaño respecto al plano calibrado. Es
 	// bastante para el ruido y el gesto, pero rechaza una mano claramente por
 	// delante o por detrás del rectángulo imaginario.
@@ -101,26 +108,71 @@ func (c CalibracionPanel) Valida() error {
 	return err
 }
 
-// Mapear transforma una muestra en coordenadas de pantalla. dentro solo es
-// true si la mano cae en el rectángulo y su tamaño aparente coincide con la
-// profundidad del plano calibrado.
-func (c CalibracionPanel) Mapear(m MuestraPanel) (p PuntoPanel, dentro bool) {
+// mapearCrudo devuelve la posición geométrica dentro del panel antes de la
+// ganancia de bordes y si coincide con la profundidad del plano calibrado.
+func (c CalibracionPanel) mapearCrudo(m MuestraPanel) (p PuntoPanel, profundidad bool) {
 	if c.Valida() != nil || !muestraPanelValida(m) {
 		return PuntoPanel{}, false
 	}
 	a, b, q := proyectarPanel(c.SuperiorIzquierda), proyectarPanel(c.InferiorDerecha), proyectarPanel(m)
 	p.X = (q.X - a.X) / (b.X - a.X)
 	p.Y = (q.Y - a.Y) / (b.Y - a.Y)
-	if p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1 {
-		return p, false
-	}
-	avance := (p.X + p.Y) / 2
+	avance := (acotar01(p.X) + acotar01(p.Y)) / 2
 	esperado := c.SuperiorIzquierda.Tamano + avance*(c.InferiorDerecha.Tamano-c.SuperiorIzquierda.Tamano)
 	if esperado <= 0 || math.Abs(m.Tamano/esperado-1) > toleranciaProfundidadPanel {
 		return p, false
 	}
 	return p, true
 }
+
+func ganarBordes(p PuntoPanel) PuntoPanel {
+	escala := 1 - 2*MargenGananciaPanel
+	return PuntoPanel{
+		X: acotar01((p.X - MargenGananciaPanel) / escala),
+		Y: acotar01((p.Y - MargenGananciaPanel) / escala),
+	}
+}
+
+func enRectangulo(p PuntoPanel, margen float64) bool {
+	return p.X >= -margen && p.X <= 1+margen && p.Y >= -margen && p.Y <= 1+margen
+}
+
+// Mapear transforma una muestra en coordenadas de pantalla. Es la variante
+// sin memoria: exige el borde real. Para recorridos cuadro a cuadro se usa
+// MapeadorPanel, que añade la banda exterior con histéresis.
+func (c CalibracionPanel) Mapear(m MuestraPanel) (PuntoPanel, bool) {
+	p, profundidad := c.mapearCrudo(m)
+	return ganarBordes(p), profundidad && enRectangulo(p, 0)
+}
+
+// MapeadorPanel conserva si una mano ya entró al panel. Una mano nueva entra
+// solo por el rectángulo real; una que ya estaba dentro sigue contando en la
+// banda exterior. La posición devuelta siempre está acotada a la pantalla.
+type MapeadorPanel struct {
+	Calibracion CalibracionPanel
+	dentro      bool
+}
+
+func NuevoMapeadorPanel(c CalibracionPanel) *MapeadorPanel {
+	return &MapeadorPanel{Calibracion: c}
+}
+
+func (m *MapeadorPanel) Mapear(muestra MuestraPanel) (PuntoPanel, bool) {
+	pantalla, _, dentro := m.mapear(muestra)
+	return pantalla, dentro
+}
+
+func (m *MapeadorPanel) mapear(muestra MuestraPanel) (pantalla, cruda PuntoPanel, dentro bool) {
+	p, profundidad := m.Calibracion.mapearCrudo(muestra)
+	limite := 0.0
+	if m.dentro {
+		limite = BandaExteriorPanel
+	}
+	m.dentro = profundidad && enRectangulo(p, limite)
+	return ganarBordes(p), p, m.dentro
+}
+
+func (m *MapeadorPanel) Reiniciar() { m.dentro = false }
 
 // AjustesOneEuro equilibran quietud y respuesta: a poca velocidad domina
 // MinCutoff; al mover de verdad, Beta eleva el corte y reduce el retraso.
@@ -183,7 +235,19 @@ func (f *FiltroOneEuroPanel) Filtrar(tMs int64, p PuntoPanel) PuntoPanel {
 		a = AjustesOneEuroPorDefecto
 	}
 	t := float64(tMs) / 1000
-	return PuntoPanel{X: f.x.filtrar(t, p.X, a), Y: f.y.filtrar(t, p.Y, a)}
+	x, y := f.x.filtrar(t, p.X, a), f.y.filtrar(t, p.Y, a)
+	// Los extremos son objetivos absolutos, no muestras que deban quedarse
+	// cortas por la inercia del filtro. También se actualiza su estado para
+	// que el siguiente cuadro parta del borde alcanzado.
+	if p.X <= 0 || p.X >= 1 {
+		x = acotar01(p.X)
+		f.x.filtrado = x
+	}
+	if p.Y <= 0 || p.Y >= 1 {
+		y = acotar01(p.Y)
+		f.y.filtrado = y
+	}
+	return PuntoPanel{X: acotar01(x), Y: acotar01(y)}
 }
 
 func (f *FiltroOneEuroPanel) Reiniciar() { *f = NuevoFiltroOneEuroPanel() }
@@ -195,8 +259,10 @@ type DiagnosticoPanel struct {
 	// Rectángulo del panel en la imagen a la escala de la mano actual: el
 	// panel se mide en palmas, así que crece al acercar la mano.
 	X0, Y0, X1, Y1 float64
-	ManoX, ManoY   float64
-	Dentro         bool
+	// BX0..BY1 es la banda exterior de permanencia a la misma escala.
+	BX0, BY0, BX1, BY1 float64
+	ManoX, ManoY       float64
+	Dentro             bool
 	// Motivo: dentro, fuera_borde, cerca o lejos.
 	Motivo string
 	// Profundidad es el tamaño de la palma contra el esperado en el plano
@@ -225,6 +291,10 @@ func (c CalibracionPanel) Diagnosticar(m MuestraPanel, aspecto float64) (Diagnos
 		X1: b.X*m.Tamano/aspecto + .5, Y1: b.Y*m.Tamano + .5,
 		ManoX: m.X/aspecto + .5, ManoY: m.Y + .5,
 	}
+	d.BX0 = d.X0 - BandaExteriorPanel*(d.X1-d.X0)
+	d.BY0 = d.Y0 - BandaExteriorPanel*(d.Y1-d.Y0)
+	d.BX1 = d.X1 + BandaExteriorPanel*(d.X1-d.X0)
+	d.BY1 = d.Y1 + BandaExteriorPanel*(d.Y1-d.Y0)
 	p := PuntoPanel{X: (q.X - a.X) / (b.X - a.X), Y: (q.Y - a.Y) / (b.Y - a.Y)}
 	avance := (acotar01(p.X) + acotar01(p.Y)) / 2
 	esperado := c.SuperiorIzquierda.Tamano + avance*(c.InferiorDerecha.Tamano-c.SuperiorIzquierda.Tamano)

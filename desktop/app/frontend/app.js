@@ -87,8 +87,8 @@ function pintar(manos, cuerpo) {
   }
 }
 
-// Panel sobre la cámara: punteado = como se calibró; sólido = el panel a la
-// escala de cada mano (verde si cuenta, naranja si no) y el motivo.
+// Panel sobre la cámara: punteado = como se calibró; trazo fino = banda
+// exterior de permanencia; sólido = panel a la escala de cada mano.
 const MOTIVOS = { dentro: "dentro", fuera_borde: "fuera del borde", cerca: "muy cerca", lejos: "muy lejos" };
 function pintarPanel(pc) {
   if (!pc) return;
@@ -100,6 +100,9 @@ function pintarPanel(pc) {
   c.setLineDash([]);
   for (const m of pc.manos || []) {
     const color = m.Dentro ? "#4fd18b" : "#ff9f43";
+		c.strokeStyle = "rgba(255,204,77,.8)"; c.lineWidth = 2; c.setLineDash([5, 5]);
+		c.strokeRect(Math.min(m.BX0, m.BX1) * W, Math.min(m.BY0, m.BY1) * H, Math.abs(m.BX1 - m.BX0) * W, Math.abs(m.BY1 - m.BY0) * H);
+		c.setLineDash([]);
     c.strokeStyle = color; c.lineWidth = 3;
     c.strokeRect(Math.min(m.X0, m.X1) * W, Math.min(m.Y0, m.Y1) * H, Math.abs(m.X1 - m.X0) * W, Math.abs(m.Y1 - m.Y0) * H);
     c.fillStyle = color;
@@ -282,7 +285,7 @@ function pintarEstado(e) {
 	panelUltimo = panel;
 	mostrarIndicador(e.indicador);
 	texto("panelentrada", panel.modo_entrada === "tactil" ? "Entrada: pantalla táctil virtual" : "Entrada: respaldo de ratón y teclado");
-	texto("panelaviso", panel.aviso_entrada || "");
+	texto("panelaviso", [panel.aviso_entrada, panel.aviso_calibracion].filter(Boolean).join(" "));
   texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas para crear el panel delante de ti.");
   texto("panelerror", panel.error || "");
   texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 2` :
