@@ -2,8 +2,9 @@
 id: dec-0j4m
 fecha: 2026-11-19
 temas: [negocio, licencia, privacidad, multidispositivo]
-estado: propuesta
+estado: aceptada
 autor: agente (decidido por el dueño, 19-nov)
+aceptada_el: 2026-11-19
 ---
 # Open core: el táctil completo es gratis; se cobra el servicio multidispositivo
 

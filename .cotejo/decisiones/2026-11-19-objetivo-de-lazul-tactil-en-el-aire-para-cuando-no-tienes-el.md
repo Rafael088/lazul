@@ -2,8 +2,9 @@
 id: dec-uaex
 fecha: 2026-11-19
 temas: [objetivo, modo-tactil, marca, criterios]
-estado: propuesta
+estado: aceptada
 autor: agente (acordado con el dueño, 19-nov)
+aceptada_el: 2026-11-19
 ---
 # Objetivo de Lazul: táctil en el aire para cuando no tienes el ratón a mano
 
