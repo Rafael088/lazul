@@ -252,6 +252,15 @@ func (f *FiltroOneEuroPanel) Filtrar(tMs int64, p PuntoPanel) PuntoPanel {
 
 func (f *FiltroOneEuroPanel) Reiniciar() { *f = NuevoFiltroOneEuroPanel() }
 
+// Motivos del diagnóstico del panel: por qué una mano cuenta o no. Se usan
+// tal cual en la vista de cámara y en el registro de la app.
+const (
+	PanelDentro     = "dentro"      // cuenta: está en el rectángulo y a la distancia calibrada
+	PanelFueraBorde = "fuera_borde" // no cuenta: la palma rebasó el rectángulo
+	PanelCerca      = "cerca"       // no cuenta: la palma está más grande que en el plano calibrado
+	PanelLejos      = "lejos"       // no cuenta: la palma está más pequeña que en el plano calibrado
+)
+
 // DiagnosticoPanel explica, para la vista de cámara, dónde está el panel y
 // por qué una mano cuenta o no. Las coordenadas X0..Y1 y ManoX/ManoY están en
 // la imagen (0..1, sin espejar) para dibujarlas sobre el cuadro.
@@ -263,7 +272,7 @@ type DiagnosticoPanel struct {
 	BX0, BY0, BX1, BY1 float64
 	ManoX, ManoY       float64
 	Dentro             bool
-	// Motivo: dentro, fuera_borde, cerca o lejos.
+	// Motivo: PanelDentro, PanelFueraBorde, PanelCerca o PanelLejos.
 	Motivo string
 	// Profundidad es el tamaño de la palma contra el esperado en el plano
 	// calibrado: 1 es la misma distancia; cuenta entre 0,65 y 1,35.
@@ -304,13 +313,13 @@ func (c CalibracionPanel) Diagnosticar(m MuestraPanel, aspecto float64) (Diagnos
 	_, d.Dentro = c.Mapear(m)
 	switch {
 	case d.Dentro:
-		d.Motivo = "dentro"
+		d.Motivo = PanelDentro
 	case p.X < 0 || p.X > 1 || p.Y < 0 || p.Y > 1:
-		d.Motivo = "fuera_borde"
+		d.Motivo = PanelFueraBorde
 	case d.Profundidad > 1+toleranciaProfundidadPanel:
-		d.Motivo = "cerca"
+		d.Motivo = PanelCerca
 	default:
-		d.Motivo = "lejos"
+		d.Motivo = PanelLejos
 	}
 	return d, true
 }

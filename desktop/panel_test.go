@@ -343,14 +343,14 @@ func TestPanelFiltraManosFueraDelRectanguloCalibrado(t *testing.T) {
 	p, _ := NuevoPanel(ruta, &punteroPanelPrueba{})
 	cuadro := cuadroPanelPrueba(0, manoPanelPrueba(0, 0, .2, false), manoPanelPrueba(1.5, 0, .2, false))
 	filtrado, rechazadas := p.Filtrar(cuadro)
-	if len(filtrado.Manos) != 1 || rechazadas != 1 {
-		t.Fatalf("manos dentro %d, rechazadas %d", len(filtrado.Manos), rechazadas)
+	if len(filtrado.Manos) != 1 || rechazadas.Total != 1 || rechazadas.PorMotivo[MotivoFueraBorde] != 1 {
+		t.Fatalf("manos dentro %d, rechazadas %+v", len(filtrado.Manos), rechazadas)
 	}
 
 	p.EmpezarCalibracion()
 	filtrado, rechazadas = p.Filtrar(cuadro)
-	if len(filtrado.Manos) != 2 || rechazadas != 0 {
-		t.Fatalf("durante calibración no debe filtrar: manos %d, rechazadas %d", len(filtrado.Manos), rechazadas)
+	if len(filtrado.Manos) != 2 || rechazadas.Total != 0 {
+		t.Fatalf("durante calibración no debe filtrar: manos %d, rechazadas %+v", len(filtrado.Manos), rechazadas)
 	}
 }
 
@@ -376,11 +376,57 @@ func TestPanelFiltraConLaMismaBandaDeHisteresis(t *testing.T) {
 	for i, caso := range casos {
 		t.Run(caso.nombre, func(t *testing.T) {
 			filtrado, rechazadas := p.Filtrar(cuadroPanelPrueba(int64(i), manoPanelPrueba(caso.x, 0, .2, false)))
-			pasa := len(filtrado.Manos) == 1 && rechazadas == 0
+			pasa := len(filtrado.Manos) == 1 && rechazadas.Total == 0
 			if pasa != caso.pasa {
-				t.Fatalf("x %.2f: pasa %v, rechazadas %d; quería pasa %v", caso.x, pasa, rechazadas, caso.pasa)
+				t.Fatalf("x %.2f: pasa %v, rechazadas %+v; quería pasa %v", caso.x, pasa, rechazadas, caso.pasa)
 			}
 		})
+	}
+}
+
+func TestPanelDicePorQueDejoFueraCadaMano(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	c, _ := gestures.NuevaCalibracionPanel(muestraPanelPrueba(-1, -1, .2), muestraPanelPrueba(1, 1, .2))
+	if err := GuardarCalibracionPanel(ruta, c); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := NuevoPanel(ruta, &punteroPanelPrueba{})
+	cuadro := cuadroPanelPrueba(0,
+		manoPanelPrueba(0, 0, .2, false),   // dentro
+		manoPanelPrueba(1.5, 0, .2, false), // rebasó el borde
+		manoPanelPrueba(0, 0, .3, false),   // más grande que el plano: cerca
+		manoPanelPrueba(0, 0, .1, false),   // más pequeña que el plano: lejos
+		gestures.Mano{},                    // la palma no se puede medir
+	)
+	filtrado, rechazo := p.Filtrar(cuadro)
+	if len(filtrado.Manos) != 1 || rechazo.Total != 4 {
+		t.Fatalf("manos dentro %d, rechazadas %+v", len(filtrado.Manos), rechazo)
+	}
+	for _, motivo := range []string{MotivoFueraBorde, MotivoCerca, MotivoLejos, MotivoSinPalma} {
+		if rechazo.PorMotivo[motivo] != 1 {
+			t.Errorf("%s: %d, quería 1 (motivos %v)", motivo, rechazo.PorMotivo[motivo], rechazo.PorMotivo)
+		}
+	}
+}
+
+// Una mano que sigue en la banda exterior no salió: no debe contarse como
+// rechazada ni llevar motivo.
+func TestPanelNoAnotaMotivoMientrasLaManoSigueEnLaBanda(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	c, _ := gestures.NuevaCalibracionPanel(muestraPanelPrueba(-1, -1, .2), muestraPanelPrueba(1, 1, .2))
+	if err := GuardarCalibracionPanel(ruta, c); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := NuevoPanel(ruta, &punteroPanelPrueba{})
+	for i, x := range []float64{.9, 1.1, 1.2} {
+		filtrado, rechazo := p.Filtrar(cuadroPanelPrueba(int64(i), manoPanelPrueba(x, 0, .2, false)))
+		if len(filtrado.Manos) != 1 || rechazo.Total != 0 || len(rechazo.PorMotivo) != 0 {
+			t.Fatalf("x %.2f: manos %d, rechazadas %+v", x, len(filtrado.Manos), rechazo)
+		}
+	}
+	filtrado, rechazo := p.Filtrar(cuadroPanelPrueba(4, manoPanelPrueba(1.4, 0, .2, false)))
+	if len(filtrado.Manos) != 0 || rechazo.Total != 1 || rechazo.PorMotivo[MotivoFueraBorde] != 1 {
+		t.Fatalf("al salir de la banda: manos %d, rechazadas %+v", len(filtrado.Manos), rechazo)
 	}
 }
 
@@ -439,7 +485,7 @@ func TestPanelSinCalibrarNoDejaPasarManos(t *testing.T) {
 	p, _ := NuevoPanel(filepath.Join(t.TempDir(), NombreCalibracionPanel), &punteroPanelPrueba{})
 	cuadro := cuadroPanelPrueba(0, manoPanelPrueba(0, 0, .2, false))
 	filtrado, rechazadas := p.Filtrar(cuadro)
-	if len(filtrado.Manos) != 0 || rechazadas != 1 {
-		t.Fatalf("sin calibrar: manos %d, rechazadas %d", len(filtrado.Manos), rechazadas)
+	if len(filtrado.Manos) != 0 || rechazadas.Total != 1 || rechazadas.PorMotivo[MotivoSinPanel] != 1 {
+		t.Fatalf("sin calibrar: manos %d, rechazadas %+v", len(filtrado.Manos), rechazadas)
 	}
 }

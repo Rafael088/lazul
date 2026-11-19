@@ -36,6 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -255,7 +256,7 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 		}
 	}
 	if a.panel != nil {
-		var fueraPanel int
+		var fueraPanel desktop.RechazoPanel
 		cuadroPanel := filtrado
 		// Calibrando, la mano va cruda al asistente: las esquinas del panel
 		// pueden caer fuera del torso, y sentado frente al PC Pose no suele
@@ -267,8 +268,10 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 		}
 		cuadroPanel, fueraPanel = a.panel.Filtrar(cuadroPanel)
 		paraPanel = &cuadroPanel
-		if fueraPanel > 0 {
-			rechazos["fuera_panel"] = fueraPanel
+		// Una línea por motivo (borde, distancia o palma): así el registro
+		// dice por qué la mano quedó fuera y no solo que quedó fuera.
+		for motivo, n := range fueraPanel.PorMotivo {
+			rechazos[claveRechazo("fuera_panel", motivo)] = n
 		}
 		// El asistente necesita ver la mano que define las esquinas, pero esa
 		// mano todavía no está dentro de un panel válido y no llega al flujo
@@ -324,6 +327,16 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	return v
 }
 
+// claveRechazo: cómo se anota una mano que quedó fuera de la zona. Resultado
+// dice qué zona la dejó fuera y, cuando se sabe, Motivo dice por qué: en el
+// panel, fuera_borde, cerca, lejos, sin_palma o sin_panel.
+func claveRechazo(resultado, motivo string) string {
+	if motivo == "" {
+		return resultado
+	}
+	return resultado + ":" + motivo
+}
+
 // registrarEvitadas anota una sola línea al entrar en cada motivo de rechazo.
 // Mientras la mano siga fuera, los cuadros siguientes no inflan el contador.
 func (a *App) registrarEvitadas(rechazos map[string]int, ahora time.Time) {
@@ -334,22 +347,40 @@ func (a *App) registrarEvitadas(rechazos map[string]int, ahora time.Time) {
 	if a.evitadas == nil {
 		a.evitadas = map[string]int{}
 	}
-	var nuevas []string
-	for _, motivo := range []string{"sin_torso", "fuera_torso", "fuera_panel"} {
-		presente := rechazos[motivo] > 0
-		if presente && !a.rechazoActivo[motivo] {
-			a.evitadas[motivo]++
-			nuevas = append(nuevas, motivo)
+	presentes := map[string]bool{}
+	for clave, n := range rechazos {
+		if n > 0 {
+			presentes[clave] = true
 		}
-		a.rechazoActivo[motivo] = presente
+	}
+	claves := make([]string, 0, len(presentes)+len(a.rechazoActivo))
+	for clave := range presentes {
+		claves = append(claves, clave)
+	}
+	// Los motivos del cuadro anterior que ya no están también se apagan.
+	for clave := range a.rechazoActivo {
+		if !presentes[clave] {
+			claves = append(claves, clave)
+		}
+	}
+	sort.Strings(claves)
+	var nuevas []string
+	for _, clave := range claves {
+		if presentes[clave] && !a.rechazoActivo[clave] {
+			a.evitadas[clave]++
+			nuevas = append(nuevas, clave)
+		}
+		a.rechazoActivo[clave] = presentes[clave]
 	}
 	a.mu.Unlock()
 	if len(nuevas) == 0 {
 		return
 	}
 	sesion, prueba := a.flujo.Sesion(), a.flujo.EnPrueba()
-	for _, motivo := range nuevas {
-		a.reg.Anotar(desktop.Linea{T: ahora, Tipo: desktop.TipoEvitada, Sesion: sesion, Resultado: motivo, Prueba: prueba})
+	for _, clave := range nuevas {
+		resultado, motivo, _ := strings.Cut(clave, ":")
+		a.reg.Anotar(desktop.Linea{T: ahora, Tipo: desktop.TipoEvitada, Sesion: sesion,
+			Resultado: resultado, Motivo: motivo, Prueba: prueba})
 	}
 }
 

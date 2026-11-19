@@ -117,6 +117,31 @@ func TestResumenCuentaActivacionesEvitadasPorZona(t *testing.T) {
 	}
 }
 
+func TestResumenCuentaLasSalidasDelPanelPorMotivo(t *testing.T) {
+	ls := uso("a", 0, 35)
+	ls = append(ls,
+		Linea{T: en(6), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel", Motivo: MotivoFueraBorde},
+		Linea{T: en(7), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel", Motivo: MotivoFueraBorde},
+		Linea{T: en(8), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel", Motivo: MotivoCerca},
+		Linea{T: en(9), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel", Motivo: MotivoLejos},
+		Linea{T: en(9.5), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_panel"}, // sin motivo (registro anterior)
+		Linea{T: en(10), Tipo: TipoEvitada, Sesion: "a", Resultado: "fuera_torso"},
+	)
+	r := Resumir(ls)
+	if r.Evitadas != 6 || r.EvitadasPorMotivo["fuera_panel"] != 5 {
+		t.Fatalf("evitadas %+v", r)
+	}
+	for motivo, quiere := range map[string]int{MotivoFueraBorde: 2, MotivoCerca: 1, MotivoLejos: 1} {
+		if r.EvitadasPanelPorMotivo[motivo] != quiere {
+			t.Errorf("%s: %d, quería %d (%v)", motivo, r.EvitadasPanelPorMotivo[motivo], quiere, r.EvitadasPanelPorMotivo)
+		}
+	}
+	texto := r.Texto()
+	if !strings.Contains(texto, "Salidas del panel: cerca 1, fuera_borde 2, lejos 1") {
+		t.Fatalf("texto:\n%s", texto)
+	}
+}
+
 func TestResumenPromediaCostoDePose(t *testing.T) {
 	ls := uso("a", 0, 35)
 	ls = append(ls,

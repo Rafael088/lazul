@@ -64,9 +64,13 @@ type Linea struct {
 	// gesto ACTIVAR, su resultado, las acciones y la marca de la persona.
 	Activacion int    `json:"act,omitempty"`
 	Resultado  string `json:"resultado,omitempty"`
-	Que        string `json:"que,omitempty"`
-	Destino    string `json:"destino,omitempty"` // nombre del equipo (el que dio al emparejar)
-	Error      string `json:"error,omitempty"`
+	// Motivo: en una línea evitada con Resultado fuera_panel, por qué el
+	// panel dejó fuera la mano (fuera_borde, cerca, lejos, sin_palma o
+	// sin_panel). Nunca una posición.
+	Motivo  string `json:"motivo,omitempty"`
+	Que     string `json:"que,omitempty"`
+	Destino string `json:"destino,omitempty"` // nombre del equipo (el que dio al emparejar)
+	Error   string `json:"error,omitempty"`
 	// App: en el gesto 4, el id del catálogo de la app mandada o
 	// "fuera_del_catalogo". Nunca nombres, ejecutables, URL ni rutas.
 	App      string  `json:"app,omitempty"`
