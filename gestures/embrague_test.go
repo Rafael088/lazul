@@ -69,6 +69,30 @@ func TestEmbragueIgnoraPellizcoQueEmpiezaFuera(t *testing.T) {
 	}
 }
 
+func TestEmbragueArmadoUsaLaBandaDelPanel(t *testing.T) {
+	med := NuevoMedidorEmbrague(panelCuadrado(t))
+	casos := []struct {
+		nombre string
+		x      float64
+		dentro bool
+	}{
+		{"arma en el borde real", 1.00, true},
+		{"sigue dentro en la banda", 1.20, true},
+		{"sale después de la banda", 1.31, false},
+	}
+	for i, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			r := med.Cuadro(cuadroPanel(int64(i)*67, manoEnPanel(caso.x, 0, .2, true)))
+			if r.Dentro != caso.dentro {
+				t.Fatalf("x %.2f: dentro %v, quería %v", caso.x, r.Dentro, caso.dentro)
+			}
+			if r.Fase != EmbragueAgarrando || r.ManosArmadas != 1 {
+				t.Fatalf("el pellizco armado se perdió antes de la histéresis de soltar: %+v", r)
+			}
+		})
+	}
+}
+
 func TestEmbragueArrastraYClasificaLaDireccion(t *testing.T) {
 	casos := []struct {
 		nombre    string
@@ -304,7 +328,9 @@ func direccionCruda(g Grabacion, cal CalibracionPanel) (DireccionArrastre, float
 			if !ok {
 				continue
 			}
-			p, _ := cal.Mapear(mu)
+			// La línea base mide el movimiento físico, antes de la ganancia y
+			// saturación de bordes que usa el puntero de pantalla.
+			p, _ := cal.mapearCrudo(mu)
 			if !r.hay {
 				r.primero, r.hay = p, true
 			}
