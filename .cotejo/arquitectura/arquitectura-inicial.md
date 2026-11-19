@@ -1,7 +1,7 @@
 ---
 id: arq-mgew
 temas: [arquitectura]
-actualizado: 2026-11-18
+actualizado: 2026-11-19
 ---
 # Arquitectura inicial
 
@@ -24,6 +24,6 @@ Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dí
 
 ## Cómo se abre
 
-- comando: `./dev app`
-- url:
-- qué esperar: abre un indicador pequeño (236 × 64) en la esquina inferior derecha que dice «activo» o «inactivo», y un halo sobre la pantalla sigue la mano solo cuando está delante del torso y dentro del panel calibrado: nada fuera, suave dentro y encendido al agarrar. En Linux la L alterna el modo táctil y los gestos controlan scroll, zoom y diapositivas en la ventana con foco; en Windows conserva el modo de transferencia. La cámara queda encendida aunque su vista esté apagada y la app escucha en el puerto 53317; si se esconde la ventana, la cámara se detiene. El botón de cámara del indicador o `Ctrl+Mayús+C` abre la vista con el torso permitido en verde, fps, CPU, costo de Hand + Pose y activaciones evitadas. Para el otro PC Windows: `./dev app win` desde este Linux.
+- comando: `./dev pista`
+- url: `pista/index.html`
+- qué esperar: una pista de pantalla completa con 14 blancos de distintos tamaños y tipos, incluidos los cuatro bordes y las cuatro esquinas; después aparece una zona de reposo y, al terminar, un resumen que se descarga como JSON sin datos de cámara.

@@ -8,6 +8,7 @@
 #   ./dev sim [-receptores N] [-mdns]  controlador y N receptores: descubrir, emparejar, rechazar
 #   ./dev replay [-v] [-barrer|-tactil|-toques]  mide los clasificadores con grabaciones
 #   ./dev grabar [-dir D]    página local para grabar gestos con la cámara
+#   ./dev pista              abre la pista local de precisión y toques falsos
 #   ./dev gen                regenera los tipos de Go y TS desde proto/
 #   ./dev win test|contrato|check   lo mismo en el PC Windows por `ssh win`
 #   ./dev e2e win|linux [args]  de punta a punta entre este Linux y el PC Windows
@@ -20,6 +21,8 @@ set -uo pipefail
 cd "$(dirname "$0")"
 RAIZ=$PWD
 mkdir -p .dev
+: "${GOCACHE:=$RAIZ/.dev/go-cache}"
+export GOCACHE
 MOD=github.com/Rafael088/lazul
 
 # paso NOMBRE comando...: corre en silencio; "ok" o el resumen del error.
@@ -106,6 +109,10 @@ ts_check() {
 	(cd proto/ts && { [ -d node_modules ] || npm ci --silent --no-audit --no-fund; } && npx --no-install tsc --noEmit -p . && node --no-warnings --test --test-reporter=dot prueba.test.ts)
 }
 
+pista_check() {
+	node --check pista/pista.mjs && node --test pista/pista.test.mjs
+}
+
 cmd_check() {
 	local fallo=0
 	paso formato fmt_check || fallo=1
@@ -113,6 +120,11 @@ cmd_check() {
 	paso compilar go build ./... || fallo=1
 	paso apps go test ./core/apps -run TestCatalogoIncluido || fallo=1
 	paso pruebas go_test ./... || fallo=1
+	if command -v node >/dev/null; then
+		paso pista pista_check || fallo=1
+	else
+		echo "omitido pista      (falta node)"
+	fi
 	if hay_protoc && [ "$(go env GOOS)" != windows ]; then
 		paso proto proto_al_dia || fallo=1
 	else
@@ -187,6 +199,18 @@ cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; sed 's
 
 # grabar no es un paso: queda corriendo hasta Ctrl+C.
 cmd_grabar() { go run ./gestures/cmd/grabar "$@"; }
+
+cmd_pista() {
+	local pagina="$RAIZ/pista/index.html" sistema winpagina
+	sistema=$(uname -s)
+	case $sistema in
+	Linux*) command -v xdg-open >/dev/null || { echo "falta xdg-open"; return 1; }; nohup xdg-open "$pagina" >/dev/null 2>&1 & ;;
+	MINGW* | MSYS* | CYGWIN*) command -v cygpath >/dev/null || { echo "falta cygpath"; return 1; }; winpagina=$(cygpath -w "$pagina"); cmd.exe //d //c start "" "$winpagina" ;;
+	Darwin*) open "$pagina" ;;
+	*) echo "no sé abrir el navegador en $sistema"; return 1 ;;
+	esac
+	echo "pista abierta: $pagina"
+}
 
 # e2e win|linux [args del controlador]: de punta a punta entre los 2 PCs de
 # verdad, con las grabaciones reales de gestos.
@@ -421,6 +445,7 @@ contrato) cmd_contrato ;;
 sim) cmd_sim "$@" ;;
 replay) cmd_replay "$@" ;;
 grabar) cmd_grabar "$@" ;;
+pista) cmd_pista ;;
 gen) cmd_gen ;;
 win) cmd_win "$@" ;;
 e2e) cmd_e2e "$@" ;;
