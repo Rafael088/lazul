@@ -9,11 +9,15 @@
   video, canvas { position: absolute; inset: 0; width: 640px; height: 480px; }
   video { transform: scaleX(-1); }
   #estado { width: 640px; margin: 8px auto; font-family: ui-monospace, monospace; white-space: pre; }
+  #indicador { position: fixed; right: 18px; top: 18px; padding: 8px 12px; border-radius: 999px; background: #27345f; }
+  #aura { position: fixed; width: 240px; height: 240px; left: calc(50% - 120px); top: 120px; pointer-events: none; }
+  #aura::after { content: ""; position: absolute; width: 144px; height: 144px; left: 48px; top: 48px; border-radius: 50%; background: rgba(49,95,220,.32); }
 </style>
 </head>
 <body>
-<div id="escena"><video id="video" playsinline muted></video><canvas id="lienzo" width="640" height="480"></canvas><canvas id="puntos" width="640" height="480"></canvas></div>
+<div id="escena"><video id="video" playsinline muted></video><canvas id="lienzo" width="640" height="480"></canvas><canvas id="copia" width="640" height="480"></canvas><canvas id="puntos" width="640" height="480"></canvas></div>
 <div id="estado">arrancando…</div>
+<div id="indicador" hidden>inactivo</div><div id="aura" hidden></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

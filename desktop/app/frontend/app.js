@@ -160,7 +160,10 @@ function procesar(fuente, w, h) {
   // En orden y sin amontonar: si Go se atrasa, se salta el cuadro.
   if (pendientes > 4) return;
   pendientes++;
-  cola = cola.then(() => go().Cuadro(cuadro)).then(mostrarVista).catch((e) => log("cuadro: " + e)).finally(() => pendientes--);
+  // Cuadro solo entrega puntos. La vista y el indicador se leen con Estado
+  // cada 500 ms: devolver y deserializar toda la vista aquí duplicaba trabajo
+  // en cada fotograma sin que una persona pudiera ver esa frecuencia.
+  cola = cola.then(() => go().Cuadro(cuadro)).catch((e) => log("cuadro: " + e)).finally(() => pendientes--);
 }
 
 async function cargarMediaPipe() {
@@ -247,7 +250,10 @@ async function bucleProceso(gen) {
     seq = +r.headers.get("X-Seq");
     const bmp = await createImageBitmap(await r.blob());
     $("sincamara").style.display = "none";
-    ctx.drawImage(bmp, 0, 0, 640, 480);
+    // MediaPipe acepta el bitmap directamente. La copia al canvas solo sirve
+    // para la vista de ajuste; con el indicador cerrado era una copia entre
+    // gráficas por cuadro que nadie veía.
+    if (vistaCamara) ctx.drawImage(bmp, 0, 0, 640, 480);
     procesar(bmp, bmp.width, bmp.height);
     bmp.close();
   }
@@ -319,7 +325,10 @@ function pintarEstado(e) {
   }
   $("prueba").textContent = e.prueba ? "Terminar prueba de trabajo normal" : "Empezar prueba de trabajo normal";
   $("prueba").dataset.on = e.prueba ? "1" : "";
-  if (cfg && cfg.reproducir) mostrarVista(e.vista);
+  // Estado es también la única vía de vuelta para los cuadros de cámara.
+  // A 2 Hz basta para textos, diagnóstico e indicador; el aura conserva su
+  // ruta independiente y limitada.
+  mostrarVista(e.vista);
   const evitadas = Object.values(e.evitadas || {}).reduce((a, b) => a + b, 0);
   const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano ${(100 * e.con_mano).toFixed(0)} % · zona ${(100 * e.en_zona).toFixed(0)} % · CPU ${e.cpu_core.toFixed(0)} % núcleo / ${e.cpu_total.toFixed(1)} % total · mano ${e.mano_ms.toFixed(1)} ms + Pose ${e.pose_ms.toFixed(1)} ms · evitadas ${evitadas}` : "";
   texto("fps", (e.camara ? "Cámara: " + e.camara + " " : "") + fps);

@@ -50,6 +50,7 @@ async function main() {
 
   // Fuente de cuadros
   const video = $("video"), lienzo = $("lienzo"), ctx2d = lienzo.getContext("2d");
+  const copia2d = $("copia").getContext("2d");
   let foto = null;
   if (cfg.modo !== "camara" && cfg.modo !== "proceso") { foto = new Image(); foto.src = "./vendor/mano.jpg"; await foto.decode(); }
   const conMano = cfg.modo.endsWith("+mano"), porProceso = cfg.modo.startsWith("proceso");
@@ -68,7 +69,7 @@ async function main() {
     info.camara = { ancho: s.width, alto: s.height, fps_pedidos: s.frameRate, etiqueta: st.getVideoTracks()[0].label };
   }
 
-  const inf = [], c2p = [], cap2p = [];
+  const inf = [], c2p = [], cap2p = [], puente = [];
   let resultados = 0, cuadrosMano = 0, cuadrosCamara = 0, midiendo = false, tMedida = 0, ultimoTs = -1;
   const puntos = $("puntos").getContext("2d");
 
@@ -79,17 +80,62 @@ async function main() {
     for (const p of r.landmarks[0]) { puntos.beginPath(); puntos.arc(p.x * 640, p.y * 480, 4, 0, 7); puntos.fill(); }
   }
 
+  const usa = (parte) => {
+    const v = cfg.variante;
+    if (v === parte) return true;
+    if (v === "antes") return ["respuesta", "indicador", "aura", "copia"].includes(parte);
+    if (v === "despues") return ["envio", "indicador", "aura"].includes(parte);
+    return false;
+  };
+  let ultimoAura = 0, ultimoSondeo = 0, vistaSondeada = null;
+  const cuadroJSON = (r, ts) => ({ t: ts, manos: r.landmarks.map((ps, i) => ({
+    derecha: !!(r.handednesses?.[i]?.[0]?.categoryName === "Right"),
+    p: ps.map((p) => [p.x, p.y, p.z]),
+  })), cuerpo: { p: Array.from({ length: 33 }, (_, i) => [.3 + i / 100, .2 + i / 200, 0, 1]) } });
+  const pintarIndicador = (v) => {
+    const el = $("indicador"); el.hidden = false;
+    el.textContent = v?.indicador?.activo ? "mano en el panel" : "inactivo";
+  };
+  const pintarAura = (r, ahora) => {
+    if (ahora - ultimoAura < 40) return;
+    ultimoAura = ahora;
+    const el = $("aura"), p = r.landmarks?.[0]?.[9];
+    el.hidden = !p;
+    if (p) el.style.transform = `translate3d(${(p.x - .5) * 400}px, ${(p.y - .5) * 240}px, 0)`;
+  };
+  async function partes(r, ts) {
+    if (cfg.variante === "base" || cfg.variante === "copia" || cfg.variante === "aura") return;
+    const ini = performance.now(), c = cuadroJSON(r, ts);
+    if (usa("respuesta") || cfg.variante === "indicador") {
+      const v = await go().Responder(c);
+      if (usa("indicador")) pintarIndicador(v);
+    } else {
+      await go().Enviar(c);
+      // La versión optimizada obtiene textos e indicador con el sondeo ya
+      // existente, no como respuesta de cada cuadro.
+      if (cfg.variante === "despues" && performance.now() - ultimoSondeo >= 500) {
+        ultimoSondeo = performance.now(); vistaSondeada = await go().Estado();
+      }
+      if (usa("indicador") && vistaSondeada) pintarIndicador(vistaSondeada);
+    }
+    if (midiendo) puente.push(performance.now() - ini);
+  }
+
   let errores = 0, errorBucle = null;
-  function procesar(fuente, tCuadro, tCaptura, tGo) {
-    try { procesar1(fuente, tCuadro, tCaptura ?? tGo ?? null); }
+  async function procesar(fuente, tCuadro, tCaptura, tGo) {
+    try { await procesar1(fuente, tCuadro, tCaptura ?? tGo ?? null); }
     catch (e) { if (errores++ < 3) log("error en el cuadro: " + (e && e.stack || e)); }
   }
-  function procesar1(fuente, tCuadro, tCaptura) {
+  async function procesar1(fuente, tCuadro, tCaptura) {
     let ts = performance.now(); if (ts <= ultimoTs) ts = ultimoTs + 0.01; ultimoTs = ts;
+    // Copia aislada entre superficies, equivalente al JPEG que la app llevaba
+    // al lienzo aun cuando la vista de cámara estaba cerrada.
+    if (usa("copia")) copia2d.drawImage(fuente, 0, 0, 640, 480);
     const a = performance.now();
     const r = lm.detectForVideo(fuente, ts);
     const b = performance.now();
-    pintar(r);
+    if (usa("aura")) pintarAura(r, b);
+    await partes(r, ts);
     if (!midiendo) return;
     resultados++; if (r.landmarks.length) cuadrosMano++;
     inf.push(b - a); c2p.push(b - tCuadro);
@@ -119,30 +165,30 @@ async function main() {
         if (primero) { primero = false; info.camara = { ancho: bmp.width, alto: bmp.height, por: "ffmpeg v4l2", tiene_X_T: !!tGo }; }
         const tPagina = performance.now();
         const fuente = conMano ? (dibujarCompuesto(bmp), lienzo) : bmp;
-        procesar(fuente, tPagina, null, tGo ? performance.now() - (Date.now() - tGo) : null);
+        await procesar(fuente, tPagina, null, tGo ? performance.now() - (Date.now() - tGo) : null);
         bmp.close();
       }
     };
     bucle().catch((e) => { log("ERROR " + e); errorBucle = String(e); });
   } else if (cfg.modo === "imagen") {
-    const bucle = () => { const t = performance.now(); dibujarCompuesto(null); procesar(lienzo, t, null); requestAnimationFrame(bucle); };
+    const bucle = async () => { const t = performance.now(); dibujarCompuesto(null); await procesar(lienzo, t, null); requestAnimationFrame(bucle); };
     requestAnimationFrame(bucle);
   } else if (info.rvfc) {
-    const cb = (now, md) => {
+    const cb = async (now, md) => {
       if (midiendo) cuadrosCamara++;
       // captureTime está en el mismo reloj que performance.now() cuando existe
       const tCap = md && typeof md.captureTime === "number" ? md.captureTime : null;
-      if (conMano) { dibujarCompuesto(video); procesar(lienzo, now, tCap); }
-      else procesar(video, now, tCap);
+      if (conMano) { dibujarCompuesto(video); await procesar(lienzo, now, tCap); }
+      else await procesar(video, now, tCap);
       video.requestVideoFrameCallback(cb);
     };
     video.requestVideoFrameCallback(cb);
   } else {
     // Sin rVFC: rAF y solo cuando cambia currentTime
     let tv = -1;
-    const bucle = () => {
+    const bucle = async () => {
       if (video.currentTime !== tv) { tv = video.currentTime; const t = performance.now(); if (midiendo) cuadrosCamara++;
-        if (conMano) { dibujarCompuesto(video); procesar(lienzo, t, null); } else procesar(video, t, null); }
+        if (conMano) { dibujarCompuesto(video); await procesar(lienzo, t, null); } else await procesar(video, t, null); }
       requestAnimationFrame(bucle);
     };
     requestAnimationFrame(bucle);
@@ -163,7 +209,7 @@ async function main() {
   const web = { ...info, segundos: +seg.toFixed(2), resultados, fps: +(resultados / seg).toFixed(2),
     error_bucle: errorBucle,
     fps_camara: cfg.modo === "imagen" ? null : +(cuadrosCamara / seg).toFixed(2),
-    cuadros_con_mano: cuadrosMano, errores_cuadro: errores, inferencia_ms: resumen(inf), cuadro_a_puntos_ms: resumen(c2p), captura_a_puntos_ms: resumen(cap2p) };
+    cuadros_con_mano: cuadrosMano, errores_cuadro: errores, inferencia_ms: resumen(inf), puente_go_ms: resumen(puente), cuadro_a_puntos_ms: resumen(c2p), captura_a_puntos_ms: resumen(cap2p) };
   estado(JSON.stringify(web, null, 1));
   await go().Reportar(web);
 }

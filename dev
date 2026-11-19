@@ -17,6 +17,7 @@
 #   ./dev app resumen        activaciones de los últimos 30 min de uso (registro local)
 #   ./dev app compilar       compila la app para Linux y Windows (sin abrirla)
 #   ./dev app e2e win|linux  la app en los 2 PCs con grabaciones en vez de cámara
+#   ./dev camara-cpu [segundos] [nombre]  desglose CPU antes/después en NVIDIA
 set -uo pipefail
 cd "$(dirname "$0")"
 RAIZ=$PWD
@@ -211,6 +212,8 @@ cmd_pista() {
 	esac
 	echo "pista abierta: $pagina"
 }
+
+cmd_camara_cpu() { prototipos/camara/medir-partes.sh "${1:-20}" "${2:-nvidia}"; }
 
 # e2e win|linux [args del controlador]: de punta a punta entre los 2 PCs de
 # verdad, con las grabaciones reales de gestos.
@@ -446,6 +449,7 @@ sim) cmd_sim "$@" ;;
 replay) cmd_replay "$@" ;;
 grabar) cmd_grabar "$@" ;;
 pista) cmd_pista ;;
+camara-cpu) cmd_camara_cpu "$@" ;;
 gen) cmd_gen ;;
 win) cmd_win "$@" ;;
 e2e) cmd_e2e "$@" ;;
