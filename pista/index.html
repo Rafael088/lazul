@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pista de precisión · Lazul</title>
+  <meta name="theme-color" content="#081426">
+  <link rel="stylesheet" href="pista.css">
+</head>
+<body>
+  <main id="inicio" class="pantalla inicio">
+    <div class="marca" aria-label="Lazul"><span></span>Lazul</div>
+    <section class="introduccion">
+      <p class="contexto">Pista de precisión</p>
+      <h1>Toca en el aire.<br>La pista lleva la cuenta.</h1>
+      <p class="bajada">Aparecerá un blanco cada vez: enlaces, botones e íconos de varios tamaños, también en cada borde y esquina. Tócalo con Lazul tan pronto como lo veas.</p>
+      <ol>
+        <li>Deja el navegador a pantalla completa.</li>
+        <li>Completa los 14 blancos sin usar el ratón.</li>
+        <li>Quédate en reposo para medir toques involuntarios.</li>
+      </ol>
+      <div class="controles-inicio">
+        <label for="duracion">Duración del reposo</label>
+        <select id="duracion">
+          <option value="600000" selected>10 minutos · medición real</option>
+          <option value="60000">1 minuto · ensayo corto</option>
+          <option value="10000">10 segundos · comprobar la pista</option>
+        </select>
+        <button id="empezar" class="accion">Empezar la pista</button>
+      </div>
+      <p class="privacidad">Solo guarda resultados y tiempos. No usa la cámara ni registra sus posiciones.</p>
+    </section>
+  </main>
+
+  <main id="prueba" class="pantalla prueba" hidden aria-live="polite">
+    <div id="hud" class="hud">
+      <div><span id="paso">Blanco 1 de 14</span><strong id="cronometro">0,0 s</strong></div>
+      <p id="instruccion">Toca el blanco cian</p>
+      <div class="progreso"><span id="barra"></span></div>
+      <p id="cuenta-fuera">Sin toques fuera</p>
+    </div>
+    <div id="superficie" class="superficie"></div>
+  </main>
+
+  <main id="reposo" class="pantalla reposo" hidden>
+    <div class="marca marca-clara"><span></span>Lazul</div>
+    <section id="zona-reposo" class="zona-reposo">
+      <div>
+        <p class="contexto">Zona de reposo</p>
+        <h1>No hagas ningún gesto</h1>
+        <p>Trabaja o habla con normalidad. Si Lazul toca esta zona por accidente, quedará contado.</p>
+        <strong id="restante">10:00</strong>
+        <p id="falsos">0 toques falsos</p>
+      </div>
+    </section>
+    <button id="terminar-reposo" class="terminar">Terminar antes</button>
+  </main>
+
+  <main id="final" class="pantalla final" hidden>
+    <div class="marca"><span></span>Lazul</div>
+    <section class="resultado">
+      <p class="contexto">Sesión guardada</p>
+      <h1>Resultado de la pista</h1>
+      <div class="metricas">
+        <div class="metrica principal"><strong id="precision">—</strong><span>A la primera</span></div>
+        <div class="metrica"><strong id="fallos">—</strong><span>Blancos con fallos</span></div>
+        <div class="metrica"><strong id="fuera">—</strong><span>Toques fuera</span></div>
+        <div class="metrica"><strong id="tiempo">—</strong><span>Tiempo promedio</span></div>
+        <div class="metrica"><strong id="falsos-final">—</strong><span>Toques falsos</span></div>
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Blanco</th><th>Posición</th><th>A la primera</th><th>Tiempo</th></tr></thead>
+          <tbody id="detalle"></tbody>
+        </table>
+      </div>
+      <div class="acciones-finales">
+        <button id="descargar" class="accion">Descargar JSON otra vez</button>
+        <button id="repetir" class="secundaria">Repetir la pista</button>
+      </div>
+      <p id="guardado" class="privacidad"></p>
+    </section>
+  </main>
+
+  <script src="resumen.mjs"></script>
+  <script src="pista.mjs"></script>
+</body>
+</html>
