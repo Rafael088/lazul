@@ -69,9 +69,9 @@ type AjustesEmbrague struct {
 	// la mano abierta, si fue hace como mucho este tiempo. Cerrar el
 	// pellizco mueve la palma y el puntero; sin ancla, el dedo cae donde
 	// quedó la palma al cerrar y no donde se apuntaba. 0 lo apaga.
-	MsAncla int64
-	DistanciaMinima   float64 // en unidades del panel (0 a 1)
-	ZoomMinimo        float64 // cambio de separación entre manos
+	MsAncla         int64
+	DistanciaMinima float64 // en unidades del panel (0 a 1)
+	ZoomMinimo      float64 // cambio de separación entre manos
 }
 
 var AjustesEmbraguePorDefecto = AjustesEmbrague{
