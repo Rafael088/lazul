@@ -81,3 +81,32 @@ func TestCalibracionVeLaManoPeroNoActivaElFlujo(t *testing.T) {
 		t.Fatalf("el flujo recibió la mano durante la calibración: %+v", flujo.ultimo.Manos)
 	}
 }
+
+func TestAuraDeduplicaLimitaMovimientoYPreservaEstados(t *testing.T) {
+	t0 := time.Unix(100, 0)
+	dentro := EstadoAura{Activa: true, Calibrado: true, Dentro: true, X: .4, Y: .5}
+	if !debeActualizarAura(EstadoAura{}, dentro, false, time.Time{}, t0) {
+		t.Fatal("el primer estado debe llegar")
+	}
+	if debeActualizarAura(dentro, dentro, true, t0, t0.Add(time.Second)) {
+		t.Fatal("un estado idéntico no debe cruzar a la ventana")
+	}
+	movido := dentro
+	movido.X = .41
+	if debeActualizarAura(dentro, movido, true, t0, t0.Add(intervaloAura-time.Millisecond)) {
+		t.Fatal("el movimiento debe quedar limitado a 25 Hz")
+	}
+	if !debeActualizarAura(dentro, movido, true, t0, t0.Add(intervaloAura)) {
+		t.Fatal("el movimiento debe pasar al vencer el intervalo")
+	}
+	agarrando := movido
+	agarrando.Agarrando = true
+	if !debeActualizarAura(dentro, agarrando, true, t0, t0.Add(time.Millisecond)) {
+		t.Fatal("un cambio visual debe pasar sin esperar")
+	}
+	fuera := agarrando
+	fuera.Dentro = false
+	if !debeActualizarAura(agarrando, fuera, true, t0, t0.Add(time.Millisecond)) {
+		t.Fatal("ocultar el aura debe pasar sin esperar")
+	}
+}

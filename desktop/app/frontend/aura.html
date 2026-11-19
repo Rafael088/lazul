@@ -77,7 +77,7 @@
     <div id="aro"></div>
   </div>
 <script>
-  // La app llama window.aura(estado, ox, oy) en cada cuadro. La superficie es
+  // La app llama window.aura(estado, ox, oy) al cambiar, hasta 25 veces/s. La superficie es
   // chica (240 px) y la mueve el layer-shell para centrarla en la mano; ox y
   // oy son el punto de la mano dentro de ella (difieren del centro solo junto
   // a los bordes del monitor). Aquí solo se pinta: nada de clics ni foco.

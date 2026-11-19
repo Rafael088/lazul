@@ -30,8 +30,8 @@ func NuevaAura(html string) *Aura {
 	return &Aura{ptr: C.lazul_aura_crear(h)}
 }
 
-// Actualizar manda el estado a la página. Se puede llamar por cuadro: la
-// implementación descarta el estado anterior si aún no se había pintado.
+// Actualizar manda el estado a la página. App deduplica y limita el movimiento;
+// esta capa conserva además solo el último estado si GTK todavía no lo pintó.
 func (a *Aura) Actualizar(e EstadoAura) {
 	if a == nil {
 		return

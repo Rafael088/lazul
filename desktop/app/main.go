@@ -138,6 +138,9 @@ type App struct {
 	posIndicadorX     int
 	posIndicadorY     int
 	tienePosIndicador bool
+	ultimoAura        EstadoAura
+	ultimaAura        time.Time
+	tieneUltimoAura   bool
 }
 
 type flujoCamara interface {
@@ -184,8 +187,9 @@ type CuadroJS struct {
 	Alto   int     `json:"alto"`
 }
 
-// Cuadro pasa un cuadro de la cámara por el clasificador.
-func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
+// Cuadro pasa un cuadro de la cámara por el clasificador. No devuelve la vista:
+// el frontend la sondea con Estado, evitando serializarla en cada fotograma.
+func (a *App) Cuadro(cj CuadroJS) {
 	c := gestures.Cuadro{TMs: cj.T}
 	if cj.Ancho > 0 && cj.Alto > 0 {
 		c.Aspecto = float32(cj.Ancho) / float32(cj.Alto)
@@ -212,7 +216,7 @@ func (a *App) Cuadro(cj CuadroJS) desktop.Vista {
 	a.sumaPoseMs += cj.PoseMs
 	a.metricas++
 	a.mu.Unlock()
-	return a.cuadro(c)
+	a.cuadro(c)
 }
 
 func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
@@ -426,7 +430,33 @@ func (a *App) actualizarAura() {
 		e.Agarrando = p.Fase == string(gestures.EmbragueAgarrando)
 		e.Calibrado, e.Dentro, e.X, e.Y = p.Calibrado, p.Dentro || e.Agarrando, p.X, p.Y
 	}
+	a.mu.Lock()
+	ahora := time.Now()
+	if !debeActualizarAura(a.ultimoAura, e, a.tieneUltimoAura, a.ultimaAura, ahora) {
+		a.mu.Unlock()
+		return
+	}
+	a.ultimoAura, a.tieneUltimoAura, a.ultimaAura = e, true, ahora
+	a.mu.Unlock()
 	aura.Actualizar(e)
+}
+
+const intervaloAura = 40 * time.Millisecond // como máximo 25 actualizaciones/s
+
+// debeActualizarAura preserva al instante los cambios de estado (aparecer,
+// agarrar, ocultarse), elimina duplicados y limita solo el movimiento.
+func debeActualizarAura(anterior, siguiente EstadoAura, tieneAnterior bool, ultima, ahora time.Time) bool {
+	if !tieneAnterior {
+		return true
+	}
+	if anterior == siguiente {
+		return false
+	}
+	if anterior.Activa != siguiente.Activa || anterior.Calibrado != siguiente.Calibrado ||
+		anterior.Dentro != siguiente.Dentro || anterior.Agarrando != siguiente.Agarrando {
+		return true
+	}
+	return ahora.Sub(ultima) >= intervaloAura
 }
 
 // crearAura abre el halo encima de la pantalla. Solo en modo táctil: en

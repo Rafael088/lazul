@@ -33,7 +33,35 @@ type Config struct {
 	Segundos int    `json:"segundos"`
 	Calentar int    `json:"calentar"`
 	Delegado string `json:"delegado"`
+	Variante string `json:"variante"`
 	SO       string `json:"so"`
+}
+
+var variantes = map[string]bool{
+	"base": true, "envio": true, "respuesta": true, "indicador": true,
+	"aura": true, "copia": true, "antes": true, "despues": true,
+}
+
+// CuadroBanco imita el JSON que la app manda a Go en cada fotograma.
+type CuadroBanco struct {
+	T     float64 `json:"t"`
+	Manos []struct {
+		Derecha bool         `json:"derecha"`
+		P       [][3]float64 `json:"p"`
+	} `json:"manos"`
+	Cuerpo *struct {
+		P [][4]float64 `json:"p"`
+	} `json:"cuerpo,omitempty"`
+}
+
+// VistaBanco tiene suficiente estructura para medir el viaje de vuelta y su
+// deserialización sin depender del clasificador real.
+type VistaBanco struct {
+	Pose      string         `json:"pose"`
+	Modo      string         `json:"modo"`
+	Ultimo    string         `json:"ultimo"`
+	Indicador map[string]any `json:"indicador"`
+	Panel     map[string]any `json:"panel_camara"`
 }
 
 type App struct {
@@ -45,6 +73,8 @@ type App struct {
 	alCerrar  func()
 	cpuInicio float64
 	tInicio   time.Time
+	cuadrosGo int
+	ultima    VistaBanco
 }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
@@ -64,6 +94,38 @@ func (a *App) MedirInicio() {
 	defer a.mu.Unlock()
 	a.cpuInicio = cpuArbol()
 	a.tInicio = time.Now()
+}
+
+func vistaDe(c CuadroBanco) VistaBanco {
+	conMano := len(c.Manos) > 0
+	return VistaBanco{
+		Pose: "MANO", Modo: "activo", Ultimo: "PELLIZCO",
+		Indicador: map[string]any{"activo": conMano, "gesto": "toque", "direccion": ""},
+		Panel:     map[string]any{"calibrado": []float64{.15, .12, .86, .9}, "dentro": conMano},
+	}
+}
+
+// Enviar mide solo JSON+puente hacia Go, sin una respuesta por cuadro.
+func (a *App) Enviar(c CuadroBanco) {
+	a.mu.Lock()
+	a.cuadrosGo++
+	a.ultima = vistaDe(c)
+	a.mu.Unlock()
+}
+
+// Responder añade la vista completa que la app devolvía antes en cada cuadro.
+func (a *App) Responder(c CuadroBanco) VistaBanco {
+	a.Enviar(c)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ultima
+}
+
+// Estado imita el sondeo del indicador que queda después de la optimización.
+func (a *App) Estado() VistaBanco {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ultima
 }
 
 // Reportar recibe las métricas de la página, añade la CPU del árbol de
@@ -104,14 +166,23 @@ func manejador(c *captura) http.Handler {
 
 func main() {
 	app := &App{}
+	variante := os.Getenv("LAZUL_VARIANTE")
+	if variante == "" {
+		variante = "base"
+	}
 	flag.StringVar(&app.cfg.Modo, "modo", "camara", "camara | camara+mano | proceso | proceso+mano | imagen")
 	flag.IntVar(&app.cfg.Segundos, "segundos", 30, "segundos de medida")
 	flag.IntVar(&app.cfg.Calentar, "calentar", 5, "segundos de calentamiento sin medir")
 	flag.StringVar(&app.cfg.Delegado, "delegado", "GPU", "GPU | CPU")
+	flag.StringVar(&app.cfg.Variante, "variante", variante, "base | envio | respuesta | indicador | aura | copia | antes | despues")
 	flag.StringVar(&app.salida, "salida", "", "archivo JSON con el resultado")
 	dispositivo := flag.String("dispositivo", "/dev/video0", "cámara para los modos proceso (ffmpeg -f v4l2)")
 	reg := flag.String("registro", "", "archivo para el registro (por defecto, stderr)")
 	flag.Parse()
+	if !variantes[app.cfg.Variante] {
+		fmt.Fprintf(os.Stderr, "variante desconocida %q\n", app.cfg.Variante)
+		os.Exit(2)
+	}
 	if *reg != "" {
 		if f, err := os.Create(*reg); err == nil {
 			registro = f
