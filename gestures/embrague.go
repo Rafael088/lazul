@@ -59,6 +59,10 @@ type AjustesEmbrague struct {
 	Pellizco          AjustesPellizco
 	CuadrosParaSoltar int
 	MsParaSoltar      int64
+	// CuadrosParaApoyar es cuántos cuadros seguidos tiene que estar cerrado
+	// un pellizco que empezó dentro para armarse: un cierre de un solo
+	// cuadro (el parpadeo) no apoya el dedo.
+	CuadrosParaApoyar int
 	DistanciaMinima   float64 // en unidades del panel (0 a 1)
 	ZoomMinimo        float64 // cambio de separación entre manos
 }
@@ -67,6 +71,7 @@ var AjustesEmbraguePorDefecto = AjustesEmbrague{
 	Pellizco:          AjustesPellizcoPorDefecto,
 	CuadrosParaSoltar: 3,
 	MsParaSoltar:      200,
+	CuadrosParaApoyar: 2,
 	// Un arrastre tiene que mover al menos un 15 % del panel: así un
 	// pellizco involuntario que apenas se desplaza no cuenta.
 	DistanciaMinima: 0.15,
@@ -125,6 +130,8 @@ type estadoManoEmbrague struct {
 	clave         ClaveMano
 	cerrada       bool
 	armada        bool // el pellizco empezó dentro del panel
+	pendiente     bool // empezó dentro y espera CuadrosParaApoyar
+	cerrados      int  // cuadros seguidos cerrado
 	inicio        PuntoPanel
 	ultima        PuntoPanel
 	inicioGesto   PuntoPanel
@@ -271,21 +278,23 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	}
 	if md.estado.Cerrado {
 		if !est.cerrada {
-			// Empieza un pellizco. Solo se arma dentro del panel; si empieza
-			// fuera, se queda sin agarrar hasta que se suelte.
+			// Empieza un pellizco. Solo se arma si empieza dentro del panel;
+			// si empieza fuera, se queda sin agarrar hasta que se suelte.
 			est.cerrada = true
 			est.abiertos = 0
-			if !est.armada {
-				if md.dentroReal {
-					est.armada = true
-					est.inicio = md.pos
-					est.ultima = md.pos
-					est.inicioGesto = md.gesto
-					est.ultimaGesto = md.gesto
-					est.tienePos = true
-					est.sinArrastre = false
-				}
-			}
+			est.cerrados = 0
+			est.pendiente = !est.armada && md.dentroReal
+		}
+		est.cerrados++
+		if est.pendiente && est.cerrados >= m.Ajustes.CuadrosParaApoyar {
+			est.pendiente = false
+			est.armada = true
+			est.inicio = md.pos
+			est.ultima = md.pos
+			est.inicioGesto = md.gesto
+			est.ultimaGesto = md.gesto
+			est.tienePos = md.ok
+			est.sinArrastre = false
 		}
 		if est.armada && md.ok {
 			est.ultima = md.pos
@@ -300,6 +309,7 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	// histéresis): cuenta para soltar, pero no borra la posición del último
 	// cuadro agarrado, que es la que cierra el arrastre.
 	est.cerrada = false
+	est.pendiente = false
 	return m.abrir(est, t)
 }
 

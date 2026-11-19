@@ -82,6 +82,10 @@ func TestEmbragueArmadoUsaLaBandaDelPanel(t *testing.T) {
 	}
 	for i, caso := range casos {
 		t.Run(caso.nombre, func(t *testing.T) {
+			if i == 0 {
+				// El pellizco se arma al segundo cuadro cerrado (CuadrosParaApoyar).
+				med.Cuadro(cuadroPanel(-33, manoEnPanel(caso.x, 0, .2, true)))
+			}
 			r := med.Cuadro(cuadroPanel(int64(i)*67, manoEnPanel(caso.x, 0, .2, true)))
 			if r.Dentro != caso.dentro {
 				t.Fatalf("x %.2f: dentro %v, quería %v", caso.x, r.Dentro, caso.dentro)
@@ -525,5 +529,23 @@ func TestEmbragueNormalNoArrastra(t *testing.T) {
 		if len(m.arrastres) != 0 || len(m.zooms) != 0 {
 			t.Fatalf("%s: arrastres %+v, zoom %+v", g.Archivo, m.arrastres, m.zooms)
 		}
+	}
+}
+
+// Un cierre de un solo cuadro (el pellizco que parpadea) no apoya el dedo:
+// en las tomas reales salía como un tap de 200 ms que nadie pidió.
+func TestEmbragueNoArmaConUnSoloCuadroCerrado(t *testing.T) {
+	med := NuevoMedidorEmbrague(panelCuadrado(t))
+	cerrado := []bool{false, true, false, false, false, false}
+	for i, c := range cerrado {
+		r := med.Cuadro(cuadroPanel(int64(i)*67, manoEnPanel(0, 0, .2, c)))
+		if r.ManosArmadas != 0 {
+			t.Fatalf("cuadro %d: armó con un solo cuadro cerrado: %+v", i, r)
+		}
+	}
+	r := med.Cuadro(cuadroPanel(500, manoEnPanel(0, 0, .2, true)))
+	r = med.Cuadro(cuadroPanel(567, manoEnPanel(0, 0, .2, true)))
+	if r.ManosArmadas != 1 {
+		t.Fatalf("dos cuadros cerrados dentro deberían armar: %+v", r)
 	}
 }
