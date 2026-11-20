@@ -158,6 +158,32 @@ type TouchScreen interface {
 	Frame(ctx context.Context, points []TouchPoint) error
 }
 
+// Display es un monitor del escritorio. X, Y, Width y Height van en las
+// coordenadas del escritorio que usa el adaptador (Linux: píxeles lógicos de
+// Hyprland; Windows: píxeles físicos de la pantalla virtual). Focused marca
+// el monitor de la ventana con el foco.
+type Display struct {
+	Name          string
+	X, Y          int
+	Width, Height int
+	Focused       bool
+}
+
+// Map lleva un punto normalizado del monitor (0..1) a las coordenadas del
+// escritorio en píxeles.
+func (d Display) Map(x, y float64) (float64, float64) {
+	return float64(d.X) + x*float64(d.Width), float64(d.Y) + y*float64(d.Height)
+}
+
+// Displays lista los monitores y dirige a uno de ellos el puntero absoluto y
+// la pantalla táctil: desde Target, (0,0)-(1,1) de MoveAbsolute y de Frame es
+// ese monitor. Es opcional: sin él (o con un solo monitor) todo va a la
+// pantalla de siempre.
+type Displays interface {
+	List(ctx context.Context) ([]Display, error)
+	Target(ctx context.Context, name string) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
@@ -168,4 +194,5 @@ type Sistema struct {
 	TactileActions  TactileActions
 	AbsolutePointer AbsolutePointer
 	TouchScreen     TouchScreen
+	Displays        Displays
 }

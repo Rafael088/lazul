@@ -23,6 +23,18 @@ type punteroVirtual struct {
 	f     *os.File
 	err   error
 	abrir sync.Once
+	// Con varios monitores, destino es el que se controla y caja el
+	// escritorio entero al que el compositor reparte el rango 0..65535.
+	destino *platform.Display
+	caja    platform.Display
+}
+
+// dirigir hace que (0,0)-(1,1) de MoveAbsolute sea el monitor d dentro del
+// escritorio caja. nil vuelve al escritorio entero.
+func (p *punteroVirtual) dirigir(d *platform.Display, caja platform.Display) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.destino, p.caja = d, caja
 }
 
 const (
@@ -166,8 +178,7 @@ func (p *punteroVirtual) MoveAbsolute(ctx context.Context, x, y float64) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	b, err := eventosPuntero(x, y)
-	if err != nil {
+	if _, err := eventosPuntero(x, y); err != nil {
 		return err
 	}
 	if err := p.Prepare(ctx); err != nil {
@@ -175,6 +186,13 @@ func (p *punteroVirtual) MoveAbsolute(ctx context.Context, x, y float64) error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.destino != nil {
+		x, y = platform.EnAbarque(*p.destino, p.caja, x, y)
+	}
+	b, err := eventosPuntero(x, y)
+	if err != nil {
+		return err
+	}
 	if _, err := p.f.Write(b); err != nil {
 		return fmt.Errorf("puntero virtual: escribir: %w", err)
 	}

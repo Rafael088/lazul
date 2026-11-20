@@ -8,6 +8,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/Rafael088/lazul/platform"
 	"golang.org/x/sys/windows"
 )
 
@@ -120,6 +121,7 @@ type Aura struct {
 	pendiente EstadoAura
 	hay       bool
 	cerrada   bool
+	monitor   *platform.Display // el que controla el panel; nil = la principal
 
 	// Solo en el hilo de la ventana.
 	lado      int32
@@ -295,8 +297,13 @@ func (a *Aura) aplicar() {
 	}
 	ancho, _, _ := getSystemMetricsAura.Call(0)
 	alto, _, _ := getSystemMetricsAura.Call(1)
-	x := int32(math.Round(e.X*float64(int32(ancho)-1))) - a.lado/2
-	y := int32(math.Round(e.Y*float64(int32(alto)-1))) - a.lado/2
+	a.mu.Lock()
+	m := platform.Display{Width: int(int32(ancho)), Height: int(int32(alto))}
+	if a.monitor != nil {
+		m = *a.monitor
+	}
+	a.mu.Unlock()
+	x, y := posicionAura(e, m, a.lado)
 	d := a.dibujos[0]
 	if e.Agarrando {
 		d = a.dibujos[1]
@@ -312,6 +319,17 @@ func (a *Aura) aplicar() {
 		setWindowPos.Call(hwnd, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
 		a.visible = true
 	}
+}
+
+// EnPantalla lleva el aura al monitor d (en píxeles físicos, los mismos que
+// usa el hilo del aura con DPI por monitor).
+func (a *Aura) EnPantalla(d platform.Display) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.monitor = &d
 }
 
 // Cerrar destruye la ventana desde su hilo.

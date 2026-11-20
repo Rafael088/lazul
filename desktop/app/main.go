@@ -44,6 +44,7 @@ import (
 	"github.com/Rafael088/lazul/core"
 	"github.com/Rafael088/lazul/desktop"
 	"github.com/Rafael088/lazul/gestures"
+	"github.com/Rafael088/lazul/platform"
 	"github.com/Rafael088/lazul/platform/real"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -112,6 +113,8 @@ type App struct {
 	cap    *captura
 	panel  *desktop.Panel
 	aura   *Aura
+	// pantallas decide qué monitor controla el panel (barrido y foco).
+	pantallas *desktop.Pantallas
 
 	mu            sync.Mutex
 	permiso       *Solicitud
@@ -253,6 +256,18 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 				motivo = "sin_torso"
 			}
 			rechazos[motivo] = fueraTorso
+		}
+	}
+	if a.panel != nil && a.pantallas != nil {
+		// El barrido se mira antes del panel: la mano sale de él por un lado.
+		// Con el pellizco agarrando, calibrando o en la prueba de trabajo
+		// normal, la mano no cambia de pantalla.
+		e := a.panel.Estado()
+		libre := e.Calibrado && !e.Calibrando && e.Fase != string(gestures.EmbragueAgarrando) && !a.flujo.EnPrueba()
+		if a.pantallas.Cuadro(filtrado, libre, ahora) {
+			if d, ok := a.pantallas.Actual(); ok {
+				decir("el panel pasa al monitor %s", d.Name)
+			}
 		}
 	}
 	if a.panel != nil {
@@ -517,6 +532,19 @@ func (a *App) crearAura() {
 	a.mu.Lock()
 	a.aura = aura
 	a.mu.Unlock()
+	if a.pantallas != nil {
+		if d, ok := a.pantallas.Actual(); ok {
+			aura.EnPantalla(d)
+		}
+	}
+}
+
+// auraEnPantalla lleva el aura al monitor que controla el panel.
+func (a *App) auraEnPantalla(d platform.Display) {
+	a.mu.Lock()
+	aura := a.aura
+	a.mu.Unlock()
+	aura.EnPantalla(d)
 }
 
 // cerrarAura suelta la superficie antes de que termine la app.
@@ -928,6 +956,17 @@ func correr(o opciones) error {
 		app.panel.Acciones = sis.TactileActions
 		app.panel.Tactil = sis.TouchScreen
 		app.panel.Reg = reg
+		if !app.cfg.Reproducir {
+			// Antes de preparar el táctil: así nace ya con la salida del
+			// monitor con el foco y no hay que recrearlo.
+			app.pantallas = desktop.NuevasPantallas(sis.Displays)
+			app.pantallas.Reg = reg
+			app.pantallas.AlCambiar = app.auraEnPantalla
+			app.pantallas.Iniciar(time.Now())
+			if d, ok := app.pantallas.Actual(); ok {
+				decir("el panel controla el monitor %s", d.Name)
+			}
+		}
 		if err := app.panel.Preparar(); err != nil {
 			decir("aviso: %v", err)
 		}

@@ -2,6 +2,8 @@
 
 package main
 
+import "github.com/Rafael088/lazul/platform"
+
 // Aura sin superficie: un binario de Linux sin cgo (o de otro sistema) no
 // puede dibujarla; Windows tiene la suya en aura_windows.go. El halo se apaga y la app sigue igual; la
 // señal visual sigue siendo la píldora del indicador.
@@ -15,3 +17,6 @@ func (a *Aura) Actualizar(EstadoAura) {}
 
 // Cerrar no hace nada: no hay superficie que liberar.
 func (a *Aura) Cerrar() {}
+
+// EnPantalla no hace nada: no hay superficie que mover.
+func (a *Aura) EnPantalla(platform.Display) {}

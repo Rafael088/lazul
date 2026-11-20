@@ -32,7 +32,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `proto/go/lazulv1/` | tipos de Go generados | no editar a mano; `compat_test.go` fija los bytes |
 | `proto/ts/` | tipos de TS generados (`src/`) y prueba de compatibilidad con Go | no editar `src/` a mano |
 | `proto/testdata/sobre_v1.bin` | el mismo Sobre que leen y escriben Go y TS | regenerar con `go test ./proto/go/lazulv1 -actualizar` |
-| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen y errores | pequeñas; una por capacidad |
+| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen, Displays (monitores: listar y dirigir táctil y puntero a uno) y errores; `pantallas.go`: vecino por lado y mapeo por monitor, puros | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
 | `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles, puntero absoluto y pantalla táctil multitoque uinput; Windows deja TouchScreen como no soportado para activar el respaldo; terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
@@ -80,6 +80,14 @@ bajando 1,25 anchos de hombro; calibrando, la mano no pasa por este filtro; con 
 ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonces mueve un puntero absoluto uinput
 sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
 y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`; su tercer paso («junta los dedos») guarda la apertura del pellizco del dueño y `AjustesPellizcoPara` fija a su mano los umbrales de cerrar (por defecto 0,20) y firme (0,12: apoya desde el 1.er cuadro; el tibio espera 3).
+Con dos monitores, `desktop.Pantallas` decide cuál controla el panel: el del
+foco al arrancar (y lo sigue si el foco cambia); un barrido rápido de una mano
+abierta hacia un lado (`gestures.DetectorBarridoPantalla`: ≥ 2,5 palmas en
+350 ms, horizontal, sin vaivén ni saltos ni pinza; 0 disparos en todas las
+grabaciones reales) pasa al vecino de ese lado con `platform.Displays.Target`
+y mueve el aura. Linux: `hyprctl eval` con `hl.device` (salida del táctil),
+`hl.dsp.focus` y el puntero llevado al rectángulo del monitor; Windows: toques
+y puntero en las coordenadas de ese monitor. Un solo monitor: nada cambia.
 El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
 mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
 la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen

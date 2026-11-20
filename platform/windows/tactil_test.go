@@ -5,6 +5,7 @@ package windows
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"unsafe"
 
@@ -12,6 +13,9 @@ import (
 )
 
 func TestTamanosWin32(t *testing.T) {
+	if n := unsafe.Sizeof(monitorInfoEx{}); n != 104 {
+		t.Fatalf("MONITORINFOEXW mide %d, quiere 104", n)
+	}
 	if n := unsafe.Sizeof(pointerInfo{}); n != 96 {
 		t.Errorf("POINTER_INFO mide %d; Windows espera 96", n)
 	}
@@ -55,7 +59,7 @@ func TestEstadoTactilApoyarMoverLevantar(t *testing.T) {
 	var s estadoTactil
 	paso := func(points []platform.TouchPoint) []pointerTouchInfo {
 		t.Helper()
-		cs, err := s.cuadro(points, 1921, 1081)
+		cs, err := s.cuadro(points, zonaTactil{ancho: 1921, alto: 1081})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +84,7 @@ func TestEstadoTactilApoyarMoverLevantar(t *testing.T) {
 
 func TestEstadoTactilInvalidos(t *testing.T) {
 	var s estadoTactil
-	if _, err := s.cuadro([]platform.TouchPoint{{Slot: 2, X: .5, Y: .5, Down: true}}, 10, 10); !errors.Is(err, platform.ErrAccionInvalida) {
+	if _, err := s.cuadro([]platform.TouchPoint{{Slot: 2, X: .5, Y: .5, Down: true}}, zonaTactil{ancho: 10, alto: 10}); !errors.Is(err, platform.ErrAccionInvalida) {
 		t.Fatalf("ranura 2: %v", err)
 	}
 	if s.abajo != [touchSlots]bool{} {
@@ -116,5 +120,55 @@ func TestPunteroRechazaFuera(t *testing.T) {
 	}
 	if v, _ := coordenadaAbsoluta(1); v != rangoAbsoluto {
 		t.Fatalf("1 → %d", v)
+	}
+}
+
+func TestEstadoTactilEnOtroMonitor(t *testing.T) {
+	// La externa (1920×1080) a la derecha de una principal de 2880 px: el
+	// centro del monitor elegido cae en su centro, no en el de la principal.
+	var s estadoTactil
+	externa := zonaTactil{x: 2880, y: 0, ancho: 1921, alto: 1081}
+	cs, err := s.cuadro([]platform.TouchPoint{{Slot: 0, X: .5, Y: .5, Down: true}}, externa)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisar(t, cs, contactoEsperado{0, fAbajo, 2880 + 960, 540})
+	// Una a la izquierda de la principal tiene X negativa.
+	izquierda := zonaTactil{x: -1920, y: 120, ancho: 1921, alto: 1081}
+	s = estadoTactil{}
+	cs, _ = s.cuadro([]platform.TouchPoint{{Slot: 0, X: 0, Y: 1, Down: true}}, izquierda)
+	revisar(t, cs, contactoEsperado{0, fAbajo, -1920, 120 + 1080})
+}
+
+func TestZonaDe(t *testing.T) {
+	principal := func() (int32, int32) { return 2880, 1800 }
+	if z := zonaDe(nil, principal); z != (zonaTactil{0, 0, 2880, 1800}) {
+		t.Errorf("sin destino = %+v", z)
+	}
+	d := &destinoPantalla{}
+	if z := zonaDe(d, principal); z != (zonaTactil{0, 0, 2880, 1800}) {
+		t.Errorf("destino vacío = %+v", z)
+	}
+	d.poner(&platform.Display{Name: `\\.\DISPLAY2`, X: 2880, Y: 0, Width: 1920, Height: 1080})
+	if z := zonaDe(d, principal); z != (zonaTactil{2880, 0, 1920, 1080}) {
+		t.Errorf("con destino = %+v", z)
+	}
+}
+
+func TestAbsolutoVirtual(t *testing.T) {
+	virtual := zonaTactil{x: -1920, y: 0, ancho: 1920 + 2880, alto: 1800}
+	casos := []struct {
+		p      punto
+		vx, vy int32
+	}{
+		{punto{-1920, 0}, 0, 0},
+		{punto{2879, 1799}, rangoAbsoluto, rangoAbsoluto},
+		{punto{0, 0}, int32(math.Round(1920 * rangoAbsoluto / 4799.0)), 0},
+		{punto{-5000, 9000}, 0, rangoAbsoluto}, // fuera: se limita
+	}
+	for _, c := range casos {
+		if vx, vy := absolutoVirtual(c.p, virtual); vx != c.vx || vy != c.vy {
+			t.Errorf("absolutoVirtual(%v) = (%d,%d), quiere (%d,%d)", c.p, vx, vy, c.vx, c.vy)
+		}
 	}
 }
