@@ -173,6 +173,20 @@ otro también pueda mandarte, empareja al revés.
 - El halo es la señal visual: fuera del panel calibrado no se ve nada; dentro,
   un halo suave sigue la mano; al agarrar (pellizco) se enciende. La píldora
   sigue mostrando el último gesto reconocido, sin tapar la pantalla.
+- **Dos pantallas**: el panel controla el monitor que tiene el foco, y el halo
+  aparece en ese monitor, así se ve cuál se controla. Un **barrido rápido con
+  la mano abierta** hacia tu izquierda o tu derecha pasa el control al monitor
+  de ese lado (unas 2,5 palmas en menos de 350 ms, en horizontal y sin
+  vaivén). No cuenta mientras pellizcas ni al mover el puntero despacio, y tras
+  un barrido hay 1 s de pausa para que el rebote de la mano no lo deshaga. Si
+  cambias el foco de monitor con el ratón o el teclado, el panel lo sigue
+  (lo mira una vez por segundo). En Linux el barrido también mueve el foco
+  (`hl.dsp.focus`) y la salida del táctil virtual (`hl.device`, con
+  `hyprctl eval`); el táctil se recrea para tomarla (~0,7 s). En Windows los
+  toques (`InjectTouchInput`) y el puntero van a las coordenadas de ese
+  monitor; el foco no se mueve. Con un solo monitor no cambia nada. Cada
+  cambio se anota en el registro (`"tipo":"pantalla"`, con el lado, nunca
+  posiciones).
 
 Los gestos se aplican a la ventana que tenga el foco; el panel mueve el
 cursor y el pellizco toca (o usa el respaldo de botón si el táctil no está

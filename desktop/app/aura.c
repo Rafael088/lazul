@@ -10,6 +10,9 @@ struct Aura {
   char *html;
   char *pendiente;
   double x, y; /* posición pendiente, 0..1 en el monitor */
+  gboolean hay_monitor; /* el panel controla el monitor con origen (mx, my) */
+  int mx, my;
+  gboolean monitor_pendiente;
   gboolean listo;
   guint fuente_crear;
   guint fuente_aplicar;
@@ -24,16 +27,39 @@ static gboolean aplicar_idle(gpointer datos) {
   char *js = aura->pendiente;
   aura->pendiente = NULL;
   double x = aura->x, y = aura->y;
+  /* El cambio de monitor espera a que exista la ventana. */
+  gboolean hay_monitor = aura->hay_monitor;
+  gboolean cambiar = aura->monitor_pendiente && aura->ventana != NULL;
+  int mx = aura->mx, my = aura->my;
+  if (cambiar) aura->monitor_pendiente = FALSE;
   g_mutex_unlock(&aura->mutex);
+
+  GdkMonitor *elegido = NULL;
+  if (hay_monitor && aura->ventana != NULL) {
+    GdkDisplay *pantalla = gtk_widget_get_display(aura->ventana);
+    int n = gdk_display_get_n_monitors(pantalla);
+    for (int i = 0; i < n; i++) {
+      GdkMonitor *m = gdk_display_get_monitor(pantalla, i);
+      GdkRectangle g;
+      gdk_monitor_get_geometry(m, &g);
+      if (g.x == mx && g.y == my) {
+        elegido = m;
+        break;
+      }
+    }
+    if (elegido != NULL && cambiar) {
+      gtk_layer_set_monitor(GTK_WINDOW(aura->ventana), elegido);
+    }
+  }
 
   if (js != NULL && aura->web != NULL) {
     /* Margen para centrar la superficie en la mano, acotado al monitor; lo
        que no se pudo mover va como desplazamiento dentro de la página. */
     int ancho = 0, alto = 0;
     GdkDisplay *pantalla = gtk_widget_get_display(aura->ventana);
-    GdkMonitor *monitor = NULL;
+    GdkMonitor *monitor = elegido;
     GdkWindow *gw = gtk_widget_get_window(aura->ventana);
-    if (gw != NULL) monitor = gdk_display_get_monitor_at_window(pantalla, gw);
+    if (monitor == NULL && gw != NULL) monitor = gdk_display_get_monitor_at_window(pantalla, gw);
     if (monitor == NULL) monitor = gdk_display_get_primary_monitor(pantalla);
     if (monitor == NULL) monitor = gdk_display_get_monitor(pantalla, 0);
     if (monitor != NULL) {
@@ -177,6 +203,22 @@ void lazul_aura_actualizar(Aura *aura, const char *json, double x, double y) {
   aura->pendiente = js;
   aura->x = x;
   aura->y = y;
+  g_mutex_unlock(&aura->mutex);
+  programa_aplicar(aura);
+}
+
+void lazul_aura_monitor(Aura *aura, int x, int y) {
+  if (aura == NULL) {
+    return;
+  }
+  g_mutex_lock(&aura->mutex);
+  gboolean cambia = !aura->hay_monitor || aura->mx != x || aura->my != y;
+  aura->hay_monitor = TRUE;
+  aura->mx = x;
+  aura->my = y;
+  if (cambia) {
+    aura->monitor_pendiente = TRUE;
+  }
   g_mutex_unlock(&aura->mutex);
   programa_aplicar(aura);
 }

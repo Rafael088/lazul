@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"sync"
 	"unsafe"
+
+	"github.com/Rafael088/lazul/platform"
 )
 
 // Aura es la ventana layer-shell transparente que sigue a la mano. Es
@@ -48,6 +50,21 @@ func (a *Aura) Actualizar(e EstadoAura) {
 		return
 	}
 	C.lazul_aura_actualizar(a.ptr, js, C.double(e.X), C.double(e.Y))
+}
+
+// EnPantalla mueve la superficie al monitor d (el que controla el panel). GTK
+// no da el nombre del conector, así que se busca por su origen en el
+// escritorio, que es el mismo que da Hyprland.
+func (a *Aura) EnPantalla(d platform.Display) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.ptr == nil {
+		return
+	}
+	C.lazul_aura_monitor(a.ptr, C.int(d.X), C.int(d.Y))
 }
 
 // Cerrar destruye la superficie. Wails ya está cerrando: solo libera.

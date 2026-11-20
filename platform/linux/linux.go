@@ -16,5 +16,6 @@ func New() platform.Sistema {
 		TactileActions:  accionesTactiles{rueda: &ruedaVirtual{}},
 		AbsolutePointer: puntero,
 		TouchScreen:     tactil,
+		Displays:        pantallasHyprland{ejecutar: ejecutarTactilReal, puntero: puntero, tactil: tactil},
 	}
 }

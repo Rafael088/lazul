@@ -6,6 +6,8 @@ import (
 	"image/png"
 	"os"
 	"testing"
+
+	"github.com/Rafael088/lazul/platform"
 )
 
 func TestPintarAura(t *testing.T) {
@@ -76,5 +78,29 @@ func TestPintarAuraEscalaUnaVez(t *testing.T) {
 	b := pintarAura(ladoAura, 1, false)
 	if a := b[(ladoAura/2*ladoAura+ladoAura-1)*4+3]; a != 0 {
 		t.Errorf("el borde de la superficie tiene alfa %d", a)
+	}
+}
+
+func TestPosicionAuraPorMonitor(t *testing.T) {
+	const lado = 180
+	principal := platform.Display{Width: 2880, Height: 1800}
+	externa := platform.Display{Name: `\\.\DISPLAY2`, X: 2880, Y: 0, Width: 1920, Height: 1080}
+	izquierda := platform.Display{Name: `\\.\DISPLAY3`, X: -1920, Y: 200, Width: 1920, Height: 1080}
+	casos := []struct {
+		m      platform.Display
+		x, y   float64
+		px, py int32
+	}{
+		// Un solo monitor: como antes (centro de la principal).
+		{principal, .5, .5, 1440 - lado/2, 900 - lado/2},
+		{externa, .5, .5, 2880 + 960 - lado/2, 540 - lado/2},
+		{externa, 0, 0, 2880 - lado/2, -lado / 2},
+		{izquierda, 1, 1, -1920 + 1919 - lado/2, 200 + 1079 - lado/2},
+	}
+	for _, c := range casos {
+		px, py := posicionAura(EstadoAura{X: c.x, Y: c.y}, c.m, lado)
+		if px != c.px || py != c.py {
+			t.Errorf("%s (%v,%v) = (%d,%d), quiere (%d,%d)", c.m.Name, c.x, c.y, px, py, c.px, c.py)
+		}
 	}
 }

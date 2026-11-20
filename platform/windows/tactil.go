@@ -113,7 +113,7 @@ func contactoTactil(slot int, p punto, flags uint32) pointerTouchInfo {
 // anterior a points sobre una pantalla de ancho×alto píxeles. Un dedo que
 // sigue apoyado va como actualización; uno omitido o con Down=false se
 // levanta en su última posición.
-func (s *estadoTactil) cuadro(points []platform.TouchPoint, ancho, alto int32) ([]pointerTouchInfo, error) {
+func (s *estadoTactil) cuadro(points []platform.TouchPoint, z zonaTactil) ([]pointerTouchInfo, error) {
 	if err := validarPuntosTactiles(points); err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (s *estadoTactil) cuadro(points []platform.TouchPoint, ancho, alto int32) (
 	for slot, d := range dedos {
 		switch {
 		case d.Down:
-			p := punto{int32(math.Round(d.X * float64(ancho-1))), int32(math.Round(d.Y * float64(alto-1)))}
+			p := z.pixel(d.X, d.Y)
 			flags := uint32(punteroEnRango | punteroEnContacto | punteroActualizar)
 			if !s.abajo[slot] {
 				flags = punteroEnRango | punteroEnContacto | punteroAbajo
@@ -167,6 +167,7 @@ type tactilVirtual struct {
 	latido  *time.Ticker
 	parar   chan struct{}
 	cerrado bool
+	destino *destinoPantalla // monitor elegido; nil o vacío = la principal
 }
 
 var _ platform.TouchScreen = (*tactilVirtual)(nil)
@@ -242,8 +243,7 @@ func (t *tactilVirtual) Frame(ctx context.Context, points []platform.TouchPoint)
 		return errors.New("táctil virtual: cerrado")
 	}
 	return conDPIFisico(func() error {
-		ancho, alto := pantallaPrincipal()
-		cs, err := t.estado.cuadro(points, ancho, alto)
+		cs, err := t.estado.cuadro(points, zonaDe(t.destino, pantallaPrincipal))
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func (t *tactilVirtual) Close() error {
 		t.latido.Stop()
 		close(t.parar)
 	}
-	cs, _ := t.estado.cuadro(nil, 1, 1)
+	cs, _ := t.estado.cuadro(nil, zonaTactil{ancho: 1, alto: 1})
 	if len(cs) == 0 {
 		return nil
 	}

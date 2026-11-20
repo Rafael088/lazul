@@ -136,7 +136,6 @@ type tactilVirtual struct {
 	mu     sync.Mutex
 	f      *os.File
 	err    error
-	abrir  sync.Once
 	estado estadoTactil
 }
 
@@ -215,6 +214,7 @@ func (t *tactilVirtual) abrirDispositivo() {
 		return
 	}
 	t.f = f
+	t.estado.abajo = [touchSlots]bool{}
 	time.Sleep(700 * time.Millisecond)
 }
 
@@ -222,7 +222,17 @@ func (t *tactilVirtual) Prepare(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	t.abrir.Do(t.abrirDispositivo)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.preparar()
+}
+
+// preparar crea el dispositivo si todavía no existe. Un fallo queda guardado:
+// no se reintenta en cada cuadro. Se llama con t.mu tomado.
+func (t *tactilVirtual) preparar() error {
+	if t.f == nil && t.err == nil {
+		t.abrirDispositivo()
+	}
 	return t.err
 }
 
@@ -233,11 +243,11 @@ func (t *tactilVirtual) Frame(ctx context.Context, points []platform.TouchPoint)
 	if err := validarPuntosTactiles(points); err != nil {
 		return err
 	}
-	if err := t.Prepare(ctx); err != nil {
-		return err
-	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if err := t.preparar(); err != nil {
+		return err
+	}
 	b, err := t.estado.eventos(points)
 	if err != nil {
 		return err
@@ -255,6 +265,27 @@ func (t *tactilVirtual) Close() error {
 	runtime.SetFinalizer(t, nil)
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	return t.cerrar()
+}
+
+// Recrear destruye el dispositivo (si existe) y lo vuelve a crear, para que
+// el compositor lo vea nuevo y le aplique la salida que se le acaba de
+// asignar. Sin dispositivo no hace nada: el primer Prepare ya la verá.
+func (t *tactilVirtual) Recrear() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.f == nil {
+		return nil
+	}
+	if err := t.cerrar(); err != nil {
+		return err
+	}
+	return t.preparar()
+}
+
+// cerrar levanta los dedos y destruye el dispositivo. Se llama con t.mu
+// tomado.
+func (t *tactilVirtual) cerrar() error {
 	if t.f == nil {
 		return nil
 	}
