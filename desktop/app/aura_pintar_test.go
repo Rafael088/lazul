@@ -9,7 +9,7 @@ import (
 )
 
 func TestPintarAura(t *testing.T) {
-	const lado = 360
+	const lado = ladoAura * 3 / 2 // la superficie a escala 1,5
 	for _, agarrando := range []bool{false, true} {
 		b := pintarAura(lado, 1.5, agarrando)
 		if len(b) != lado*lado*4 {
@@ -51,5 +51,30 @@ func TestPintarAura(t *testing.T) {
 			png.Encode(f, img)
 			f.Close()
 		}
+	}
+}
+
+// El dibujo se mide en píxeles CSS: a escala 2 ocupa cuatro veces los píxeles
+// físicos que a escala 1, no dieciséis (eso sería escalar dos veces).
+func TestPintarAuraEscalaUnaVez(t *testing.T) {
+	visibles := func(escala float64) int {
+		lado := int(ladoAura * escala)
+		b := pintarAura(lado, escala, false)
+		n := 0
+		for i := 3; i < len(b); i += 4 {
+			if b[i] > 8 {
+				n++
+			}
+		}
+		return n
+	}
+	uno, dos := visibles(1), visibles(2)
+	if r := float64(dos) / float64(uno); r < 3.6 || r > 4.4 {
+		t.Fatalf("a escala 2 hay %.2f veces los píxeles de escala 1; se esperaba ~4", r)
+	}
+	// El halo suave cabe en la superficie con margen (radio 60 % del lado / 2).
+	b := pintarAura(ladoAura, 1, false)
+	if a := b[(ladoAura/2*ladoAura+ladoAura-1)*4+3]; a != 0 {
+		t.Errorf("el borde de la superficie tiene alfa %d", a)
 	}
 }

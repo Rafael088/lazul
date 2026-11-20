@@ -8,7 +8,7 @@ import "math"
 // solo mueve. Las medidas están en píxeles CSS; escala pasa a píxeles físicos.
 
 // ladoAura es el lado de la superficie en píxeles CSS (como LAZUL_AURA_LADO).
-const ladoAura = 240
+const ladoAura = 180
 
 type colorAura struct{ r, g, b, a float64 } // r, g, b en 0..255; a en 0..1
 
@@ -70,23 +70,27 @@ func brillo(d, b float64) float64 {
 // pintarAura devuelve lado×lado píxeles BGRA premultiplicados, de arriba
 // abajo, con el aura centrada. agarrando enciende el halo y agranda el anillo.
 func pintarAura(lado int, escala float64, agarrando bool) []byte {
-	// Halo: caja de 144 px con border-radius 50 %; el degradado «circle»
-	// llega a la esquina más lejana (72·√2).
-	radioHalo, paradas := 72.0, haloSuave
-	// Anillo: 60 px por fuera con 2 px de borde y sus dos sombras.
-	radioAro, borde := 30.0, 2.0
+	// Figura calibrada para una superficie de 240 px CSS: k la escala a
+	// ladoAura. Sale de ladoAura y no de lado (píxeles físicos) para no
+	// multiplicar dos veces por la escala de la pantalla.
+	k := float64(ladoAura) / 240
+	// Halo: caja del 60 % del lado con border-radius 50 %; el degradado
+	// «circle» llega a la esquina más lejana (r·√2).
+	radioHalo, paradas := 72*k, haloSuave
+	// Anillo: caja del 25 % del lado con 2 px de borde y sus dos sombras.
+	radioAro, borde := 30*k, 2*k
 	colorBorde := colorAura{127, 168, 255, .78}
 	type sombra struct {
 		c      colorAura
 		b      float64
 		dentro bool
 	}
-	sombras := []sombra{{conA(lapis, .55), 12, false}, {conA(lapis, .35), 8, true}}
+	sombras := []sombra{{conA(lapis, .55), 12 * k, false}, {conA(lapis, .35), 8 * k, true}}
 	if agarrando {
-		radioHalo, paradas = 72*1.35, haloVivo
-		radioAro, borde = 30*1.45, 2*1.45
+		radioHalo, paradas = 72*1.35*k, haloVivo
+		radioAro, borde = 30*1.45*k, 2*1.45*k
 		colorBorde = colorAura{232, 236, 255, .96}
-		sombras = []sombra{{conA(lapis, .95), 22 * 1.45, false}, {conA(hielo, .9), 7 * 1.45, false}}
+		sombras = []sombra{{conA(lapis, .95), 22 * 1.45 * k, false}, {conA(hielo, .9), 7 * 1.45 * k, false}}
 	}
 	radioDeg := radioHalo * math.Sqrt2
 
