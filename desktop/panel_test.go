@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -295,7 +296,8 @@ func TestPanelCalibraGuardaRecargaYMueve(t *testing.T) {
 	if e := p.Estado(); !e.Calibrado || e.Calibrando {
 		t.Fatalf("estado tras calibrar: %+v", e)
 	}
-	if info, err := os.Stat(ruta); err != nil || info.Mode().Perm() != 0o600 {
+	// Windows no tiene bits de permiso: Go informa 0666 para cualquier archivo.
+	if info, err := os.Stat(ruta); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("archivo privado: info %v, error %v", info, err)
 	}
 

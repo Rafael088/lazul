@@ -1,9 +1,9 @@
-//go:build !linux || !cgo
+//go:build !windows && (!linux || !cgo)
 
 package main
 
-// Aura sin layer-shell: Windows no tiene gtk-layer-shell y un binario sin cgo
-// no puede dibujar la superficie. El halo se apaga y la app sigue igual; la
+// Aura sin superficie: un binario de Linux sin cgo (o de otro sistema) no
+// puede dibujarla; Windows tiene la suya en aura_windows.go. El halo se apaga y la app sigue igual; la
 // señal visual sigue siendo la píldora del indicador.
 type Aura struct{}
 

@@ -2,9 +2,9 @@
 // Por defecto la ventana es una píldora pequeña en una esquina: muestra si
 // el modo táctil está activo y destella el gesto reconocido. La vista de la
 // cámara queda como opción para acomodarse (botón o Ctrl+Mayús+C) y la app
-// arranca con la cámara encendida aunque su vista esté apagada. En Linux abre
-// por defecto el modo táctil local (el pellizco toca la pantalla virtual y
-// los otros gestos actúan sobre la ventana con foco);
+// arranca con la cámara encendida aunque su vista esté apagada. En Linux y
+// Windows abre por defecto el modo táctil local (el pellizco toca la pantalla
+// virtual y los otros gestos actúan sobre la ventana con foco);
 // el modo de transferencia anterior sigue disponible con -modo transferencia.
 //
 // La webview abre la cámara (Windows: getUserMedia; Linux: ffmpeg en un
@@ -533,7 +533,7 @@ func (a *App) cerrarAura() {
 // CalibrarPanel empieza (o repite) el asistente de dos esquinas.
 func (a *App) CalibrarPanel() string {
 	if a.panel == nil {
-		return "el puntero absoluto solo está disponible en el modo táctil de Linux"
+		return "el panel solo está disponible en el modo táctil"
 	}
 	a.panel.EmpezarCalibracion()
 	return ""
@@ -793,7 +793,7 @@ func main() {
 	estado := flag.String("estado", "", "carpeta de identidad, equipos y registro (por defecto la de configuración y la de estado del usuario)")
 	escucha := flag.String("escucha", fmt.Sprintf(":%d", desktop.PuertoLazul), "dirección en que escucha el receptor")
 	camara := flag.String("camara", "auto", "auto | webview | proceso | no (auto: proceso en Linux, webview en Windows)")
-	modoApp := flag.String("modo", "auto", "auto | tactil | transferencia (auto: táctil en Linux)")
+	modoApp := flag.String("modo", "auto", "auto | tactil | transferencia (auto: táctil en Linux y Windows)")
 	dispositivo := flag.String("dispositivo", "/dev/video0", "cámara para el modo proceso (ffmpeg -f v4l2)")
 	abrir := flag.Bool("abrir", true, "abrir de verdad lo que llega (false: solo anotarlo)")
 	usarMDNS := flag.Bool("mdns", true, "anunciar este equipo y buscar los demás por mDNS")
@@ -885,8 +885,9 @@ func correr(o opciones) error {
 	}
 	modoControl := o.modo
 	if modoControl == "auto" {
+		// Linux (uinput) y Windows (InjectTouchInput) tienen táctil virtual.
 		modoControl = "transferencia"
-		if runtime.GOOS == "linux" {
+		if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
 			modoControl = "tactil"
 		}
 	}
@@ -917,7 +918,7 @@ func correr(o opciones) error {
 	}
 	if modoControl == "tactil" {
 		if sis.TactileActions == nil {
-			return errors.New("el modo táctil solo está disponible en Linux")
+			return errors.New("el modo táctil solo está disponible en Linux y Windows")
 		}
 		app.flujo = &desktop.Tactil{Reg: reg, Acciones: sis.TactileActions, AlEvento: app.ind.Aplicar}
 		app.panel, err = desktop.NuevoPanel(rutaPanel, sis.AbsolutePointer)

@@ -11,5 +11,5 @@ import (
 
 func TestContrato(t *testing.T) {
 	contrato.Exigir(t)
-	contrato.Correr(t, windows.New(), contrato.Opciones{AppInofensiva: "calc.exe"})
+	contrato.Correr(t, windows.New(), contrato.Opciones{AppInofensiva: "calc.exe", TactileActions: true, TouchScreen: true})
 }
