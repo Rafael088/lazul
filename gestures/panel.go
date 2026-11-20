@@ -198,7 +198,10 @@ type AjustesOneEuro struct {
 	DerivativeCutoff float64
 }
 
-var AjustesOneEuroPorDefecto = AjustesOneEuro{MinCutoff: 1.2, Beta: 0.08, DerivativeCutoff: 1.0}
+// 0,7 y 0,7 salen de medir con la mano quieta (temblor) y al mover rápido
+// (retraso): bajar el corte reduce el temblor; la Beta alta lo devuelve al
+// subir la velocidad, sin añadir retraso (cotejo-ifh3nu).
+var AjustesOneEuroPorDefecto = AjustesOneEuro{MinCutoff: 0.7, Beta: 0.7, DerivativeCutoff: 1.0}
 
 type filtroOneEuro1D struct {
 	iniciado           bool
