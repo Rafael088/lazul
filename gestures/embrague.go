@@ -17,9 +17,12 @@ import (
 //   - El pellizco parpadea: 29 veces se abrió uno o dos cuadros en medio de un
 //     arrastre a 15 fps. Para soltar se exigen 3 cuadros abiertos y 250 ms
 //     (las dos cosas: a fps bajos manda el tiempo y a fps altos, los cuadros),
-//     así un parpadeo no corta el arrastre. Para apoyar, 3 cuadros cerrados
-//     seguidos: un cierre de uno o dos cuadros no es un toque. Y el dedo cae
-//     en el ancla, donde apuntaba la mano abierta (cotejo-uy84og).
+//     así un parpadeo no corta el arrastre. Para apoyar, dos niveles
+//     (cotejo-lgbapm): un pellizco muy cerrado (por debajo de UmbralFirme)
+//     apoya desde el primer cuadro, para que cuente el tap rápido; uno tibio
+//     espera 3 cuadros cerrados seguidos, porque un cierre tibio de uno o dos
+//     cuadros es el parpadeo y no un toque. Y el dedo cae en el ancla, donde
+//     apuntaba la mano abierta (cotejo-uy84og).
 //   - Dos manos pellizcando y separándose o juntándose son un zoom; el resto
 //     de los casos es un arrastre, con la dirección del eje que más se movió.
 //
@@ -62,8 +65,9 @@ type AjustesEmbrague struct {
 	CuadrosParaSoltar int
 	MsParaSoltar      int64
 	// CuadrosParaApoyar es cuántos cuadros seguidos tiene que estar cerrado
-	// un pellizco que empezó dentro para armarse: un cierre de un solo
-	// cuadro (el parpadeo) no apoya el dedo.
+	// un pellizco tibio que empezó dentro para armarse: un cierre de un solo
+	// cuadro (el parpadeo) no apoya el dedo. Uno por debajo de
+	// Pellizco.UmbralFirme apoya sin esperar.
 	CuadrosParaApoyar int
 	// MsAncla: el dedo cae donde estaba el puntero en el último cuadro con
 	// la mano abierta, si fue hace como mucho este tiempo. Cerrar el
@@ -176,8 +180,12 @@ type MedidorEmbrague struct {
 }
 
 // NuevoMedidorEmbrague arranca con la calibración del panel.
+// Los umbrales del pellizco salen de la calibración (los del dueño si se
+// midieron).
 func NuevoMedidorEmbrague(c CalibracionPanel) *MedidorEmbrague {
-	return NuevoMedidorEmbragueCon(c, AjustesEmbraguePorDefecto)
+	aj := AjustesEmbraguePorDefecto
+	aj.Pellizco = c.AjustesPellizco()
+	return NuevoMedidorEmbragueCon(c, aj)
 }
 
 func NuevoMedidorEmbragueCon(c CalibracionPanel, aj AjustesEmbrague) *MedidorEmbrague {
@@ -300,7 +308,7 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 			est.pendiente = !est.armada && md.dentroReal
 		}
 		est.cerrados++
-		if est.pendiente && est.cerrados >= m.Ajustes.CuadrosParaApoyar {
+		if est.pendiente && (est.cerrados >= m.Ajustes.CuadrosParaApoyar || m.firme(md.estado)) {
 			est.pendiente = false
 			est.armada = true
 			est.inicio = md.pos
@@ -332,6 +340,14 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	est.cerrada = false
 	est.pendiente = false
 	return m.abrir(est, t)
+}
+
+// firme dice si el pellizco está tan cerrado que apoya sin esperar a
+// CuadrosParaApoyar: el tap rápido dura uno o dos cuadros (~66 ms a 30 fps,
+// ~130 ms a 15 fps) y con tres no llegaba a contar.
+func (m *MedidorEmbrague) firme(e EstadoPellizco) bool {
+	f := m.Ajustes.Pellizco.UmbralFirme
+	return f > 0 && float64(e.Apertura) < f
 }
 
 // anclaVigente dice si la mano tiene un ancla reciente (MsAncla).

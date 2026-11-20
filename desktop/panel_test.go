@@ -293,6 +293,26 @@ func TestPanelCalibraGuardaRecargaYMueve(t *testing.T) {
 	if err := p.CapturarEsquina(); err != nil {
 		t.Fatal(err)
 	}
+	// Tercer paso: junta los dedos. Con la mano abierta no se puede capturar;
+	// con las puntas juntas, sí, y la calibración guarda su apertura.
+	if e := p.Estado(); e.Calibrado || !e.Calibrando || e.Paso != 3 {
+		t.Fatalf("tras las dos esquinas falta el pellizco: %+v", e)
+	}
+	for i := 0; i < muestrasParaEsquina; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(800+i*33), manoPanelPrueba(0, 0, .25, false)), false)
+	}
+	if p.Estado().ListoCapturar || p.CapturarEsquina() == nil {
+		t.Fatal("capturó el pellizco con la mano abierta")
+	}
+	for i := 0; i < muestrasParaEsquina; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(1100+i*33), manoPanelPrueba(0, 0, .25, true)), false)
+	}
+	if !p.Estado().ListoCapturar {
+		t.Fatalf("el pellizco quieto no quedó listo: %+v", p.Estado())
+	}
+	if err := p.CapturarEsquina(); err != nil {
+		t.Fatal(err)
+	}
 	if e := p.Estado(); !e.Calibrado || e.Calibrando {
 		t.Fatalf("estado tras calibrar: %+v", e)
 	}
@@ -313,6 +333,12 @@ func TestPanelCalibraGuardaRecargaYMueve(t *testing.T) {
 	recargado, err := NuevoPanel(ruta, otroPuntero)
 	if err != nil || !recargado.Estado().Calibrado {
 		t.Fatalf("no recargó la calibración: estado %+v, error %v", recargado.Estado(), err)
+	}
+	if a := recargado.calibracion.PellizcoCerrado; math.Abs(a-0.10) > 1e-3 {
+		t.Fatalf("pellizco guardado %v, quería 0,10", a)
+	}
+	if aj := recargado.embrague.Ajustes.Pellizco; aj != gestures.AjustesPellizcoPara(recargado.calibracion.PellizcoCerrado) {
+		t.Fatalf("el embrague recargado no usa el pellizco calibrado: %+v", aj)
 	}
 	if err := recargado.Preparar(); err != nil || !otroPuntero.preparado {
 		t.Fatalf("no preparó el puntero: preparado %v, error %v", otroPuntero.preparado, err)
@@ -449,6 +475,30 @@ func TestAvisoEsquinaCercaDelBordeDeImagen(t *testing.T) {
 				t.Fatalf("avisa %v, quería %v", avisa, caso.avisa)
 			}
 		})
+	}
+}
+
+// Una calibración de antes (sin pellizco) sigue valiendo con los umbrales
+// por defecto; una con un pellizco fuera de rango es un archivo dañado.
+func TestCalibracionSinPellizcoUsaLosDeDefecto(t *testing.T) {
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	vieja := `{"version":1,"superior_izquierda":{"x":-0.2,"y":-0.2,"tamano":0.2},"inferior_derecha":{"x":0.2,"y":0.2,"tamano":0.2}}`
+	if err := os.WriteFile(ruta, []byte(vieja), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := NuevoPanel(ruta, nil)
+	if err != nil || !p.Estado().Calibrado {
+		t.Fatalf("no leyó la calibración vieja: %v", err)
+	}
+	if aj := p.embrague.Ajustes.Pellizco; aj != gestures.AjustesPellizcoPorDefecto {
+		t.Fatalf("sin pellizco medido deberían valer los de por defecto: %+v", aj)
+	}
+	mala := strings.Replace(vieja, `"version":1`, `"version":1,"pellizco_cerrado":0.4`, 1)
+	if err := os.WriteFile(ruta, []byte(mala), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NuevoPanel(ruta, nil); err == nil {
+		t.Fatal("aceptó un pellizco calibrado de 0,4")
 	}
 }
 

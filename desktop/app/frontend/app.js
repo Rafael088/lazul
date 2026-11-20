@@ -292,15 +292,16 @@ function pintarEstado(e) {
 	mostrarIndicador(e.indicador);
 	texto("panelentrada", panel.modo_entrada === "tactil" ? "Entrada: pantalla táctil virtual" : "Entrada: respaldo de ratón y teclado");
 	texto("panelaviso", [panel.aviso_entrada, panel.aviso_calibracion].filter(Boolean).join(" "));
-  texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas para crear el panel delante de ti.");
+  texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas y tu pellizco para crear el panel delante de ti.");
   texto("panelerror", panel.error || "");
-  texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 2` :
+  texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 3` :
     (panel.calibrado ? (panel.dentro ? "Mano dentro del panel" : "Panel listo") : "Sin calibrar"));
   texto("panelpos", panel.dentro ? `${Math.round(100 * panel.x)} %, ${Math.round(100 * panel.y)} %` : "");
   $("calibrarpanel").textContent = panel.calibrado ? "Recalibrar" : "Calibrar panel";
   $("capturarpanel").style.display = panel.calibrando ? "inline-block" : "none";
   $("capturarpanel").disabled = !panel.listo_capturar;
-  $("capturarpanel").textContent = panel.paso === 2 ? "Guardar esquina inferior derecha" : "Guardar esquina superior izquierda";
+  $("capturarpanel").textContent = panel.paso === 3 ? "Guardar mi pellizco" :
+    (panel.paso === 2 ? "Guardar esquina inferior derecha" : "Guardar esquina superior izquierda");
   const r = e.red;
   texto("nombre", r.nombre); texto("huella", r.huella);
   texto("dirs", (r.direcciones || []).join("  ·  ") || (r.escuchando ? "(sin red local)" : "-"));

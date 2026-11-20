@@ -530,7 +530,7 @@ func (a *App) cerrarAura() {
 	}
 }
 
-// CalibrarPanel empieza (o repite) el asistente de dos esquinas.
+// CalibrarPanel empieza (o repite) el asistente: dos esquinas y el pellizco.
 func (a *App) CalibrarPanel() string {
 	if a.panel == nil {
 		return "el panel solo está disponible en el modo táctil"

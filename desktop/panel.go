@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -20,6 +21,9 @@ const (
 	muestrasParaEsquina    = 8
 	maxMuestrasEsquina     = 15
 	toleranciaQuieta       = .2 // en palmas, respecto a la media de las últimas muestras
+	// El tercer paso mide el pellizco del dueño: 8 cuadros con las puntas
+	// juntas que no varíen más de esto entre sí (MediaPipe tiembla 0,03–0,05).
+	toleranciaPellizco = .08
 )
 
 // motivos con que el registro anota una mano que el panel dejó fuera. Los
@@ -82,7 +86,9 @@ type Panel struct {
 	calibrando       bool
 	paso             int
 	primera          gestures.MuestraPanel
+	nueva            gestures.CalibracionPanel // las dos esquinas, esperando el pellizco
 	muestras         []gestures.MuestraPanel
+	aperturas        []float64
 	aspecto          float64
 	avisoCalibracion string
 	filtro           gestures.FiltroOneEuroPanel
@@ -173,7 +179,7 @@ func (p *Panel) EmpezarCalibracion() {
 	p.soltarBoton()
 	p.levantarDedos()
 	p.calibrando, p.paso = true, 1
-	p.muestras = nil
+	p.muestras, p.aperturas = nil, nil
 	p.dentro = false
 	p.fase = gestures.EmbragueFuera
 	p.armadas = 0
@@ -211,13 +217,34 @@ func (p *Panel) muestraEstable() (gestures.MuestraPanel, error) {
 	return media, nil
 }
 
-// CapturarEsquina toma la muestra estable del paso actual. En el segundo paso
-// valida y persiste la calibración completa.
+// pellizcoEstable da la apertura mediana de los últimos cuadros con las
+// puntas juntas, o por qué todavía no.
+func (p *Panel) pellizcoEstable() (float64, error) {
+	if len(p.aperturas) < muestrasParaEsquina {
+		return 0, fmt.Errorf("junta las puntas del pulgar y el índice: faltan %d cuadros", muestrasParaEsquina-len(p.aperturas))
+	}
+	ultimas := append([]float64(nil), p.aperturas[len(p.aperturas)-muestrasParaEsquina:]...)
+	sort.Float64s(ultimas)
+	if ultimas[len(ultimas)-1] > gestures.MaxPellizcoCerrado {
+		return 0, errors.New("junta más las puntas del pulgar y el índice, hasta que se toquen")
+	}
+	if ultimas[len(ultimas)-1]-ultimas[0] > toleranciaPellizco {
+		return 0, errors.New("mantén el pellizco quieto un momento antes de capturar")
+	}
+	return (ultimas[len(ultimas)/2-1] + ultimas[len(ultimas)/2]) / 2, nil
+}
+
+// CapturarEsquina toma la muestra estable del paso actual. El segundo paso
+// valida el rectángulo; el tercero mide el pellizco del dueño y persiste la
+// calibración completa.
 func (p *Panel) CapturarEsquina() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.calibrando {
 		return errors.New("empieza la calibración primero")
+	}
+	if p.paso == 3 {
+		return p.capturarPellizco()
 	}
 	m, err := p.muestraEstable()
 	if err != nil {
@@ -234,19 +261,34 @@ func (p *Panel) CapturarEsquina() error {
 		p.err = err.Error()
 		return err
 	}
-	if err := GuardarCalibracionPanel(p.ruta, c); err != nil {
-		p.err = "no se guardó la calibración: " + err.Error()
-		return err
-	}
-	p.calibracion, p.calibrado = c, true
-	p.embrague = gestures.NuevoMedidorEmbrague(c)
 	if aviso := avisoEsquinaCercaDelBorde("La esquina inferior derecha", m, p.aspecto); aviso != "" {
 		if p.avisoCalibracion != "" {
 			p.avisoCalibracion += " "
 		}
 		p.avisoCalibracion += aviso
 	}
-	p.calibrando, p.paso, p.muestras, p.err = false, 0, nil, ""
+	p.nueva, p.paso, p.muestras, p.aperturas, p.err = c, 3, nil, nil, ""
+	return nil
+}
+
+// capturarPellizco cierra la calibración con el pellizco del dueño: los
+// umbrales del embrague se fijan a su mano (gestures.AjustesPellizcoPara).
+// Se llama con p.mu tomado.
+func (p *Panel) capturarPellizco() error {
+	a, err := p.pellizcoEstable()
+	if err != nil {
+		p.err = err.Error()
+		return err
+	}
+	c := p.nueva
+	c.PellizcoCerrado = a
+	if err := GuardarCalibracionPanel(p.ruta, c); err != nil {
+		p.err = "no se guardó la calibración: " + err.Error()
+		return err
+	}
+	p.calibracion, p.calibrado = c, true
+	p.embrague = gestures.NuevoMedidorEmbrague(c)
+	p.calibrando, p.paso, p.muestras, p.aperturas, p.err = false, 0, nil, nil, ""
 	p.filtro.Reiniciar()
 	p.mapeadores = map[gestures.ClaveMano]*gestures.MapeadorPanel{}
 	return nil
@@ -374,7 +416,16 @@ func (p *Panel) Cuadro(c gestures.Cuadro, mover bool) {
 	if p.calibrando {
 		p.aspecto = float64(c.Aspecto)
 		if len(c.Manos) == 0 {
-			p.muestras = nil
+			p.muestras, p.aperturas = nil, nil
+			return
+		}
+		if p.paso == 3 {
+			if a, ok := gestures.AperturaPellizco(c.Manos[0], c.Aspecto); ok {
+				p.aperturas = append(p.aperturas, a)
+				if len(p.aperturas) > maxMuestrasEsquina {
+					p.aperturas = p.aperturas[len(p.aperturas)-maxMuestrasEsquina:]
+				}
+			}
 			return
 		}
 		if m, ok := gestures.MuestraPanelDe(c.Manos[0], c.Aspecto); ok {
@@ -639,10 +690,12 @@ func (p *Panel) Estado() EstadoPanel {
 	switch {
 	case p.calibrando && p.paso == 1:
 		e.Instruccion = "Pon la palma en la esquina superior izquierda del panel imaginario, mantenla quieta y captura la esquina."
-	case p.calibrando:
+	case p.calibrando && p.paso == 2:
 		e.Instruccion = "Ahora pon la palma en la esquina inferior derecha del panel imaginario, mantenla quieta y captura la esquina."
+	case p.calibrando:
+		e.Instruccion = "Junta los dedos: toca la punta del índice con la del pulgar, como al pellizcar, mantenlo quieto y captura. Así el pellizco se ajusta a tu mano."
 	case !p.calibrado:
-		e.Instruccion = "Calibra dos esquinas para crear el panel delante de ti."
+		e.Instruccion = "Calibra dos esquinas y tu pellizco para crear el panel delante de ti."
 	case p.armadas == 2:
 		if p.tactilListo {
 			e.Instruccion = "Dos manos pellizcando: dos dedos hacen zoom directamente en la app."
@@ -661,7 +714,12 @@ func (p *Panel) Estado() EstadoPanel {
 		e.Instruccion = "Panel listo. Mete la palma dentro del rectángulo que calibraste."
 	}
 	if p.calibrando {
-		_, err := p.muestraEstable()
+		var err error
+		if p.paso == 3 {
+			_, err = p.pellizcoEstable()
+		} else {
+			_, err = p.muestraEstable()
+		}
 		e.ListoCapturar = err == nil
 	}
 	return e

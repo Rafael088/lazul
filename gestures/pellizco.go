@@ -2,6 +2,7 @@ package gestures
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -16,17 +17,76 @@ import (
 
 // AjustesPellizco son los umbrales de apertura, en largos de palma. Se
 // cierra por debajo de UmbralCerrar y se abre por encima de UmbralAbrir:
-// entre los dos el estado no cambia (histéresis). Provisional hasta medir
-// con las tomas reales (cotejo-glt7ss); sale de la pinza del clasificador
-// (puntasPinza = 0,30) con margen para el temblor.
+// entre los dos el estado no cambia (histéresis). UmbralFirme es el segundo
+// nivel del embrague: un pellizco que baja de él está claramente cerrado y
+// apoya desde el primer cuadro; uno tibio (entre UmbralFirme y UmbralCerrar)
+// sigue esperando CuadrosParaApoyar (cotejo-lgbapm). 0 lo apaga.
+//
+// En las tomas reales (fixtures/pellizco) el pellizco de verdad baja hasta
+// 0,09 de mediana (p90 0,15) y el involuntario se queda en 0,18: con 0,30 se
+// armaba sin que los dedos se tocaran. La calibración del panel puede fijar
+// los tres a la mano del dueño (AjustesPellizcoPara).
 type AjustesPellizco struct {
 	UmbralCerrar float64
 	UmbralAbrir  float64
+	UmbralFirme  float64
 }
 
 var AjustesPellizcoPorDefecto = AjustesPellizco{
-	UmbralCerrar: 0.30,
+	UmbralCerrar: 0.20,
 	UmbralAbrir:  0.45,
+	UmbralFirme:  0.12,
+}
+
+// MaxPellizcoCerrado es la apertura más grande que se acepta como «dedos
+// juntos» al calibrar: en las tomas, el 90 % de los pellizcos de verdad baja
+// de 0,15 y el involuntario se queda en 0,18; por encima de 0,22 las puntas
+// no se están tocando.
+const MaxPellizcoCerrado = 0.22
+
+// Márgenes de la calibración del pellizco, en largos de palma, sobre la
+// apertura medida con los dedos juntos. Con 0,11 de margen para cerrar y 0,03
+// para firme, el dueño de las tomas (≈0,09 con las puntas juntas) da los
+// mismos 0,20 y 0,12 de por defecto. El mínimo de cerrar es 0,18: quieta y
+// apretando, la mano mide menos que pellizcando en movimiento (mediana 0,13
+// en los arrastres de las tomas) y con 0,16 las tomas pierden 7 aciertos.
+const (
+	margenCerrarCalibrado = 0.11
+	margenFirmeCalibrado  = 0.03
+	minCerrarCalibrado    = 0.18
+	maxCerrarCalibrado    = 0.30 // el umbral de antes: nunca más generoso que eso
+	minFirmeCalibrado     = 0.08
+	huecoFirmeCerrar      = 0.06 // el firme queda al menos esto por debajo de cerrar
+)
+
+// AjustesPellizcoPara fija los umbrales a la mano del dueño a partir de la
+// apertura de su pellizco con las puntas juntas: cerrar y firme un margen por
+// encima, acotados para que una medida rara no deje el pellizco imposible ni
+// vuelva al umbral generoso. Abrir no cambia: es el que corta el arrastre y
+// lo mide el parpadeo, no la mano.
+func AjustesPellizcoPara(cerrado float64) AjustesPellizco {
+	aj := AjustesPellizcoPorDefecto
+	if !(cerrado > 0 && cerrado <= MaxPellizcoCerrado) { // también NaN
+		return aj
+	}
+	aj.UmbralCerrar = acotar(cerrado+margenCerrarCalibrado, minCerrarCalibrado, maxCerrarCalibrado)
+	aj.UmbralFirme = acotar(cerrado+margenFirmeCalibrado, minFirmeCalibrado, aj.UmbralCerrar-huecoFirmeCerrar)
+	return aj
+}
+
+func acotar(v, lo, hi float64) float64 {
+	return math.Max(lo, math.Min(hi, v))
+}
+
+// validarPellizcoCerrado acepta 0 (sin medir) o una apertura de dedos juntos.
+func validarPellizcoCerrado(a float64) error {
+	if a == 0 {
+		return nil
+	}
+	if !(a > 0 && a <= MaxPellizcoCerrado) {
+		return fmt.Errorf("pellizco calibrado fuera de rango: %v", a)
+	}
+	return nil
 }
 
 // EstadoPellizco es el pellizco de una mano en un cuadro.
