@@ -33,20 +33,23 @@ function etiquetaGesto(ind) {
 function mostrarIndicador(ind) {
   const pill = $("indicador");
   if (!pill) return;
-  // Con el panel calibrado, lo que importa es el panel (no necesita la L):
-  // el indicador dice si la mano está dentro y si está tocando.
+  // La L es un interruptor: el indicador dice siempre encendido o apagado.
+  // Con el panel calibrado, encendido añade lo que hace la mano.
   const p = panelUltimo;
+  const sufijo = (modoEntradaPanel === "respaldo" ? " · respaldo" : "") + (delegadoMP === "CPU" ? " · CPU lenta" : "");
   if (p.calibrado && !p.calibrando) {
-    const tocando = p.fase === "agarrando";
-    pill.classList.toggle("activo", tocando || !!p.dentro);
-    let t = tocando ? (p.manos_armadas === 2 ? "2 dedos" : "tocando") : (p.dentro ? "mano en el panel" : "panel listo");
-    $("indicador-estado").textContent = t + (modoEntradaPanel === "respaldo" ? " · respaldo" : "") + (delegadoMP === "CPU" ? " · CPU lenta" : "");
+    const encendido = !!p.encendido;
+    const tocando = encendido && p.fase === "agarrando";
+    pill.classList.toggle("activo", encendido);
+    let t = "apagado";
+    if (encendido) t = tocando ? (p.manos_armadas === 2 ? "encendido · 2 dedos" : "encendido · tocando") : (p.dentro ? "encendido · mano en el panel" : "encendido");
+    $("indicador-estado").textContent = t + sufijo;
     $("indicador-gesto").textContent = "";
     return;
   }
   const activo = !!(ind && ind.activo);
-  pill.classList.toggle("activo", activo);
-  $("indicador-estado").textContent = (p.calibrando ? "calibrando" : (activo ? "activo" : "inactivo")) + (modoEntradaPanel === "respaldo" ? " · respaldo" : "");
+  pill.classList.toggle("activo", activo && !p.calibrando);
+  $("indicador-estado").textContent = (p.calibrando ? "calibrando" : (activo ? "encendido" : "apagado")) + sufijo;
   // El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la
   // señal visual. Queda la etiqueta como recordatorio en la píldora.
   $("indicador-gesto").textContent = ind && ind.destello ? etiquetaGesto(ind) : "";
@@ -120,14 +123,15 @@ function mostrarVista(v) {
   if (!v) return;
   if (vistaCamara) pintarPanel(v.panel_camara);
   $("pose").textContent = v.pose || "-";
-  $("modo").textContent = (v.modo || "-").toUpperCase();
+  const esTactil = cfg && cfg.modo === "tactil";
+  $("modo").textContent = esTactil && v.modo === "activo" ? "ENCENDIDO" : esTactil && v.modo === "inactivo" ? "APAGADO" : (v.modo || "-").toUpperCase();
   $("modo").className = "grande modo-" + (v.modo || "reposo");
   $("ultimo").textContent = v.ultimo || "-";
   $("ultimohora").textContent = v.ultimo_hora ? "a las " + v.ultimo_hora : "";
   mostrarIndicador(v.indicador);
   if (cfg && cfg.modo === "tactil") {
-    let aviso = panelUltimo.calibrado ? "El panel no necesita la L; la L solo enciende scroll y diapositivas por gestos" : "Haz la L para activar";
-    if (v.modo === "activo") aviso = v.sin_mano ? `sin mano · se apaga en ${Math.max(1, Math.ceil((v.apaga_en_ms || 0) / 1000))} s` : "mano detectada";
+    // Interruptor: la L enciende y otra L apaga. No se apaga por tiempo.
+    const aviso = v.modo === "activo" ? "Haz la L para apagar" : "Haz la L para encender";
     texto("apagatactil", aviso);
     texto("errtactil", v.error ? "No se pudo ejecutar: " + v.error : "");
   }

@@ -65,6 +65,9 @@ type EstadoPanel struct {
 	X                float64 `json:"x,omitempty"`
 	Y                float64 `json:"y,omitempty"`
 	Error            string  `json:"error,omitempty"`
+	// Encendido es el interruptor de la L: apagado, el panel no mueve el
+	// puntero ni toca nada. Arranca apagado.
+	Encendido bool `json:"encendido"`
 }
 
 // Panel toma las muestras de la mano, guía la calibración, mueve el puntero
@@ -81,6 +84,9 @@ type Panel struct {
 	// Acciones ejecuta el zoom de respaldo (Ctrl+ más/menos). Es opcional.
 	Acciones platform.TactileActions
 
+	// apagado: el interruptor de la L. Mientras esté apagado Cuadro no toca
+	// nada (salvo para calibrar). NuevoPanel lo deja apagado.
+	apagado          bool
 	calibracion      gestures.CalibracionPanel
 	calibrado        bool
 	calibrando       bool
@@ -114,7 +120,7 @@ type Panel struct {
 // devuelve un panel utilizable (sin calibrar) junto con el error para que la
 // app lo muestre y permita repetirla.
 func NuevoPanel(ruta string, puntero platform.AbsolutePointer) (*Panel, error) {
-	p := &Panel{Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques(), mapeadores: map[gestures.ClaveMano]*gestures.MapeadorPanel{}}
+	p := &Panel{apagado: true, Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques(), mapeadores: map[gestures.ClaveMano]*gestures.MapeadorPanel{}}
 	for i := range p.filtrosDedo {
 		p.filtrosDedo[i] = gestures.NuevoFiltroOneEuroPanel()
 	}
@@ -433,13 +439,67 @@ func (p *Panel) Cuadro(c gestures.Cuadro, mover bool) {
 		}
 		return
 	}
-	if !p.calibrado {
+	if !p.calibrado || p.apagado {
 		return
 	}
+	c = sinL(c)
 	if p.embrague == nil {
 		p.embrague = gestures.NuevoMedidorEmbrague(p.calibracion)
 	}
 	p.aplicar(p.embrague.Cuadro(c), c.TMs, mover)
+}
+
+// sinL quita del cuadro las manos que están haciendo la L. La L es el
+// interruptor, no un gesto del panel: mientras se forma (o para apagar), el
+// panel la ve como una mano que se va, así que suelta lo que tuviera apoyado
+// y no puede dejar un toque suelto. No modifica el cuadro de quien llama.
+func sinL(c gestures.Cuadro) gestures.Cuadro {
+	hayL := false
+	for _, m := range c.Manos {
+		if gestures.PoseDe(m, c.Aspecto) == gestures.PoseL {
+			hayL = true
+			break
+		}
+	}
+	if !hayL {
+		return c
+	}
+	manos := make([]gestures.Mano, 0, len(c.Manos))
+	for _, m := range c.Manos {
+		if gestures.PoseDe(m, c.Aspecto) != gestures.PoseL {
+			manos = append(manos, m)
+		}
+	}
+	c.Manos = manos
+	return c
+}
+
+// Encender es el interruptor del panel (lo mueve la L). Al apagar levanta
+// los dedos, suelta el botón y olvida las manos, de modo que no queda ningún
+// toque suelto; al encender el embrague empieza de cero. Repetir el mismo
+// estado no hace nada.
+func (p *Panel) Encender(on bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if on == !p.apagado {
+		return
+	}
+	p.apagado = !on
+	if on {
+		p.embrague = nil
+		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "enciende"})
+		return
+	}
+	p.soltarBoton()
+	p.levantarDedos()
+	if p.embrague != nil {
+		p.embrague.Parar()
+	}
+	p.dentro = false
+	p.fase, p.armadas = gestures.EmbragueFuera, 0
+	p.arrastre, p.zoom = "", ""
+	p.filtro.Reiniciar()
+	p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "apaga"})
 }
 
 // aplicar traduce el resultado del embrague a los efectos reales del sistema.
@@ -683,7 +743,7 @@ func (p *Panel) Estado() EstadoPanel {
 	e := EstadoPanel{Calibrado: p.calibrado, Calibrando: p.calibrando, Paso: p.paso,
 		Dentro: p.dentro, Fase: string(fase), ManosArmadas: p.armadas,
 		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err,
-		ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil, AvisoCalibracion: p.avisoCalibracion}
+		Encendido: !p.apagado, ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil, AvisoCalibracion: p.avisoCalibracion}
 	if p.tactilListo {
 		e.ModoEntrada = "tactil"
 	}

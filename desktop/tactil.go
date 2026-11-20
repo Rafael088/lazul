@@ -13,18 +13,12 @@ import (
 	"github.com/Rafael088/lazul/platform"
 )
 
-// TactilApagarSinMano evita que el modo quede armado cuando la persona se
-// aparta. La cámara sigue dando cuadros vacíos, así que no hace falta un
-// temporizador ni una gorrutina aparte.
-const TactilApagarSinMano = 3 * time.Second
-
 // Tactil conecta el clasificador táctil con la ventana que tiene el foco.
 // También conserva una línea por gesto para poder revisar activaciones falsas.
 type Tactil struct {
 	Reg        *Registro
 	Acciones   platform.TactileActions
 	Ajustes    gestures.AjustesTactiles
-	SinMano    time.Duration
 	Navegacion platform.NavigationMode
 	// AlEvento, si está, recibe cada evento táctil reconocido (incluido el
 	// apagado por falta de mano) para que la ventana pinte el indicador.
@@ -32,23 +26,21 @@ type Tactil struct {
 
 	mu sync.Mutex
 
-	sesion        string
-	enUso         bool
-	est           gestures.EstadoTactil
-	prueba        bool
-	act           int
-	abierta       bool
-	huboAccion    bool
-	actPrueba     bool
-	actDesde      time.Time
-	ultimaManoMs  int64
-	hayUltimaMano bool
-	latido        time.Time
-	cuadros       int
-	conMano       int
-	ultimo        string
-	ultimoT       time.Time
-	ultimoError   string
+	sesion      string
+	enUso       bool
+	est         gestures.EstadoTactil
+	prueba      bool
+	act         int
+	abierta     bool
+	huboAccion  bool
+	actPrueba   bool
+	actDesde    time.Time
+	latido      time.Time
+	cuadros     int
+	conMano     int
+	ultimo      string
+	ultimoT     time.Time
+	ultimoError string
 
 	// Scroll continuo (palanca): pasos de rueda acumulados que aún no suman
 	// una unidad, el último cuadro visto y si la rueda virtual falló.
@@ -112,13 +104,6 @@ func (t *Tactil) ajustes() gestures.AjustesTactiles {
 	return t.Ajustes
 }
 
-func (t *Tactil) sinMano() time.Duration {
-	if t.SinMano <= 0 {
-		return TactilApagarSinMano
-	}
-	return t.SinMano
-}
-
 func (t *Tactil) navegacion() platform.NavigationMode {
 	if t.Navegacion == 0 {
 		return platform.NavigationSlides
@@ -131,7 +116,6 @@ func (t *Tactil) empezar(ahora time.Time) {
 	t.enUso = true
 	t.est = gestures.NuevoEstadoTactil(false, t.ajustes())
 	t.act, t.abierta, t.huboAccion = 0, false, false
-	t.hayUltimaMano = false
 	t.latido, t.cuadros, t.conMano = ahora, 0, 0
 	t.Reg.Anotar(Linea{T: ahora, Tipo: TipoInicio, Sesion: t.sesion, Prueba: t.prueba})
 	// La rueda virtual se crea al empezar: el compositor tarda un momento
@@ -246,12 +230,18 @@ func (t *Tactil) vista(c gestures.Cuadro, pose gestures.Pose) Vista {
 	if !t.ultimoT.IsZero() {
 		v.UltimoHora = t.ultimoT.Format("15:04:05")
 	}
-	if activo && t.hayUltimaMano {
-		v.SinMano = len(c.Manos) == 0
-		pasado := time.Duration(c.TMs-t.ultimaManoMs) * time.Millisecond
-		v.ApagaEnMs = max(0, (t.sinMano() - pasado).Milliseconds())
-	}
 	return v
+}
+
+// El modo es un interruptor: arranca apagado, la L lo enciende y otra L lo
+// apaga. No hay apagado por tiempo (decisión del dueño, 20-nov): si la mano
+// se va, el modo sigue como estaba.
+
+// Activo dice si el interruptor está encendido.
+func (t *Tactil) Activo() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.est.Activo()
 }
 
 // Cuadro clasifica un cuadro, ejecuta la acción local y devuelve el estado
@@ -268,27 +258,6 @@ func (t *Tactil) Cuadro(c gestures.Cuadro, ahora time.Time) Vista {
 	if len(c.Manos) > 0 {
 		t.conMano++
 		pose = gestures.PoseDe(c.Manos[0], c.Aspecto)
-		if t.est.Activo() {
-			t.ultimaManoMs, t.hayUltimaMano = c.TMs, true
-		}
-	}
-
-	// Si desaparece la mano, el modo se desarma aunque nunca vuelva a verse
-	// la L. Se registra como un cambio de modo para que quede auditable.
-	if t.est.Activo() && t.hayUltimaMano && len(c.Manos) == 0 &&
-		time.Duration(c.TMs-t.ultimaManoMs)*time.Millisecond >= t.sinMano() {
-		t.est = gestures.NuevoEstadoTactil(false, t.ajustes())
-		ev := gestures.EventoTactil{Accion: gestures.TactilModo, Activo: false, CuadroMs: c.TMs}
-		t.registrar(ev, pose, ahora, "sin_mano", nil)
-		if t.AlEvento != nil {
-			t.AlEvento(ev, ahora)
-		}
-		t.cerrar(ahora, "")
-		t.hayUltimaMano = false
-		t.latir(ahora)
-		v := t.vista(c, pose)
-		v.Gesto = nombreAccionTactil(ev.Accion)
-		return v
 	}
 
 	var ev gestures.EventoTactil
@@ -297,7 +266,6 @@ func (t *Tactil) Cuadro(c gestures.Cuadro, ahora time.Time) Vista {
 		if ev.Accion == gestures.TactilModo && ev.Activo {
 			t.act++
 			t.abierta, t.huboAccion, t.actPrueba, t.actDesde = true, false, t.prueba, ahora
-			t.ultimaManoMs, t.hayUltimaMano = c.TMs, len(c.Manos) > 0
 		}
 		resultado := "ok"
 		var err error
@@ -315,7 +283,6 @@ func (t *Tactil) Cuadro(c gestures.Cuadro, ahora time.Time) Vista {
 		}
 		if ev.Accion == gestures.TactilModo && !ev.Activo {
 			t.cerrar(ahora, "")
-			t.hayUltimaMano = false
 		}
 	}
 	t.moverRueda(c)
@@ -344,7 +311,6 @@ func (t *Tactil) Parar(ahora time.Time) {
 	t.Reg.Anotar(Linea{T: ahora, Tipo: TipoFin, Sesion: t.sesion, Cuadros: t.cuadros, ConMano: t.conMano})
 	t.enUso = false
 	t.est = gestures.NuevoEstadoTactil(false, t.ajustes())
-	t.hayUltimaMano = false
 }
 
 // Prueba activa el trabajo normal: se reconocen y registran gestos, pero no

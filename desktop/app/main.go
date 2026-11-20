@@ -284,6 +284,9 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 	}
 	v := a.flujo.Cuadro(filtrado, ahora)
 	if paraPanel != nil {
+		// La L es el interruptor: el panel solo toca con el modo encendido
+		// (y suelta todo al apagarse). Calibrando sigue recibiendo la mano.
+		a.panel.Encender(v.Modo == "activo")
 		a.panel.Cuadro(*paraPanel, !a.flujo.EnPrueba())
 	}
 	a.registrarEvitadas(rechazos, ahora)
@@ -411,6 +414,7 @@ func (a *App) CamaraApagar() {
 	a.flujo.Parar(time.Now())
 	if a.panel != nil {
 		a.panel.Parar()
+		a.panel.Encender(false)
 	}
 	a.mu.Lock()
 	a.tactil = gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto)
@@ -458,6 +462,8 @@ func (a *App) actualizarAura() {
 	e := EstadoAura{Activa: activa}
 	if a.panel != nil {
 		p := a.panel.Estado()
+		// El aura sigue al interruptor de la L: apagado, no hay aura.
+		e.Activa = e.Activa && p.Encendido
 		e.Agarrando = p.Fase == string(gestures.EmbragueAgarrando)
 		e.Calibrado, e.Dentro, e.X, e.Y = p.Calibrado, p.Dentro || e.Agarrando, p.X, p.Y
 	}

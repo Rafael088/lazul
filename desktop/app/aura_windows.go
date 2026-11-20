@@ -6,6 +6,7 @@ import (
 	"math"
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -126,6 +127,43 @@ type Aura struct {
 	dibujos   [2]dibujoAura // suave, agarrando
 	visible   bool
 	agarrando bool
+	ultimo    pintadoAura // lo último pintado: el aura se apaga desde ahí
+}
+
+// pintadoAura es lo necesario para repintar el aura con otra opacidad.
+type pintadoAura struct {
+	d       dibujoAura
+	destino puntoAura
+	tamano  puntoAura
+}
+
+// Fundido corto al encender y apagar el interruptor de la L: pasos de
+// pasoFundidoAura, que suman unos 150 ms (el CSS de Linux usa .16 s).
+const (
+	pasosFundidoAura = 5
+	pasoFundidoAura  = 30 * time.Millisecond
+)
+
+// pintar actualiza la ventana por capas con la opacidad constante alfa (0..255).
+func (a *Aura) pintar(hwnd uintptr, p pintadoAura, alfa uint32) {
+	origen := puntoAura{}
+	mezcla := uint32(0) | alfa<<16 | acSrcAlpha<<24 // AC_SRC_OVER, sin flags, alfa constante, alfa por píxel
+	updateLayeredWindow.Call(hwnd, 0, uintptr(unsafe.Pointer(&p.destino)), uintptr(unsafe.Pointer(&p.tamano)),
+		p.d.dc, uintptr(unsafe.Pointer(&origen)), 0, uintptr(unsafe.Pointer(&mezcla)), ulwAlpha)
+}
+
+// fundir lleva la opacidad de 0 a 255 (entrando) o de 255 a 0 (saliendo).
+func (a *Aura) fundir(hwnd uintptr, p pintadoAura, entrando bool) {
+	for i := 1; i <= pasosFundidoAura; i++ {
+		alfa := uint32(255 * i / pasosFundidoAura)
+		if !entrando {
+			alfa = 255 - alfa
+		}
+		a.pintar(hwnd, p, alfa)
+		if i < pasosFundidoAura {
+			time.Sleep(pasoFundidoAura)
+		}
+	}
 }
 
 // La clase de ventana tiene un solo procedimiento; la app abre un aura.
@@ -288,6 +326,7 @@ func (a *Aura) aplicar() {
 	mostrar := e.Activa && e.Calibrado && e.Dentro
 	if !mostrar {
 		if a.visible {
+			a.fundir(hwnd, a.ultimo, false)
 			showWindow.Call(hwnd, swHide)
 			a.visible = false
 		}
@@ -301,17 +340,18 @@ func (a *Aura) aplicar() {
 	if e.Agarrando {
 		d = a.dibujos[1]
 	}
-	destino := puntoAura{x, y}
-	tamano := puntoAura{a.lado, a.lado}
-	origen := puntoAura{}
-	mezcla := uint32(0) | 255<<16 | acSrcAlpha<<24 // AC_SRC_OVER, sin flags, opaco, alfa por píxel
-	updateLayeredWindow.Call(hwnd, 0, uintptr(unsafe.Pointer(&destino)), uintptr(unsafe.Pointer(&tamano)),
-		d.dc, uintptr(unsafe.Pointer(&origen)), 0, uintptr(unsafe.Pointer(&mezcla)), ulwAlpha)
+	p := pintadoAura{d: d, destino: puntoAura{x, y}, tamano: puntoAura{a.lado, a.lado}}
+	a.ultimo = p
 	if !a.visible {
+		// Entra con fundido: primero transparente, ya visible, y sube.
+		a.pintar(hwnd, p, 0)
 		showWindow.Call(hwnd, swShowNoActivate)
 		setWindowPos.Call(hwnd, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
 		a.visible = true
+		a.fundir(hwnd, p, true)
+		return
 	}
+	a.pintar(hwnd, p, 255)
 }
 
 // Cerrar destruye la ventana desde su hilo.
