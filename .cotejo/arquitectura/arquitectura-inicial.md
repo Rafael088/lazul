@@ -24,6 +24,5 @@ Piezas: (1) núcleo Go: descubrimiento mDNS, emparejamiento con código de 6 dí
 
 ## Cómo se abre
 
-- comando: `./dev pista`
-- url: `pista/index.html`
-- qué esperar: una pista de pantalla completa con 14 blancos de distintos tamaños y tipos, incluidos los cuatro bordes y las cuatro esquinas; después aparece una zona de reposo y, al terminar, un resumen que se descarga como JSON sin datos de cámara.
+- comando: `./dev app`
+- qué esperar: Lazul compila y se abre con la cámara; sale el indicador pequeño en una esquina y, con la mano dentro del panel calibrado, el aura que la sigue y el pellizco que toca, arrastra y hace scroll. La pista de precisión se abre aparte con `./dev pista`.
