@@ -79,7 +79,7 @@ MediaPipe Pose ve en el mismo cuadro (sin caderas visibles, sentado, el torso se
 bajando 1,25 anchos de hombro; calibrando, la mano no pasa por este filtro; con el panel
 ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonces mueve un puntero absoluto uinput
 sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
-y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`.
+y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`; su tercer paso («junta los dedos») guarda la apertura del pellizco del dueño y `AjustesPellizcoPara` fija a su mano los umbrales de cerrar (por defecto 0,20) y firme (0,12: apoya desde el 1.er cuadro; el tibio espera 3).
 El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
 mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
 la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen

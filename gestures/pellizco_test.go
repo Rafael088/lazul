@@ -38,15 +38,16 @@ func TestAperturaPellizco(t *testing.T) {
 }
 
 func TestPellizcoConHisteresis(t *testing.T) {
-	// Cierra por debajo de 0,30, sigue cerrado hasta pasar 0,45 y vuelve a
-	// abrirse; un cuadro en 0,35 no lo hace parpadear.
+	// Cierra por debajo de 0,20, sigue cerrado hasta pasar 0,45 y vuelve a
+	// abrirse; un cuadro en 0,35 no lo hace parpadear. Los dedos cerca sin
+	// tocarse (0,22–0,28) ya no cierran (cotejo-lgbapm).
 	medidor := NuevoMedidorPellizco(AjustesPellizcoPorDefecto)
 	casos := []struct {
 		apertura float64
 		cerrado  bool
 	}{
-		{0.60, false}, {0.40, false}, {0.28, true}, {0.35, true},
-		{0.44, true}, {0.46, false}, {0.20, true}, {0.30, true}, {0.60, false},
+		{0.60, false}, {0.40, false}, {0.28, false}, {0.22, false}, {0.18, true}, {0.35, true},
+		{0.44, true}, {0.46, false}, {0.15, true}, {0.30, true}, {0.60, false},
 	}
 	for i, c := range casos {
 		estados := medidor.Cuadro([]Mano{manoApertura(c.apertura)}, 4.0/3)
@@ -58,7 +59,7 @@ func TestPellizcoConHisteresis(t *testing.T) {
 
 func TestPellizcoDosManos(t *testing.T) {
 	medidor := NuevoMedidorPellizco(AjustesPellizcoPorDefecto)
-	derecha := manoApertura(0.20)
+	derecha := manoApertura(0.15)
 	derecha.Derecha = true
 	izquierda := manoApertura(0.80)
 	izquierda.Derecha = false
@@ -68,7 +69,7 @@ func TestPellizcoDosManos(t *testing.T) {
 		t.Fatalf("dos manos: %+v", estados)
 	}
 	// La izquierda se acerca: se cierra sin tocar la derecha.
-	izquierda = manoApertura(0.25)
+	izquierda = manoApertura(0.18)
 	izquierda.Derecha = false
 	estados = medidor.Cuadro([]Mano{derecha, izquierda}, 4.0/3)
 	if !estados[0].Cerrado || !estados[1].Cerrado {
@@ -86,7 +87,7 @@ func TestPellizcoDosManos(t *testing.T) {
 		t.Fatalf("la mano que vuelve no empieza abierta: %+v", estados)
 	}
 	// Y se cierra de nuevo al acercar las puntas.
-	izquierda = manoApertura(0.25)
+	izquierda = manoApertura(0.18)
 	izquierda.Derecha = false
 	if estados = medidor.Cuadro([]Mano{derecha, izquierda}, 4.0/3); !estados[1].Cerrado {
 		t.Fatalf("la mano que vuelve no se cierra: %+v", estados)
@@ -96,7 +97,7 @@ func TestPellizcoDosManos(t *testing.T) {
 func TestAnotarPellizcoNoTocaElOriginal(t *testing.T) {
 	g := Grabacion{Cuadros: []Cuadro{
 		{TMs: 0, Aspecto: 4.0 / 3, Manos: []Mano{manoApertura(0.60)}},
-		{TMs: 33, Aspecto: 4.0 / 3, Manos: []Mano{manoApertura(0.20)}},
+		{TMs: 33, Aspecto: 4.0 / 3, Manos: []Mano{manoApertura(0.15)}},
 	}}
 	anotada := AnotarPellizco(g)
 	if anotada.Cuadros[1].Manos[0].Pellizco == nil || !anotada.Cuadros[1].Manos[0].Pellizco.Cerrado {
@@ -143,5 +144,32 @@ func TestTomasPellizco(t *testing.T) {
 	}
 	if TomaPellizcoValida("saludar") {
 		t.Error("aceptó una toma que no existe")
+	}
+}
+
+// AjustesPellizcoPara fija los umbrales a la mano del dueño con márgenes y
+// topes: el dueño de las tomas (0,09) da los de por defecto, una mano que
+// mide más sube los umbrales y una medida muy apretada no los deja por debajo
+// de lo que da un pellizco en movimiento.
+func TestAjustesPellizcoPara(t *testing.T) {
+	cerca := func(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
+	if aj := AjustesPellizcoPara(0.09); !cerca(aj.UmbralCerrar, AjustesPellizcoPorDefecto.UmbralCerrar) ||
+		!cerca(aj.UmbralFirme, AjustesPellizcoPorDefecto.UmbralFirme) {
+		t.Fatalf("0,09 debería dar los de por defecto: %+v", aj)
+	}
+	for _, m := range []float64{0.001, 0.04, 0.09, 0.15, 0.20, MaxPellizcoCerrado} {
+		aj := AjustesPellizcoPara(m)
+		if aj.UmbralCerrar < 0.18 || aj.UmbralCerrar > 0.30 || aj.UmbralFirme < 0.08 ||
+			aj.UmbralFirme > aj.UmbralCerrar-0.06+1e-9 || aj.UmbralAbrir != AjustesPellizcoPorDefecto.UmbralAbrir {
+			t.Errorf("%.3f: %+v", m, aj)
+		}
+		if m >= aj.UmbralCerrar {
+			t.Errorf("%.3f: la mano calibrada no cerraría con %+v", m, aj)
+		}
+	}
+	for _, m := range []float64{0, -0.1, MaxPellizcoCerrado + 0.01, math.NaN()} {
+		if aj := AjustesPellizcoPara(m); aj != AjustesPellizcoPorDefecto {
+			t.Errorf("%v debería dar los de por defecto: %+v", m, aj)
+		}
 	}
 }

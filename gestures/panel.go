@@ -29,6 +29,11 @@ type CalibracionPanel struct {
 	Version           int          `json:"version"`
 	SuperiorIzquierda MuestraPanel `json:"superior_izquierda"`
 	InferiorDerecha   MuestraPanel `json:"inferior_derecha"`
+	// PellizcoCerrado es la apertura (en largos de palma) del pellizco del
+	// dueño con las puntas juntas, medida en el tercer paso de la
+	// calibración. 0 si no se midió (calibraciones de antes de cotejo-
+	// lgbapm): entonces valen los umbrales por defecto.
+	PellizcoCerrado float64 `json:"pellizco_cerrado,omitempty"`
 }
 
 const (
@@ -104,8 +109,19 @@ func (c CalibracionPanel) Valida() error {
 	if c.Version != versionCalibracionPanel {
 		return errors.New("versión de calibración desconocida")
 	}
-	_, err := NuevaCalibracionPanel(c.SuperiorIzquierda, c.InferiorDerecha)
-	return err
+	if _, err := NuevaCalibracionPanel(c.SuperiorIzquierda, c.InferiorDerecha); err != nil {
+		return err
+	}
+	return validarPellizcoCerrado(c.PellizcoCerrado)
+}
+
+// AjustesPellizco son los umbrales del pellizco para esta calibración: los de
+// la mano del dueño si se midió, los de por defecto si no.
+func (c CalibracionPanel) AjustesPellizco() AjustesPellizco {
+	if c.PellizcoCerrado <= 0 {
+		return AjustesPellizcoPorDefecto
+	}
+	return AjustesPellizcoPara(c.PellizcoCerrado)
 }
 
 // mapearCrudo devuelve la posición geométrica dentro del panel antes de la

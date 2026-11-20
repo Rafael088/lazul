@@ -125,7 +125,10 @@ otro también pueda mandarte, empareja al revés.
 
 - Abre la vista de cámara y pulsa **Calibrar panel**. Imagina un rectángulo
   cómodo delante de ti: pon la palma quieta en su esquina superior izquierda y
-  guarda esa esquina; repite en la inferior derecha. Puedes pulsar **Recalibrar**
+  guarda esa esquina; repite en la inferior derecha. Por último, **junta los
+  dedos** (la punta del índice contra la del pulgar, quieta) y guarda tu
+  pellizco: así el pellizco solo cuenta cuando tus dedos se tocan de verdad.
+  Una calibración de antes sin este paso usa los umbrales por defecto. Puedes pulsar **Recalibrar**
   cuando cambies de silla, cámara o postura.
 - Dentro de ese rectángulo, la palma mueve el puntero por toda la pantalla. El
   tamaño aparente de la mano compensa cuánto te acercas a la cámara y un filtro
@@ -140,7 +143,9 @@ otro también pueda mandarte, empareja al revés.
   pellizco se apoya un dedo táctil, al moverlo se arrastra y al abrirlo se
   levanta. Solo cuenta si empieza dentro del panel; uno que empieza fuera se
   ignora hasta soltarlo. Para que el parpadeo no corte el contacto, al soltar se
-  exigen unos cuadros y 250 ms abierto; para apoyar, 3 cuadros cerrados seguidos.
+  exigen unos cuadros y 250 ms abierto. Para apoyar hay dos niveles: un
+  pellizco muy cerrado apoya desde el primer cuadro (un tap rápido cuenta) y
+  uno tibio, apenas cerrado, espera 3 cuadros cerrados seguidos.
   Mientras se cierra el pellizco el puntero se queda donde apuntaba la mano
   abierta (hasta 400 ms) y el dedo cae ahí, no donde la palma se movió al cerrar. Dos manos pellizcando son dos dedos:
   el navegador, PDF u otra app reconoce directamente su zoom. Cada dedo lleva

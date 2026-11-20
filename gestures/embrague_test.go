@@ -12,8 +12,18 @@ import (
 
 // manoEnPanel construye una mano cuyo MuestraPanelDe da la posición y el
 // tamaño pedidos, con el pellizco abierto o cerrado. El panel de prueba es el
-// cuadrado proyectado [-1,1]², así que (x,y) en [-1,1] cae dentro.
+// cuadrado proyectado [-1,1]², así que (x,y) en [-1,1] cae dentro. Cerrado es
+// un pellizco tibio (0,16: entre UmbralFirme y UmbralCerrar), que espera
+// CuadrosParaApoyar; manoEnPanelApertura da cualquier otra apertura.
 func manoEnPanel(x, y, tam float64, cerrado bool) Mano {
+	apertura := 0.80
+	if cerrado {
+		apertura = 0.16
+	}
+	return manoEnPanelApertura(x, y, tam, apertura)
+}
+
+func manoEnPanelApertura(x, y, tam, apertura float64) Mano {
 	var m Mano
 	medio := tam / math.Sqrt2 / 2
 	cx, cy := x*tam+0.5, y*tam+0.5
@@ -22,10 +32,6 @@ func manoEnPanel(x, y, tam float64, cerrado bool) Mano {
 	m.Puntos[MedioMCP] = Punto{float32(cx), float32(cy + medio), 0}
 	m.Puntos[AnularMCP] = Punto{float32(cx), float32(cy), 0}
 	m.Puntos[MeniqueMCP] = Punto{float32(cx + medio), float32(cy), 0}
-	apertura := 0.80
-	if cerrado {
-		apertura = 0.10
-	}
 	m.Puntos[PulgarPunta] = Punto{float32(cx), float32(cy), 0}
 	m.Puntos[IndicePunta] = Punto{float32(cx + apertura*tam/math.Sqrt2), float32(cy), 0}
 	return m
@@ -551,6 +557,96 @@ func TestEmbragueNoArmaConUnCierreCorto(t *testing.T) {
 	}
 	if r.ManosArmadas != 1 {
 		t.Fatalf("%d cuadros cerrados dentro deberían armar: %+v", AjustesEmbraguePorDefecto.CuadrosParaApoyar, r)
+	}
+}
+
+// Dos niveles (cotejo-lgbapm): un pellizco muy cerrado apoya desde el primer
+// cuadro, así el tap rápido (uno o dos cuadros, ~130 ms a 15 fps en Windows)
+// cuenta; uno tibio sigue esperando CuadrosParaApoyar; y uno que solo se
+// acerca sin bajar de UmbralCerrar no apoya nunca.
+func TestEmbragueFirmeApoyaAlPrimerCuadro(t *testing.T) {
+	aj := AjustesPellizcoPorDefecto
+	firme := aj.UmbralFirme - 0.04
+	tibio := (aj.UmbralFirme + aj.UmbralCerrar) / 2
+	casi := aj.UmbralCerrar + 0.03
+
+	med := NuevoMedidorEmbrague(panelCuadrado(t))
+	med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	if r := med.Cuadro(cuadroPanel(67, manoEnPanelApertura(0, 0, .2, firme))); r.ManosArmadas != 1 {
+		t.Fatalf("firme (%.2f) no apoyó al primer cuadro: %+v", firme, r)
+	}
+	// El tap: se abre enseguida y se levanta al cumplirse el soltar.
+	var r ResultadoEmbrague
+	for k := int64(2); k < 8; k++ {
+		r = med.Cuadro(cuadroPanel(k*67, manoEnPanel(0, 0, .2, false)))
+	}
+	if r.ManosArmadas != 0 {
+		t.Fatalf("el tap no se levantó: %+v", r)
+	}
+
+	// Tibio y después firme en el segundo cuadro: apoya en el segundo.
+	med = NuevoMedidorEmbrague(panelCuadrado(t))
+	med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	if r := med.Cuadro(cuadroPanel(67, manoEnPanelApertura(0, 0, .2, tibio))); r.ManosArmadas != 0 {
+		t.Fatalf("tibio (%.2f) apoyó al primer cuadro: %+v", tibio, r)
+	}
+	if r := med.Cuadro(cuadroPanel(134, manoEnPanelApertura(0, 0, .2, firme))); r.ManosArmadas != 1 {
+		t.Fatalf("tibio y luego firme no apoyó: %+v", r)
+	}
+
+	// Tibio sostenido: apoya justo en CuadrosParaApoyar.
+	med = NuevoMedidorEmbrague(panelCuadrado(t))
+	med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	n := AjustesEmbraguePorDefecto.CuadrosParaApoyar
+	for k := 1; k <= n; k++ {
+		r := med.Cuadro(cuadroPanel(int64(k)*67, manoEnPanelApertura(0, 0, .2, tibio)))
+		if (r.ManosArmadas == 1) != (k == n) {
+			t.Fatalf("tibio, cuadro %d de %d: %+v", k, n, r)
+		}
+	}
+
+	// Los dedos cerca sin tocarse (por encima de cerrar) no apoyan nunca.
+	med = NuevoMedidorEmbrague(panelCuadrado(t))
+	for k := int64(0); k < 10; k++ {
+		if r := med.Cuadro(cuadroPanel(k*67, manoEnPanelApertura(0, 0, .2, casi))); r.ManosArmadas != 0 {
+			t.Fatalf("%.2f, sin tocarse, apoyó: %+v", casi, r)
+		}
+	}
+
+	// Un firme que empieza fuera del panel tampoco apoya (uy84og).
+	med = NuevoMedidorEmbrague(panelCuadrado(t))
+	for k := int64(0); k < 5; k++ {
+		if r := med.Cuadro(cuadroPanel(k*67, manoEnPanelApertura(1.4, 0, .2, firme))); r.ManosArmadas != 0 {
+			t.Fatalf("firme fuera del panel apoyó: %+v", r)
+		}
+	}
+}
+
+// La calibración con el pellizco del dueño cambia los umbrales del embrague.
+func TestEmbragueUsaElPellizcoCalibrado(t *testing.T) {
+	c := panelCuadrado(t)
+	c.PellizcoCerrado = 0.15 // una mano cuyas puntas juntas miden 0,15
+	aj := AjustesPellizcoPara(c.PellizcoCerrado)
+	med := NuevoMedidorEmbrague(c)
+	if med.Ajustes.Pellizco != aj {
+		t.Fatalf("ajustes %+v, quería %+v", med.Ajustes.Pellizco, aj)
+	}
+	// 0,22 no cierra con los de por defecto (0,20) y sí con los de esta mano.
+	med.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	var r ResultadoEmbrague
+	for k := int64(1); k <= 3; k++ {
+		r = med.Cuadro(cuadroPanel(k*67, manoEnPanelApertura(0, 0, .2, 0.22)))
+	}
+	if r.ManosArmadas != 1 {
+		t.Fatalf("con el pellizco calibrado 0,22 debería apoyar: %+v", r)
+	}
+	def := NuevoMedidorEmbrague(panelCuadrado(t))
+	def.Cuadro(cuadroPanel(0, manoEnPanel(0, 0, .2, false)))
+	for k := int64(1); k <= 3; k++ {
+		r = def.Cuadro(cuadroPanel(k*67, manoEnPanelApertura(0, 0, .2, 0.22)))
+	}
+	if r.ManosArmadas != 0 {
+		t.Fatalf("sin calibrar, 0,22 no debería apoyar: %+v", r)
 	}
 }
 

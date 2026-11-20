@@ -213,7 +213,7 @@ func tomaDePellizco(t *testing.T, aperturas []float64) string {
 // y sale con el estado del pellizco anotado cuadro a cuadro.
 func TestGuardarTomaDePellizco(t *testing.T) {
 	srv, dir := probar(t)
-	cuerpo := tomaDePellizco(t, []float64{0.60, 0.25, 0.35, 0.44, 0.50})
+	cuerpo := tomaDePellizco(t, []float64{0.60, 0.15, 0.35, 0.44, 0.50})
 	cod, res := pedir(t, "POST", srv.URL+"/guardar", cuerpo)
 	if cod != 200 {
 		t.Fatalf("%d", cod)
@@ -289,7 +289,7 @@ func TestTomaDePellizcoRecibeElPanelCalibrado(t *testing.T) {
 	}
 	srv := httptest.NewServer(s.rutas())
 	t.Cleanup(srv.Close)
-	cuerpo := strings.Replace(tomaDePellizco(t, []float64{0.60, 0.25, 0.50}), `"panel":{"x0":0.1,"x1":0.9,"y0":0.1,"y1":0.9},`, "", 1)
+	cuerpo := strings.Replace(tomaDePellizco(t, []float64{0.60, 0.15, 0.50}), `"panel":{"x0":0.1,"x1":0.9,"y0":0.1,"y1":0.9},`, "", 1)
 	if strings.Contains(cuerpo, `"panel"`) {
 		t.Fatalf("la toma de prueba todavía trae panel: %s", cuerpo[:200])
 	}
