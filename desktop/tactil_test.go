@@ -86,7 +86,7 @@ func TestTactilConectaGestosConAccionesDeLinux(t *testing.T) {
 	if !slices.Equal(acciones.hechas, quiere) {
 		t.Fatalf("acciones %v, quiere %v", acciones.hechas, quiere)
 	}
-	if vista.Modo != "activo" || vista.Ultimo != "BARRIDO → izquierda" || vista.ApagaEnMs <= 0 {
+	if vista.Modo != "activo" || vista.Ultimo != "BARRIDO → izquierda" {
 		t.Errorf("vista final %+v", vista)
 	}
 	gestos := deTipo(lineas(t, ruta), TipoGesto)
@@ -116,33 +116,6 @@ func TestTactilRegistraFallaDeLaAccion(t *testing.T) {
 	}
 	if vista.Error == "" {
 		t.Fatal("la ventana no recibió el error de la acción")
-	}
-}
-
-func TestTactilSeApagaTrasTresSegundosSinMano(t *testing.T) {
-	ruta := filepath.Join(t.TempDir(), "r.jsonl")
-	reg, _ := AbrirRegistro(ruta)
-	acciones := &accionesTactilesPrueba{}
-	v := &Tactil{Reg: reg, Acciones: acciones}
-	cs := recorridoTactil(t, "modo-activar-buena-001")
-	ult := cs[len(cs)-1].TMs
-	for ms := ult + 33; ms <= ult+3500; ms += 33 {
-		cs = append(cs, gestures.Cuadro{TMs: ms, Aspecto: 4.0 / 3.0})
-	}
-	vista := pasarTactil(t, v, cs, time.Now())
-	v.Parar(time.Now())
-	reg.Cerrar()
-
-	if vista.Modo != "inactivo" || vista.ApagaEnMs != 0 {
-		t.Fatalf("no se apagó: %+v", vista)
-	}
-	gestos := deTipo(lineas(t, ruta), TipoGesto)
-	if len(gestos) != 2 || gestos[1].Gesto != "MODO" || gestos[1].Resultado != "sin_mano" {
-		t.Fatalf("registro del apagado %+v", gestos)
-	}
-	acts := deTipo(lineas(t, ruta), TipoActivacion)
-	if len(acts) != 1 || acts[0].Resultado != ActSinGesto {
-		t.Fatalf("activación %+v", acts)
 	}
 }
 
@@ -176,17 +149,51 @@ func TestTactilAlimentaElIndicador(t *testing.T) {
 		t.Fatalf("indicador tras activar y hacer scroll: %+v", vi)
 	}
 
-	// Sin mano 3 s: el modo se apaga y el indicador también.
+	// Sin mano mucho rato el modo no se apaga solo: solo lo apaga otra L.
 	ult := cs[len(cs)-1].TMs
 	var vacios []gestures.Cuadro
-	for ms := ult + 33; ms <= ult+3500; ms += 33 {
+	for ms := ult + 33; ms <= ult+30000; ms += 33 {
 		vacios = append(vacios, gestures.Cuadro{TMs: ms, Aspecto: 4.0 / 3.0})
 	}
 	pasarTactil(t, v, vacios, time.Now())
+	if !v.Activo() || !ind.Vista(time.Now()).Activo {
+		t.Fatal("el modo se apagó por tiempo sin mano (no debe)")
+	}
 	v.Parar(time.Now())
 	reg.Cerrar()
-	if ind.Vista(time.Now()).Activo {
-		t.Fatal("el indicador sigue activo después de apagarse el modo sin mano")
+	if v.Activo() {
+		t.Fatal("parar la cámara debe dejar el modo apagado")
+	}
+}
+
+func TestTactilLaLEsUnInterruptor(t *testing.T) {
+	reg, _ := AbrirRegistro(filepath.Join(t.TempDir(), "r.jsonl"))
+	defer reg.Cerrar()
+	ind := &Indicador{}
+	v := &Tactil{Reg: reg, Acciones: &accionesTactilesPrueba{}, AlEvento: ind.Aplicar}
+	if v.Activo() {
+		t.Fatal("el modo debe arrancar apagado")
+	}
+	// Una L enciende; una segunda L (tras soltar la primera) apaga.
+	cs := recorridoTactil(t, "modo-activar-buena-001")
+	pasarTactil(t, v, cs, time.Now())
+	if !v.Activo() || !ind.Vista(time.Now()).Activo {
+		t.Fatal("la primera L no encendió el modo")
+	}
+	ult := cs[len(cs)-1].TMs
+	var neutros []gestures.Cuadro
+	for ms := ult + 33; ms <= ult+1500; ms += 33 {
+		neutros = append(neutros, gestures.Cuadro{TMs: ms, Aspecto: 4.0 / 3.0})
+	}
+	pasarTactil(t, v, neutros, time.Now())
+	segunda := recorridoTactil(t, "modo-activar-buena-001")
+	t0 := ult + 1500 + 33
+	for i := range segunda {
+		segunda[i].TMs += t0
+	}
+	pasarTactil(t, v, segunda, time.Now())
+	if v.Activo() || ind.Vista(time.Now()).Activo {
+		t.Fatal("la segunda L no apagó el modo")
 	}
 }
 

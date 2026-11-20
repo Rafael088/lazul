@@ -97,9 +97,9 @@
 </style>
 </head>
 <body>
-<aside id="indicador" aria-live="polite" title="Lazul · modo táctil (L para activar o apagar)">
+<aside id="indicador" aria-live="polite" title="Lazul · modo táctil (la L enciende y apaga)">
   <span class="punto" aria-hidden="true"></span>
-  <span class="estado" id="indicador-estado">inactivo</span>
+  <span class="estado" id="indicador-estado">apagado</span>
   <span class="gesto" id="indicador-gesto" aria-hidden="true"></span>
   <button id="abrir-ajuste" class="icono" title="Acomodar la cámara (Ctrl+Mayús+C)" aria-label="Acomodar la cámara">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -127,7 +127,7 @@
       </div>
       <div id="estado-gesto" class="fila" style="margin-top:8px">
         <span>Pose <b id="pose" class="grande">-</b></span>
-        <span><span id="modoetiqueta">Modo táctil</span> <b id="modo" class="grande modo-inactivo">INACTIVO</b> <span id="apagatactil" class="tenue">Haz la L para activar</span></span>
+        <span><span id="modoetiqueta">Modo táctil</span> <b id="modo" class="grande modo-inactivo">APAGADO</b> <span id="apagatactil" class="tenue">Haz la L para encender</span></span>
         <span>Último gesto <b id="ultimo" class="grande">-</b> <span id="ultimohora" class="tenue"></span></span>
       </div>
       <div id="errtactil" class="mal"></div>
@@ -221,7 +221,7 @@
   // cada gesto; el aura sobre la pantalla es la señal del gesto.
   if (location.protocol === "file:") {
     document.getElementById("indicador").classList.add("activo");
-    document.getElementById("indicador-estado").textContent = "activo";
+    document.getElementById("indicador-estado").textContent = "encendido";
     document.getElementById("indicador-gesto").textContent = "scroll ↑";
   }
 </script>

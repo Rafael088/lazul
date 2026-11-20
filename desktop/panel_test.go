@@ -97,6 +97,7 @@ func TestPanelPellizcoPulsaYSueltaElBoton(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	p.Encender(true)
 	// Agarra dentro y arrastra a la derecha.
 	for i := 0; i < 5; i++ {
 		p.Cuadro(cuadroPanelPrueba(int64(i)*67, manoPanelPrueba(-0.5, 0, .2, true)), true)
@@ -539,5 +540,119 @@ func TestPanelSinCalibrarNoDejaPasarManos(t *testing.T) {
 	filtrado, rechazadas := p.Filtrar(cuadro)
 	if len(filtrado.Manos) != 0 || rechazadas.Total != 1 || rechazadas.PorMotivo[MotivoSinPanel] != 1 {
 		t.Fatalf("sin calibrar: manos %d, rechazadas %+v", len(filtrado.Manos), rechazadas)
+	}
+}
+
+// panelAlrededorDe calibra un panel cuyo centro es la mano m, para que esa
+// mano caiga dentro.
+func panelAlrededorDe(t *testing.T, m gestures.Mano, aspecto float32) (*Panel, *punteroPanelPrueba, *tactilPanelPrueba, gestures.CalibracionPanel) {
+	t.Helper()
+	ms, ok := gestures.MuestraPanelDe(m, aspecto)
+	if !ok {
+		t.Fatal("la mano de prueba no da muestra de panel")
+	}
+	sup := gestures.MuestraPanel{X: ms.X - .5*ms.Tamano, Y: ms.Y - .5*ms.Tamano, Tamano: ms.Tamano}
+	inf := gestures.MuestraPanel{X: ms.X + .5*ms.Tamano, Y: ms.Y + .5*ms.Tamano, Tamano: ms.Tamano}
+	cal, err := gestures.NuevaCalibracionPanel(sup, inf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ruta := filepath.Join(t.TempDir(), NombreCalibracionPanel)
+	if err := GuardarCalibracionPanel(ruta, cal); err != nil {
+		t.Fatal(err)
+	}
+	puntero, tactil := &punteroPanelPrueba{}, &tactilPanelPrueba{}
+	p, err := NuevoPanel(ruta, puntero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Tactil = tactil
+	if err := p.Preparar(); err != nil {
+		t.Fatal(err)
+	}
+	return p, puntero, tactil, cal
+}
+
+func TestPanelArrancaApagadoYNoTocaNada(t *testing.T) {
+	p, puntero, tactil, _ := panelAlrededorDe(t, manoPanelPrueba(0, 0, .2, false), 1)
+	if p.Estado().Encendido {
+		t.Fatal("el panel debe arrancar apagado")
+	}
+	for i := 0; i < 8; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(i)*33, manoPanelPrueba(0, 0, .2, i >= 2)), true)
+	}
+	if len(puntero.puntos) != 0 || len(puntero.botones) != 0 || len(tactil.frames) != 0 {
+		t.Fatalf("apagado tocó algo: puntero %v botones %v toques %v", puntero.puntos, puntero.botones, tactil.frames)
+	}
+	if e := p.Estado(); e.Dentro || e.Fase != "fuera" {
+		t.Fatalf("apagado no debe seguir la mano: %+v", e)
+	}
+}
+
+func TestPanelEncenderYApagarNoDejaToqueSuelto(t *testing.T) {
+	p, puntero, tactil, _ := panelAlrededorDe(t, manoPanelPrueba(0, 0, .2, false), 1)
+	p.Encender(true)
+	p.Encender(true) // repetir no hace nada
+	for i := 0; i < 8; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(i)*33, manoPanelPrueba(0, 0, .2, i >= 2)), true)
+	}
+	if !p.Estado().Encendido || len(puntero.puntos) == 0 {
+		t.Fatalf("encendido no sigue la mano: %+v", p.Estado())
+	}
+	if p.Estado().Fase != "agarrando" || len(tactil.frames) == 0 || !tactil.frames[len(tactil.frames)-1][0].Down {
+		t.Fatalf("encendido no apoyó el dedo: %+v %+v", p.Estado(), tactil.frames)
+	}
+	// Se apaga con el pellizco todavía cerrado: el dedo se levanta.
+	p.Encender(false)
+	ultimo := tactil.frames[len(tactil.frames)-1]
+	if len(ultimo) != 1 || ultimo[0].Down {
+		t.Fatalf("apagar dejó un toque suelto: %+v", ultimo)
+	}
+	if e := p.Estado(); e.Encendido || e.Dentro || e.Fase != "fuera" || e.ManosArmadas != 0 {
+		t.Fatalf("estado tras apagar: %+v", e)
+	}
+	n := len(tactil.frames)
+	for i := 8; i < 14; i++ {
+		p.Cuadro(cuadroPanelPrueba(int64(i)*33, manoPanelPrueba(0, 0, .2, true)), true)
+	}
+	if len(tactil.frames) != n {
+		t.Fatalf("apagado volvió a tocar: %+v", tactil.frames[n:])
+	}
+	// Al volver a encender el pellizco empieza de cero: armar exige cuadros
+	// nuevos, no hereda el agarre anterior.
+	p.Encender(true)
+	if e := p.Estado(); e.Fase != "fuera" || e.ManosArmadas != 0 {
+		t.Fatalf("encender heredó estado: %+v", e)
+	}
+}
+
+func TestPanelLaLNoLlegaAlPanel(t *testing.T) {
+	cs := recorridoTactil(t, "modo-activar-buena-001")
+	var l gestures.Cuadro
+	for _, c := range cs {
+		if len(c.Manos) > 0 && gestures.PoseDe(c.Manos[0], c.Aspecto) == gestures.PoseL {
+			l = c
+			break
+		}
+	}
+	if len(l.Manos) == 0 {
+		t.Fatal("la grabación no tiene ningún cuadro con la L")
+	}
+	p, puntero, tactil, cal := panelAlrededorDe(t, l.Manos[0], l.Aspecto)
+	// Control: sin el filtro de la L, esa mano caería dentro del panel.
+	if !gestures.NuevoMedidorEmbrague(cal).Cuadro(l).Dentro {
+		t.Fatal("el control no cae dentro del panel: la prueba no mide nada")
+	}
+	p.Encender(true)
+	for i := 0; i < 12; i++ {
+		c := l
+		c.TMs = int64(i) * 33
+		p.Cuadro(c, true)
+	}
+	if len(puntero.puntos) != 0 || len(puntero.botones) != 0 || len(tactil.frames) != 0 {
+		t.Fatalf("la L tocó el panel: puntero %v botones %v toques %v", puntero.puntos, puntero.botones, tactil.frames)
+	}
+	if e := p.Estado(); e.Dentro || e.Fase != "fuera" {
+		t.Fatalf("la L no debe contar como mano en el panel: %+v", e)
 	}
 }
