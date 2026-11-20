@@ -6,7 +6,9 @@
 <style>
   /* Aura de Lazul: un halo en una superficie chica que sigue la mano.
      Tres estados: fuera del panel (nada), dentro (halo suave) y agarrando
-     (halo encendido). La superficie es transparente y no recibe clics. */
+     (halo encendido). La superficie es transparente y no recibe clics.
+     Las medidas de la figura están en vw: fracciones del lado de la
+     superficie, así el dibujo escala con el tamaño. */
   :root { --noche: #101428; --lapis: #315fdc; --hielo: #e8ecff; --x: 0px; --y: 0px; }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -24,9 +26,10 @@
   }
   body.visible #punta { opacity: 1; }
 
-  /* Halo suave: Lapis sobre Noche, difuminado hacia el fondo. */
+  /* Halo suave: Lapis sobre Noche, difuminado hacia el fondo. Caja del 60 %
+     del lado de la superficie (a 180 px: caja de 108 px). */
   #halo {
-    position: absolute; left: -72px; top: -72px; width: 144px; height: 144px;
+    position: absolute; left: -30vw; top: -30vw; width: 60vw; height: 60vw;
     border-radius: 50%;
     background: radial-gradient(circle,
       rgba(49, 95, 220, .58) 0%,
@@ -37,11 +40,12 @@
     will-change: transform;
   }
 
-  /* Anillo fino: marca el punto exacto de la mano. */
+  /* Anillo fino: marca el punto exacto de la mano. Caja del 25 % del lado de
+     la superficie (a 180 px: caja de 45 px con borde de 1,5 px). */
   #aro {
-    position: absolute; left: -30px; top: -30px; width: 60px; height: 60px;
-    border-radius: 50%; border: 2px solid rgba(127, 168, 255, .78);
-    box-shadow: 0 0 12px rgba(49, 95, 220, .55), inset 0 0 8px rgba(49, 95, 220, .35);
+    position: absolute; left: -12.5vw; top: -12.5vw; width: 25vw; height: 25vw;
+    border-radius: 50%; border: 0.83vw solid rgba(127, 168, 255, .78);
+    box-shadow: 0 0 5vw rgba(49, 95, 220, .55), inset 0 0 3.33vw rgba(49, 95, 220, .35);
     transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
     will-change: transform;
   }
