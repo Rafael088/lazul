@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>cargando</title>
+<style>
+  body { margin: 0; font: 20px system-ui, sans-serif; background: #101428; color: #e8ecff; }
+  .franja { height: 400px; border-bottom: 2px solid #315fdc; padding: 16px; }
+</style>
+</head>
+<body>
+<!-- Página de prueba del táctil: el título resume lo recibido y el guion lo
+     lee por CDP (msedge --remote-debugging-port=9222). -->
+<script>
+  for (let i = 0; i < 20; i++) {
+    const d = document.createElement("div");
+    d.className = "franja";
+    d.textContent = "franja " + i;
+    document.body.appendChild(d);
+  }
+  const e = { toques: 0, raton: 0, click: 0, dbl: 0, menu: 0, menuMs: 0, x: 0, y: 0, sx: 0, sy: 0 };
+  let bajada = 0;
+  addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType === "touch") e.toques++; else e.raton++;
+    bajada = performance.now();
+    e.x = Math.round(ev.clientX); e.y = Math.round(ev.clientY);
+    e.sx = Math.round(ev.screenX); e.sy = Math.round(ev.screenY);
+    pintar();
+  });
+  addEventListener("click", () => { e.click++; pintar(); });
+  addEventListener("dblclick", () => { e.dbl++; pintar(); });
+  addEventListener("contextmenu", (ev) => { e.menu++; e.menuMs = Math.round(performance.now() - bajada); ev.preventDefault(); pintar(); });
+  addEventListener("scroll", pintar);
+  visualViewport.addEventListener("resize", pintar);
+  function pintar() {
+    document.title = `toques=${e.toques} raton=${e.raton} click=${e.click} dbl=${e.dbl} menu=${e.menu}@${e.menuMs}ms ` +
+      `scroll=${Math.round(scrollY)} zoom=${visualViewport.scale.toFixed(2)} punto=${e.x},${e.y} pantalla=${e.sx},${e.sy} ` +
+      `vista=${innerWidth}x${innerHeight} dpr=${devicePixelRatio}`;
+  }
+  setInterval(pintar, 250);
+  pintar();
+</script>
+</body>
+</html>

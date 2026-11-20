@@ -3,7 +3,7 @@
 La app es un indicador pequeño en una esquina que mira tu mano por la cámara.
 Muestra si el modo táctil está **activo** o **inactivo**, y un halo sobre toda
 la pantalla sigue la mano: nada fuera del panel, suave dentro y encendido al
-agarrar. No tapa la clase. En Linux, un panel imaginario delante de la persona
+agarrar. No tapa la clase. En Linux y en Windows, un panel imaginario delante de la persona
 mueve el puntero; al pellizcar, una pantalla táctil virtual toca la ventana que
 tenga el foco (un dedo para tocar o arrastrar y dos para el zoom nativo). Los
 otros gestos desplazan o cambian de diapositiva. Es la prueba de uso real
@@ -12,14 +12,16 @@ y está apagada por defecto.
 
 Esta interfaz reemplaza la ventana chica fija de la 0.1.0 (cotejo-luzcr0). La
 transferencia entre dos PCs de la 0.1.0 sigue disponible con
-`./dev app -modo transferencia`; también es el modo predeterminado en Windows.
+`./dev app -modo transferencia` (en Windows, `./dev app win -modo transferencia`).
+El táctil virtual de Windows usa `InjectTouchInput` y no necesita pantalla
+táctil (cotejo-ckwoq7, `docs/informes/2026-11-19-tactil-windows.md`).
 
 ## Abrirla
 
 | Dónde | Cómo |
 | --- | --- |
 | Linux (Hyprland, modo táctil) | en la carpeta del repo: `./dev app` |
-| Windows, desde el Linux | `./dev app win` (la copia a `%USERPROFILE%\Lazul\lazul.exe` y la abre en el escritorio de Windows) |
+| Windows (modo táctil), desde el Linux | `./dev app win` (la copia a `%USERPROFILE%\Lazul\lazul.exe` y la abre en el escritorio de Windows) |
 | Windows, después | doble clic en `%USERPROFILE%\Lazul\lazul.exe` |
 
 La primera vez se baja MediaPipe con los modelos de manos y Pose y queda
@@ -28,8 +30,7 @@ En Linux la cámara la abre `ffmpeg` (tiene que estar instalado).
 
 La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
 (con 16 px de margen), permanece sobre las demás y recuerda dónde la dejaste.
-En el modo táctil de Linux, además, un halo transparente sobre toda la pantalla
-sigue la mano cuando entra en el panel calibrado (nada fuera, suave dentro y
+En el modo táctil, además, un halo transparente sigue la mano cuando entra en el panel calibrado (nada fuera, suave dentro y
 encendido al agarrar). Esa superficie no recibe clics ni foco y no tapa la
 píldora.
 Esa posición se guarda en `ventana.json`, junto al estado de la app
@@ -96,7 +97,7 @@ la señal visual vuelve a ser la píldora del indicador.
 
 ## Emparejar los dos PCs (solo para transferencias)
 
-El modo táctil de Linux actúa en el mismo equipo y no necesita emparejar nada.
+El modo táctil actúa en el mismo equipo y no necesita emparejar nada.
 Para usar el modo de transferencia anterior, abre la app con
 `./dev app -modo transferencia` y sigue estos pasos:
 
@@ -250,7 +251,9 @@ ni nombres de archivos o ventanas.
 - El aura es una superficie layer-shell aparte de la ventana de Wails (Wails v2
   no abre más de una ventana): `desktop/app/aura.c` la crea y
   `desktop/app/aura_linux.go` la enlaza con Go. La página es
-  `desktop/app/frontend/aura.html`. Fuera de Linux con cgo no se dibuja.
+  `desktop/app/frontend/aura.html`. En Windows es una ventana por capas
+  (`desktop/app/aura_windows.go`) que no recibe clics ni toques, con la misma
+  figura dibujada en Go (`aura_pintar.go`). En un Linux sin cgo no se dibuja.
 - `./dev app e2e win|linux`: la app de verdad en los dos PCs sin cámara: el
   PC que manda pasa grabaciones reales (activar, agarrar, soltar) por el mismo
   camino que la cámara, y la captura tiene que llegar al otro.
