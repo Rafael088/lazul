@@ -298,6 +298,12 @@ function pintarEstado(e) {
 	texto("panelaviso", [panel.aviso_entrada, panel.aviso_calibracion].filter(Boolean).join(" "));
   texto("panelinstruccion", panel.instruccion || "Calibra dos esquinas y tu pellizco para crear el panel delante de ti.");
   texto("panelerror", panel.error || "");
+  const iman = e.iman;
+  $("imanfila").style.display = iman && iman.disponible ? "block" : "none";
+  if (iman) {
+    if (document.activeElement !== $("iman")) $("iman").checked = iman.encendido;
+    texto("imanestado", iman.encendido ? (iman.vigente ? `· ${iman.chicos} cerca · ${iman.ajustes} ajustes, ${iman.dudas} dudas` : "· esperando la ventana") : "");
+  }
   texto("panelestado", panel.calibrando ? `Calibrando · paso ${panel.paso} de 3` :
     (panel.calibrado ? (panel.dentro ? "Mano dentro del panel" : "Panel listo") : "Sin calibrar"));
   texto("panelpos", panel.dentro ? `${Math.round(100 * panel.x)} %, ${Math.round(100 * panel.y)} %` : "");
@@ -373,6 +379,7 @@ async function main() {
   $("panelcal").style.display = tactil ? "block" : "none";
   $("calibrarpanel").onclick = async () => texto("panelerror", await go().CalibrarPanel());
   $("capturarpanel").onclick = async () => texto("panelerror", await go().CapturarEsquinaPanel());
+  $("iman").onchange = async () => texto("panelerror", await go().Iman($("iman").checked));
   $("abrircodigo").onclick = () => go().AbrirCodigo();
   $("emparejar").onclick = async () => {
     $("emparejar").disabled = true;

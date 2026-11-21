@@ -83,6 +83,10 @@ type Panel struct {
 	ruta    string
 	// Acciones ejecuta el zoom de respaldo (Ctrl+ más/menos). Es opcional.
 	Acciones platform.TactileActions
+	// Iman es la asistencia de puntería de nivel 2 (frena el puntero sobre
+	// los botones chicos y lleva a ellos el toque que cae casi encima). Es
+	// opcional: nil o apagado, el panel se porta como siempre.
+	Iman *Iman
 
 	// apagado: el interruptor de la L. Mientras esté apagado Cuadro no toca
 	// nada (salvo para calibrar). NuevoPanel lo deja apagado.
@@ -112,6 +116,11 @@ type Panel struct {
 	filtrosDedo      [2]gestures.FiltroOneEuroPanel
 	dedosAbajo       [2]bool
 	ultimaDedo       [2]gestures.PuntoPanel
+	freno            FrenoIman
+	desfase          [2]gestures.PuntoPanel // del dedo apoyado respecto a la mano, fijado al apoyar
+	conDesfase       [2]bool
+	ultimoAjuste     ajusteHecho
+	ahora            func() time.Time // reloj del imán; nil es time.Now
 	x, y             float64
 	err              string
 }
@@ -517,6 +526,14 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 			entrada.X, entrada.Y = limitar01(entrada.X), limitar01(entrada.Y)
 		}
 		pos := p.filtro.Filtrar(tMs, entrada)
+		// El freno del imán solo actúa mientras ningún dedo está apoyado:
+		// así el contacto nace donde estaba el puntero frenado y el
+		// arrastre después va con la mano.
+		if r.Dentro && !p.presionado && contarDedos(p.dedosAbajo) == 0 {
+			pos = p.freno.Aplicar(p.objetivosIman(), pos)
+		} else {
+			p.freno.Reiniciar()
+		}
 		if r.Dentro {
 			p.x, p.y = pos.X, pos.Y
 		}
@@ -534,10 +551,12 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 		}
 	} else {
 		p.filtro.Reiniciar()
+		p.freno.Reiniciar()
 	}
 	if !r.Dentro && r.Fase != gestures.EmbragueAgarrando {
 		p.filtro.Reiniciar()
 	}
+	p.Iman.Pedir(mover && (r.Dentro || r.Fase == gestures.EmbragueAgarrando))
 
 	if mover && p.tactilListo {
 		if err := p.enviarToques(r, tMs); err != nil {
@@ -586,19 +605,35 @@ func (p *Panel) enviarToques(r gestures.ResultadoEmbrague, tMs int64) error {
 		if d.Apoyado {
 			if !p.dedosAbajo[d.Ranura] {
 				p.filtrosDedo[d.Ranura].Reiniciar()
+				p.conDesfase[d.Ranura] = false
 				// Con un solo dedo, el primer contacto coincide exactamente con
 				// el puntero que la palma venía moviendo.
 				if r.ManosArmadas == 1 && r.TienePos {
-					pos = gestures.PuntoPanel{X: p.x, Y: p.y}
+					contacto := gestures.PuntoPanel{X: p.x, Y: p.y}
+					if p.Iman.Encendido() {
+						// Con el imán, el dedo entero se corre lo que se
+						// corrió el contacto: el tap no se vuelve un
+						// arrastre y el arrastre no salta.
+						final := p.ajustarIman(contacto)
+						p.desfase[d.Ranura] = gestures.PuntoPanel{X: final.X - d.X, Y: final.Y - d.Y}
+						p.conDesfase[d.Ranura] = true
+					} else {
+						pos = contacto
+					}
 				}
 			}
 			pos = p.filtrosDedo[d.Ranura].Filtrar(tMs, pos)
+			if p.conDesfase[d.Ranura] {
+				pos.X += p.desfase[d.Ranura].X
+				pos.Y += p.desfase[d.Ranura].Y
+			}
 			p.ultimaDedo[d.Ranura] = pos
 			nuevoAbajo[d.Ranura] = true
 		} else {
 			pos = p.ultimaDedo[d.Ranura]
 			nuevoAbajo[d.Ranura] = false
 			p.filtrosDedo[d.Ranura].Reiniciar()
+			p.conDesfase[d.Ranura] = false
 		}
 		puntos = append(puntos, platform.TouchPoint{Slot: d.Ranura, X: limitar01(pos.X), Y: limitar01(pos.Y), Down: d.Apoyado})
 	}
@@ -614,10 +649,67 @@ func (p *Panel) enviarToques(r gestures.ResultadoEmbrague, tMs int64) error {
 		resultado := "levanta"
 		if despues > antes {
 			resultado = "apoya"
+		} else {
+			p.Iman.Cambio(p.reloj()) // un tap o un arrastre cambian la pantalla
 		}
 		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: resultado, Dedos: despues})
 	}
 	return nil
+}
+
+// ajusteHecho recuerda el último toque que el imán corrió, para repetirlo
+// en un doble toque aunque la lista ya no valga (se acaba de levantar el
+// dedo).
+type ajusteHecho struct {
+	t            time.Time
+	desde, hasta gestures.PuntoPanel
+	ancho, alto  float64
+	hay          bool
+}
+
+func (p *Panel) reloj() time.Time {
+	if p.ahora != nil {
+		return p.ahora()
+	}
+	return time.Now()
+}
+
+// objetivosIman es la lista vigente del imán o nil. Se llama con p.mu tomado.
+func (p *Panel) objetivosIman() *ObjetivosIman {
+	if p.Iman == nil {
+		return nil
+	}
+	return p.Iman.Objetivos(p.reloj())
+}
+
+// ajustarIman decide dónde se apoya un dedo que nace en contacto. Se llama
+// con p.mu tomado.
+func (p *Panel) ajustarIman(contacto gestures.PuntoPanel) gestures.PuntoPanel {
+	ahora := p.reloj()
+	u := p.ultimoAjuste
+	if u.hay && ahora.Sub(u.t) <= RepetirToqueIman &&
+		math.Hypot((contacto.X-u.desde.X)*u.ancho, (contacto.Y-u.desde.Y)*u.alto) <= RadioIman {
+		p.ultimoAjuste.t = ahora
+		p.anotarIman(AjusteRepetir)
+		return u.hasta
+	}
+	o := p.objetivosIman()
+	final, res := o.AjustarToque(contacto)
+	if res == AjusteMovido {
+		p.ultimoAjuste = ajusteHecho{t: ahora, desde: contacto, hasta: final, ancho: o.ancho, alto: o.alto, hay: true}
+	} else {
+		p.ultimoAjuste.hay = false
+	}
+	p.anotarIman(res)
+	return final
+}
+
+func (p *Panel) anotarIman(res ResultadoAjuste) {
+	p.Iman.Anotar(res)
+	switch res {
+	case AjusteMovido, AjusteDuda, AjusteRepetir:
+		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "iman_" + string(res)})
+	}
 }
 
 func contarDedos(d [2]bool) int {
@@ -686,6 +778,9 @@ func (p *Panel) levantarDedos() {
 		}
 	}
 	p.dedosAbajo = [2]bool{}
+	p.conDesfase = [2]bool{}
+	p.freno.Reiniciar()
+	p.Iman.Pedir(false)
 	for i := range p.filtrosDedo {
 		p.filtrosDedo[i].Reiniciar()
 	}
