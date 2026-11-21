@@ -101,6 +101,8 @@ type Estado struct {
 	CPUTotal  float64                `json:"cpu_total"` // porcentaje como el monitor del sistema
 	ManoMs    float64                `json:"mano_ms"`
 	PoseMs    float64                `json:"pose_ms"`
+	Manos     float64                `json:"manos_media"`
+	PoseCada  float64                `json:"pose_cada"`
 	Evitadas  map[string]int         `json:"evitadas"`
 	Camara    string                 `json:"camara"` // error de la cámara, si hay
 }
@@ -135,7 +137,11 @@ type App struct {
 	poseMs        float64
 	sumaManoMs    float64
 	sumaPoseMs    float64
+	sumaManos     int
+	poses         int
 	metricas      int
+	manosMedia    float64
+	poseCada      float64
 	evitadas      map[string]int
 	rechazoActivo map[string]bool
 	errCam        string
@@ -222,6 +228,10 @@ func (a *App) Cuadro(cj CuadroJS) {
 	a.mu.Lock()
 	a.sumaManoMs += cj.ManoMs
 	a.sumaPoseMs += cj.PoseMs
+	a.sumaManos += len(c.Manos)
+	if cj.PoseMs > 0 {
+		a.poses++
+	}
 	a.metricas++
 	a.mu.Unlock()
 	a.cuadro(c)
@@ -457,6 +467,7 @@ func (a *App) Estado() Estado {
 	a.mu.Lock()
 	e := Estado{Vista: a.vista, Indicador: vi, Permiso: a.permiso, FPS: a.fps, ConMano: a.fracMano,
 		EnZona: a.fracZona, CPUCore: a.cpuCore, CPUTotal: a.cpuTotal, ManoMs: a.manoMs, PoseMs: a.poseMs,
+		Manos: a.manosMedia, PoseCada: a.poseCada,
 		Evitadas: maps.Clone(a.evitadas), Camara: a.errCam}
 	a.mu.Unlock()
 	e.Red = a.nucleo.Estado()
@@ -796,9 +807,9 @@ func (a *App) medir(ctx context.Context) {
 		}
 		a.mu.Lock()
 		n, m, z := a.cuadros, a.conMano, a.enZona
-		sumaMano, sumaPose, nm := a.sumaManoMs, a.sumaPoseMs, a.metricas
+		sumaMano, sumaPose, sumaManos, poses, nm := a.sumaManoMs, a.sumaPoseMs, a.sumaManos, a.poses, a.metricas
 		a.cuadros, a.conMano, a.enZona = 0, 0, 0
-		a.sumaManoMs, a.sumaPoseMs, a.metricas = 0, 0, 0
+		a.sumaManoMs, a.sumaPoseMs, a.sumaManos, a.poses, a.metricas = 0, 0, 0, 0, 0
 		a.fps = float64(n) / 5
 		a.fracMano, a.fracZona = 0, 0
 		if n > 0 {
@@ -807,6 +818,11 @@ func (a *App) medir(ctx context.Context) {
 		}
 		if nm > 0 {
 			a.manoMs, a.poseMs = sumaMano/float64(nm), sumaPose/float64(nm)
+			a.manosMedia = float64(sumaManos) / float64(nm)
+			a.poseCada = 0
+			if poses > 0 {
+				a.poseCada = float64(nm) / float64(poses)
+			}
 		}
 		cpuAhora, paredAhora := cpuArbol(), time.Now()
 		seg := paredAhora.Sub(paredAnterior).Seconds()
@@ -815,7 +831,7 @@ func (a *App) medir(ctx context.Context) {
 			a.cpuTotal = a.cpuCore / float64(runtime.NumCPU())
 		}
 		cpuAnterior, paredAnterior = cpuAhora, paredAhora
-		core, total, manoMs, poseMs := a.cpuCore, a.cpuTotal, a.manoMs, a.poseMs
+		core, total, manoMs, poseMs, manosMedia, poseCada := a.cpuCore, a.cpuTotal, a.manoMs, a.poseMs, a.manosMedia, a.poseCada
 		a.mu.Unlock()
 		if a.iman != nil && n > 0 {
 			ei := a.iman.Estado(paredAhora)
@@ -823,10 +839,11 @@ func (a *App) medir(ctx context.Context) {
 				ei.Encendido, ei.Lecturas, ei.MsLectura, ei.Fallos, ei.Objetivos, ei.Chicos, ei.Ajustes, ei.Dudas)
 		}
 		if n > 0 {
-			decir("cámara: %.1f cuadros/s, mano en %d de %d, zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms",
-				float64(n)/5, m, n, z, core, total, manoMs, poseMs)
+			decir("cámara: %.1f cuadros/s, mano en %d de %d (%.2f manos), zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms (cada %.1f cuadros)",
+				float64(n)/5, m, n, manosMedia, z, core, total, manoMs, poseMs, poseCada)
 			a.reg.Anotar(desktop.Linea{Tipo: desktop.TipoRendimiento, Sesion: a.flujo.Sesion(), Prueba: a.flujo.EnPrueba(),
-				FPS: float64(n) / 5, CPUCore: core, CPUTotal: total, ManoMs: manoMs, PoseMs: poseMs})
+				FPS: float64(n) / 5, CPUCore: core, CPUTotal: total, ManoMs: manoMs, PoseMs: poseMs,
+				Manos: manosMedia, PoseCada: poseCada})
 		}
 	}
 }

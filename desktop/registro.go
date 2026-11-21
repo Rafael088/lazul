@@ -84,6 +84,8 @@ type Linea struct {
 	CPUTotal float64 `json:"cpu_total,omitempty"`
 	ManoMs   float64 `json:"mano_ms,omitempty"`
 	PoseMs   float64 `json:"pose_ms,omitempty"`
+	Manos    float64 `json:"manos_media,omitempty"` // cantidad media detectada; nunca puntos
+	PoseCada float64 `json:"pose_cada,omitempty"`   // cuadros por ejecución real de Pose
 	// Prueba: en la prueba de trabajo normal (toda activación cuenta como
 	// falsa y no se manda nada).
 	Prueba bool `json:"prueba,omitempty"`

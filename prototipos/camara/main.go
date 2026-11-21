@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,12 +30,16 @@ import (
 var assets embed.FS
 
 type Config struct {
-	Modo     string `json:"modo"`
-	Segundos int    `json:"segundos"`
-	Calentar int    `json:"calentar"`
-	Delegado string `json:"delegado"`
-	Variante string `json:"variante"`
-	SO       string `json:"so"`
+	Modo           string  `json:"modo"`
+	Segundos       int     `json:"segundos"`
+	Calentar       int     `json:"calentar"`
+	Delegado       string  `json:"delegado"`
+	Variante       string  `json:"variante"`
+	Manos          int     `json:"manos"`
+	PoseCada       int     `json:"pose_cada"`
+	PoseAdaptativa bool    `json:"pose_adaptativa"`
+	UmbralManoMs   float64 `json:"umbral_mano_ms"`
+	SO             string  `json:"so"`
 }
 
 var variantes = map[string]bool{
@@ -164,6 +169,20 @@ func manejador(c *captura) http.Handler {
 	return c
 }
 
+func enteroEntorno(nombre string, porDefecto int) int {
+	if n, err := strconv.Atoi(os.Getenv(nombre)); err == nil && n > 0 {
+		return n
+	}
+	return porDefecto
+}
+
+func decimalEntorno(nombre string, porDefecto float64) float64 {
+	if n, err := strconv.ParseFloat(os.Getenv(nombre), 64); err == nil && n >= 0 {
+		return n
+	}
+	return porDefecto
+}
+
 func main() {
 	app := &App{}
 	variante := os.Getenv("LAZUL_VARIANTE")
@@ -175,12 +194,20 @@ func main() {
 	flag.IntVar(&app.cfg.Calentar, "calentar", 5, "segundos de calentamiento sin medir")
 	flag.StringVar(&app.cfg.Delegado, "delegado", "GPU", "GPU | CPU")
 	flag.StringVar(&app.cfg.Variante, "variante", variante, "base | envio | respuesta | indicador | aura | copia | antes | despues")
+	flag.IntVar(&app.cfg.Manos, "manos", enteroEntorno("LAZUL_NUM_HANDS", 1), "máximo de manos de MediaPipe (1 | 2)")
+	flag.IntVar(&app.cfg.PoseCada, "pose-cada", enteroEntorno("LAZUL_POSE_CADA", 0), "correr Pose cada N cuadros (0: no correr Pose)")
+	flag.BoolVar(&app.cfg.PoseAdaptativa, "pose-adaptativa", os.Getenv("LAZUL_POSE_ADAPTATIVA") == "1", "duplicar pose-cada cuando Hand supera el umbral")
+	flag.Float64Var(&app.cfg.UmbralManoMs, "umbral-mano-ms", decimalEntorno("LAZUL_UMBRAL_MANO_MS", 24), "umbral de Hand para espaciar Pose")
 	flag.StringVar(&app.salida, "salida", "", "archivo JSON con el resultado")
 	dispositivo := flag.String("dispositivo", "/dev/video0", "cámara para los modos proceso (ffmpeg -f v4l2)")
 	reg := flag.String("registro", "", "archivo para el registro (por defecto, stderr)")
 	flag.Parse()
 	if !variantes[app.cfg.Variante] {
 		fmt.Fprintf(os.Stderr, "variante desconocida %q\n", app.cfg.Variante)
+		os.Exit(2)
+	}
+	if app.cfg.Manos < 1 || app.cfg.Manos > 2 || app.cfg.PoseCada < 0 {
+		fmt.Fprintln(os.Stderr, "-manos debe ser 1 o 2 y -pose-cada no puede ser negativo")
 		os.Exit(2)
 	}
 	if *reg != "" {

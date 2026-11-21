@@ -107,7 +107,29 @@ func pasarPantallas(p *Pantallas, cs []gestures.Cuadro, libre bool, t0 time.Time
 			cambios++
 		}
 	}
+	if esperarPantallas(p) {
+		cambios++
+	}
 	return cambios
+}
+
+// esperarPantallas espera solo al escritorio falso de las pruebas. En la app
+// real Cuadro recoge el cambio terminado en el fotograma siguiente.
+func esperarPantallas(p *Pantallas) bool {
+	limite := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(limite) {
+		p.mu.Lock()
+		trabajando := p.trabajando
+		if !trabajando {
+			cambio := p.cambio
+			p.cambio = false
+			p.mu.Unlock()
+			return cambio
+		}
+		p.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+	return false
 }
 
 func TestPantallasUnMonitorNoCambiaNada(t *testing.T) {
@@ -217,7 +239,10 @@ func TestPantallasSigueAlFoco(t *testing.T) {
 	if p.Cuadro(quieto[0], true, t0.Add(500*time.Millisecond)) {
 		t.Fatal("se consultó el foco antes de ConsultarFocoCada")
 	}
-	if !p.Cuadro(quieto[0], true, t0.Add(ConsultarFocoCada)) {
+	if p.Cuadro(quieto[0], true, t0.Add(ConsultarFocoCada)) {
+		t.Fatal("la consulta asíncrona anunció un cambio antes de terminar")
+	}
+	if !esperarPantallas(p) {
 		t.Fatal("no siguió al foco")
 	}
 	if d, _ := p.Actual(); d.Name != "DP-1" {
@@ -266,6 +291,7 @@ func TestPantallasSinCompositorAnotaUnaVez(t *testing.T) {
 		if p.Cuadro(gestures.Cuadro{}, true, t0.Add(time.Duration(i)*ConsultarFocoCada)) {
 			t.Fatal("sin monitores hubo cambio")
 		}
+		esperarPantallas(p)
 	}
 	if err := reg.Cerrar(); err != nil {
 		t.Fatal(err)
@@ -274,4 +300,78 @@ func TestPantallasSinCompositorAnotaUnaVez(t *testing.T) {
 	if n := strings.Count(string(b), "error_listar"); n != 1 || f.listas != 6 {
 		t.Fatalf("error_listar %d veces en %d consultas:\n%s", n, f.listas, b)
 	}
+}
+
+type pantallasBloqueadas struct {
+	ds     []platform.Display
+	inicio chan struct{}
+	soltar chan struct{}
+	mu     sync.Mutex
+	listas int
+	unaVez sync.Once
+}
+
+func (f *pantallasBloqueadas) List(ctx context.Context) ([]platform.Display, error) {
+	f.mu.Lock()
+	f.listas++
+	n := f.listas
+	f.mu.Unlock()
+	if n == 1 {
+		return append([]platform.Display(nil), f.ds...), nil
+	}
+	f.unaVez.Do(func() { close(f.inicio) })
+	select {
+	case <-f.soltar:
+		return append([]platform.Display(nil), f.ds...), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (*pantallasBloqueadas) Target(context.Context, string) error { return nil }
+
+func TestPantallasConsultarFocoNuncaBloqueaElCuadro(t *testing.T) {
+	f := &pantallasBloqueadas{
+		ds: dosMonitores("eDP-1"), inicio: make(chan struct{}), soltar: make(chan struct{}),
+	}
+	p := NuevasPantallas(f)
+	t0 := time.Unix(0, 0)
+	p.Iniciar(t0) // La primera lista prepara el estado sin bloquear.
+
+	inicio := time.Now()
+	p.Cuadro(gestures.Cuadro{}, true, t0.Add(ConsultarFocoCada))
+	if tarda := time.Since(inicio); tarda > 50*time.Millisecond {
+		t.Fatalf("consultar monitores bloqueó el cuadro durante %v", tarda)
+	}
+	select {
+	case <-f.inicio:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("la consulta no arrancó fuera del cuadro")
+	}
+	close(f.soltar)
+	esperarPantallas(p)
+}
+
+func TestPantallasConsultarParaBarridoNuncaBloqueaElCuadro(t *testing.T) {
+	f := &pantallasBloqueadas{
+		ds: dosMonitores("eDP-1"), inicio: make(chan struct{}), soltar: make(chan struct{}),
+	}
+	p := NuevasPantallas(f)
+	t0 := time.Unix(0, 0)
+	p.Iniciar(t0)
+
+	inicio := time.Now()
+	for _, c := range barrido(t, 0, true) {
+		p.Cuadro(c, true, t0.Add(time.Duration(c.TMs)*time.Millisecond))
+	}
+	if tarda := time.Since(inicio); tarda > 50*time.Millisecond {
+		t.Fatalf("consultar monitores para el barrido bloqueó cuadros durante %v", tarda)
+	}
+	select {
+	case <-f.inicio:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("la consulta del barrido no arrancó fuera del cuadro")
+	}
+	close(f.soltar)
+	esperarPantallas(p)
 }

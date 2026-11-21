@@ -25,12 +25,27 @@ type Pantallas struct {
 	Reg       *Registro
 	AlCambiar func(platform.Display)
 
-	detector  *gestures.DetectorBarridoPantalla
-	actual    platform.Display
-	hay       bool
-	focoVisto string // último monitor con foco que se vio: el seguimiento es por cambios
-	consulta  time.Time
-	fallando  bool // la última consulta de monitores falló
+	detector   *gestures.DetectorBarridoPantalla
+	actual     platform.Display
+	hay        bool
+	focoVisto  string // último monitor con foco que se vio: el seguimiento es por cambios
+	consulta   time.Time
+	fallando   bool // la última consulta de monitores falló
+	trabajando bool // hay una consulta/cambio fuera del camino del cuadro
+	pendiente  *solicitudPantallas
+	cambio     bool // un trabajo terminó de cambiar el monitor desde el último Cuadro
+}
+
+type tipoSolicitudPantallas uint8
+
+const (
+	consultarFoco tipoSolicitudPantallas = iota + 1
+	barrerPantalla
+)
+
+type solicitudPantallas struct {
+	tipo tipoSolicitudPantallas
+	lado gestures.LadoPantalla
 }
 
 // NuevasPantallas prepara el control sobre d (que puede ser nil).
@@ -47,13 +62,18 @@ func (p *Pantallas) listar() ([]platform.Display, bool) {
 	ds, err := p.Displays.List(ctx)
 	if err != nil {
 		// Sin hyprctl (otro compositor) fallaría cada segundo: se anota una vez.
-		if !p.fallando {
+		p.mu.Lock()
+		anotar := !p.fallando
+		p.fallando = true
+		p.mu.Unlock()
+		if anotar {
 			p.anotar("error_listar", "", err)
 		}
-		p.fallando = true
 		return nil, false
 	}
+	p.mu.Lock()
 	p.fallando = false
+	p.mu.Unlock()
 	return ds, len(ds) > 0
 }
 
@@ -72,19 +92,28 @@ func (p *Pantallas) anotar(resultado, dir string, err error) {
 // cámara): vuelve a mirar el foco.
 func (p *Pantallas) Iniciar(ahora time.Time) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.consulta = ahora
+	p.mu.Unlock()
 	ds, ok := p.listar()
 	if !ok {
 		return
 	}
 	foco, _ := platform.Enfocado(ds)
+	p.mu.Lock()
 	p.focoVisto = foco.Name
-	p.cambiarA(ds, foco, "inicio", "")
+	p.mu.Unlock()
+	if p.cambiarA(ds, foco, "inicio", "") {
+		// Iniciar ocurre antes de los cuadros; no es un cambio pendiente que
+		// el primer Cuadro tenga que anunciar otra vez.
+		p.mu.Lock()
+		p.cambio = false
+		p.mu.Unlock()
+	}
 }
 
 // cambiarA dirige el táctil y el puntero a d. Con un solo monitor solo lo
-// recuerda. Se llama con p.mu tomado.
+// recuerda. Puede tardar (en Linux recrea el táctil), así que nunca se llama
+// desde Cuadro.
 func (p *Pantallas) cambiarA(ds []platform.Display, d platform.Display, resultado, dir string) bool {
 	if len(ds) > 1 {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -95,7 +124,10 @@ func (p *Pantallas) cambiarA(ds []platform.Display, d platform.Display, resultad
 			return false
 		}
 	}
+	p.mu.Lock()
 	p.actual, p.hay = d, true
+	p.cambio = true
+	p.mu.Unlock()
 	if len(ds) > 1 {
 		p.anotar(resultado, dir, nil)
 	}
@@ -105,6 +137,59 @@ func (p *Pantallas) cambiarA(ds []platform.Display, d platform.Display, resultad
 	return true
 }
 
+// solicitar arranca un trabajo si no hay otro. Los barridos tienen prioridad:
+// si llegan durante una consulta de foco quedan pendientes y se atienden al
+// terminar. Se llama con p.mu tomado.
+func (p *Pantallas) solicitar(s solicitudPantallas) {
+	if p.trabajando {
+		if s.tipo == barrerPantalla {
+			copia := s
+			p.pendiente = &copia
+		}
+		return
+	}
+	p.trabajando = true
+	go p.trabajar(s)
+}
+
+func (p *Pantallas) trabajar(s solicitudPantallas) {
+	switch s.tipo {
+	case consultarFoco:
+		p.consultarFoco()
+	case barrerPantalla:
+		p.barrer(s.lado)
+	}
+	p.mu.Lock()
+	if p.pendiente != nil {
+		siguiente := *p.pendiente
+		p.pendiente = nil
+		p.mu.Unlock()
+		p.trabajar(siguiente)
+		return
+	}
+	p.trabajando = false
+	p.mu.Unlock()
+}
+
+func (p *Pantallas) consultarFoco() {
+	ds, ok := p.listar()
+	if !ok {
+		return
+	}
+	foco, _ := platform.Enfocado(ds)
+	p.mu.Lock()
+	if foco.Name == p.focoVisto {
+		p.mu.Unlock()
+		return
+	}
+	p.focoVisto = foco.Name
+	yaEsta := p.hay && foco.Name == p.actual.Name
+	p.mu.Unlock()
+	if !yaEsta {
+		p.cambiarA(ds, foco, "foco", "")
+	}
+}
+
 // Cuadro mira el barrido en el cuadro (después del filtro del torso, antes
 // del panel: el barrido sale del panel por un lado). libre es falso mientras
 // el pellizco agarra o se calibra: entonces la mano no cambia de pantalla.
@@ -112,42 +197,38 @@ func (p *Pantallas) cambiarA(ds []platform.Display, d platform.Display, resultad
 func (p *Pantallas) Cuadro(c gestures.Cuadro, libre bool, ahora time.Time) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	cambio := p.cambio
+	p.cambio = false
 	if p.Displays == nil {
-		return false
+		return cambio
 	}
 	if !libre {
 		p.detector.Reiniciar()
-		return false
+		return cambio
 	}
 	if lado := p.detector.Cuadro(c); lado != gestures.PantallaNinguna {
-		return p.barrer(lado)
+		p.solicitar(solicitudPantallas{tipo: barrerPantalla, lado: lado})
+		return cambio
 	}
 	if ahora.Sub(p.consulta) < ConsultarFocoCada {
-		return false
+		return cambio
 	}
 	p.consulta = ahora
-	ds, ok := p.listar()
-	if !ok {
-		return false
-	}
-	foco, _ := platform.Enfocado(ds)
-	if foco.Name == p.focoVisto {
-		return false
-	}
-	p.focoVisto = foco.Name
-	if p.hay && foco.Name == p.actual.Name {
-		return false
-	}
-	return p.cambiarA(ds, foco, "foco", "")
+	p.solicitar(solicitudPantallas{tipo: consultarFoco})
+	return cambio
 }
 
 func (p *Pantallas) barrer(lado gestures.LadoPantalla) bool {
+	// Se vuelve a listar fuera de Cuadro: un monitor pudo conectarse desde la
+	// última consulta y los adaptadores necesitan la geometría vigente.
 	ds, ok := p.listar()
 	if !ok || len(ds) < 2 {
 		return false // un solo monitor: el barrido no hace nada
 	}
-	actual := p.actual.Name
-	if _, sigue := platform.PorNombre(ds, actual); !p.hay || !sigue {
+	p.mu.Lock()
+	actual, hay := p.actual.Name, p.hay
+	p.mu.Unlock()
+	if _, sigue := platform.PorNombre(ds, actual); !hay || !sigue {
 		f, _ := platform.Enfocado(ds)
 		actual = f.Name
 	}
