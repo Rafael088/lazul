@@ -187,6 +187,20 @@ otro también pueda mandarte, empareja al revés.
   monitor; el foco no se mueve. Con un solo monitor no cambia nada. Cada
   cambio se anota en el registro (`"tipo":"pantalla"`, con el lado, nunca
   posiciones).
+- **Imán sobre los botones chicos (Windows)**: Lazul lee con UI Automation
+  dónde están los botones, enlaces, casillas, pestañas y menús de la ventana
+  con el foco (una vez al cambiar de ventana y cada 1,5 s con la mano en el
+  panel, nunca por cuadro). Encima de un objetivo chico (lado corto ≤ 48 px)
+  el puntero avanza a la mitad, y si el pellizco apoya el dedo a 18 px o menos
+  de uno, pero fuera de todos, el toque cae en él (al centro; en un enlace
+  largo, donde tocaste). Si dos objetivos quedan casi igual de cerca (menos de
+  12 px de diferencia) no se corrige. Tras levantar el dedo espera 400 ms a
+  que la página se asiente; un doble toque repite el mismo ajuste. Se apaga
+  con la casilla **Imán sobre los botones chicos** de la vista de cámara o
+  arrancando con `-iman=false`. En Linux todavía no está (falta leer AT-SPI).
+  Cada 5 s la salida dice `imán: …` con las lecturas, su tiempo y los ajustes
+  y dudas; el registro anota `iman_ajusta`, `iman_duda` e `iman_repetido`, sin
+  posiciones.
 
 Los gestos se aplican a la ventana que tenga el foco; el panel mueve el
 cursor y el pellizco toca (o usa el respaldo de botón si el táctil no está

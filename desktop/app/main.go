@@ -91,6 +91,7 @@ type Estado struct {
 	Vista     desktop.Vista          `json:"vista"`
 	Indicador desktop.VistaIndicador `json:"indicador"`
 	Panel     desktop.EstadoPanel    `json:"panel"`
+	Iman      *desktop.EstadoIman    `json:"iman,omitempty"`
 	Permiso   *Solicitud             `json:"permiso"`
 	Prueba    bool                   `json:"prueba"`
 	FPS       float64                `json:"fps"`
@@ -115,6 +116,9 @@ type App struct {
 	aura   *Aura
 	// pantallas decide qué monitor controla el panel (barrido y foco).
 	pantallas *desktop.Pantallas
+	// iman es la asistencia de puntería de nivel 2 (nil si el sistema no
+	// sabe leer los objetivos).
+	iman *desktop.Iman
 
 	mu            sync.Mutex
 	permiso       *Solicitud
@@ -460,7 +464,25 @@ func (a *App) Estado() Estado {
 	if a.panel != nil {
 		e.Panel = a.panel.Estado()
 	}
+	if a.iman != nil {
+		ei := a.iman.Estado(time.Now())
+		e.Iman = &ei
+	}
 	return e
+}
+
+// Iman prende o apaga el imán sobre los botones (la casilla de la ventana).
+func (a *App) Iman(on bool) string {
+	if a.iman == nil {
+		return "Este sistema todavía no lee dónde están los botones."
+	}
+	a.iman.Encender(on)
+	if on {
+		decir("imán sobre los botones: encendido")
+	} else {
+		decir("imán sobre los botones: apagado")
+	}
+	return ""
 }
 
 // actualizarAura lleva al halo la posición de la mano y la fase del pellizco
@@ -795,6 +817,11 @@ func (a *App) medir(ctx context.Context) {
 		cpuAnterior, paredAnterior = cpuAhora, paredAhora
 		core, total, manoMs, poseMs := a.cpuCore, a.cpuTotal, a.manoMs, a.poseMs
 		a.mu.Unlock()
+		if a.iman != nil && n > 0 {
+			ei := a.iman.Estado(paredAhora)
+			decir("imán: %v · %d lecturas (%.1f ms de media, %d fallos) · %d objetivos, %d chicos · %d ajustes, %d dudas",
+				ei.Encendido, ei.Lecturas, ei.MsLectura, ei.Fallos, ei.Objetivos, ei.Chicos, ei.Ajustes, ei.Dudas)
+		}
 		if n > 0 {
 			decir("cámara: %.1f cuadros/s, mano en %d de %d, zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms",
 				float64(n)/5, m, n, z, core, total, manoMs, poseMs)
@@ -844,6 +871,7 @@ func main() {
 	eco := flag.Bool("eco", false, "copiar cada línea del registro a la salida")
 	soloHuella := flag.Bool("solo-huella", false, "mostrar la huella de este equipo y salir")
 	resumen := flag.Bool("resumen", false, "mostrar el resumen del registro y salir")
+	iman := flag.Bool("iman", true, "imán sobre los botones: frenar el puntero sobre los chicos y llevarles el toque que cae casi encima (solo Windows por ahora)")
 	flag.Parse()
 
 	if *archivoSalida != "" {
@@ -853,7 +881,7 @@ func main() {
 		}
 	}
 	if err := correr(opciones{*nombre, *estado, *escucha, *camara, *dispositivo, *modoApp, *abrir, *usarMDNS, *adelantar, *titulo, *reproducir,
-		*grabaciones, *permitir, *mostrarCodigo, *emparejarCon, *codigo, *duracion, *eco, *soloHuella, *resumen}); err != nil {
+		*grabaciones, *permitir, *mostrarCodigo, *emparejarCon, *codigo, *duracion, *eco, *soloHuella, *resumen, *iman}); err != nil {
 		decir("error: %v", err)
 		os.Exit(1)
 	}
@@ -866,7 +894,7 @@ type opciones struct {
 	mostrarCodigo                                      bool
 	emparejarCon, codigo                               string
 	duracion                                           time.Duration
-	eco, soloHuella, resumen                           bool
+	eco, soloHuella, resumen, iman                     bool
 }
 
 func correr(o opciones) error {
@@ -976,6 +1004,12 @@ func correr(o opciones) error {
 		if err := app.panel.Preparar(); err != nil {
 			decir("aviso: %v", err)
 		}
+		if sis.Targets != nil && !app.cfg.Reproducir {
+			app.iman = desktop.NuevoIman(sis.Targets)
+			app.iman.Encender(o.iman)
+			app.panel.Iman = app.iman
+			decir("imán sobre los botones: %v (-iman=false lo apaga)", o.iman)
+		}
 	} else {
 		app.flujo = &desktop.Vivo{Reg: reg, AlGesto: app.nucleo.Disparar}
 	}
@@ -984,6 +1018,9 @@ func correr(o opciones) error {
 	defer cancel()
 	app.nucleo.Arrancar(ctx)
 	go app.medir(ctx)
+	if app.iman != nil {
+		go app.iman.Correr(ctx)
+	}
 	e := app.nucleo.Estado()
 	decir("huella %s", app.nucleo.Huella())
 	decir("este equipo: «%s» %s · escucha %v · cámara %s · modo %s · registro %s", e.Nombre, e.Huella, e.Direcciones, modo, modoControl, rutaReg)

@@ -192,6 +192,34 @@ type Displays interface {
 	Target(ctx context.Context, name string) error
 }
 
+// Target es un elemento que se puede tocar (botón, enlace, casilla,
+// pestaña…) de la ventana con el foco. X, Y, Width y Height van normalizados
+// como los de TouchPoint: (0,0)-(1,1) es el monitor que recibe el táctil.
+type Target struct {
+	X, Y, Width, Height float64
+}
+
+// TargetSet son los objetivos de una ventana leídos de una vez.
+// LogicalWidth y LogicalHeight son el tamaño de (0,0)-(1,1) en píxeles
+// lógicos (los CSS a escala 1), para medir los radios del imán igual en
+// cualquier escala.
+type TargetSet struct {
+	Window                      uint64 // la ventana con el foco cuando se leyó
+	Targets                     []Target
+	LogicalWidth, LogicalHeight float64
+}
+
+// TargetFinder lee de la accesibilidad del sistema dónde están los
+// elementos que se pueden tocar en la ventana con el foco (asistencia de
+// puntería, nivel 2). FocusedWindow es barato y dice qué ventana tiene el
+// foco, para leer Targets solo cuando cambia y no en cada cuadro. Targets
+// es caro: recorre el árbol de accesibilidad. Es opcional: sin él no hay
+// imán.
+type TargetFinder interface {
+	FocusedWindow(ctx context.Context) (uint64, error)
+	Targets(ctx context.Context) (TargetSet, error)
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
@@ -203,4 +231,5 @@ type Sistema struct {
 	AbsolutePointer AbsolutePointer
 	TouchScreen     TouchScreen
 	Displays        Displays
+	Targets         TargetFinder
 }
