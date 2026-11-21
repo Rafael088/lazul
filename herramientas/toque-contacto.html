@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazul · toque con área de contacto</title>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 24px; color: #1d2433; background: #f6f7f9; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { margin: 0 0 16px; max-width: 60ch; }
+  .fila { display: flex; gap: 48px; align-items: center; margin: 28px 0; }
+  .fila span { width: 9em; color: #5b6478; font-size: 13px; }
+  a { color: #1b5fd1; }
+  .chico { font-size: 11px; }
+  button.mini { width: 12px; height: 12px; padding: 0; border: 1px solid #1b5fd1; background: #dfe8fb; }
+  button.peq { font-size: 11px; padding: 1px 4px; }
+  #registro { font: 12px/1.5 ui-monospace, monospace; background: #fff; border: 1px solid #d5d9e2; padding: 8px; height: 220px; overflow: auto; white-space: pre; }
+  #area { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Toque con área de contacto</h1>
+<p>Toca con el pellizco <b>casi encima</b> (a 5-15 px) de cada blanco, sin acertarle. Si el navegador
+corrige, el blanco se marca como tocado. Abajo sale el área que recibió el navegador.</p>
+<p>Área recibida: <span id="area">— (aún sin toques)</span></p>
+
+<div class="fila"><span>enlaces chicos</span>
+  <a class="chico" href="#a1" data-blanco="enlace 1">uno</a>
+  <a class="chico" href="#a2" data-blanco="enlace 2">dos</a>
+  <a class="chico" href="#a3" data-blanco="enlace 3">tres</a>
+</div>
+<div class="fila"><span>botones 12 px</span>
+  <button class="mini" data-blanco="botón 12 a"></button>
+  <button class="mini" data-blanco="botón 12 b"></button>
+  <button class="mini" data-blanco="botón 12 c"></button>
+</div>
+<div class="fila"><span>botones de texto</span>
+  <button class="peq" data-blanco="botón texto a">ok</button>
+  <button class="peq" data-blanco="botón texto b">no</button>
+</div>
+
+<div id="registro"></div>
+
+<script>
+  const registro = document.getElementById("registro");
+  const area = document.getElementById("area");
+  const anotar = (t) => { registro.textContent = t + "\n" + registro.textContent; };
+  const fmt = (v) => (Math.round(v * 10) / 10).toString();
+
+  addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    area.textContent = `${fmt(e.width)}×${fmt(e.height)} px CSS (PointerEvent)`;
+    anotar(`pointerdown touch en ${fmt(e.clientX)},${fmt(e.clientY)} área ${fmt(e.width)}×${fmt(e.height)}`);
+  }, true);
+  addEventListener("touchstart", (e) => {
+    const t = e.changedTouches[0];
+    anotar(`touchstart radio ${fmt(t.radiusX)}×${fmt(t.radiusY)}`);
+  }, { capture: true, passive: true });
+  addEventListener("click", (e) => {
+    const b = e.target.closest("[data-blanco]");
+    if (b) {
+      e.preventDefault();
+      b.style.outline = "3px solid #1f9d55";
+      anotar(`click → ${b.dataset.blanco} (en ${fmt(e.clientX)},${fmt(e.clientY)})`);
+    } else {
+      anotar(`click sin blanco en ${fmt(e.clientX)},${fmt(e.clientY)}`);
+    }
+  }, true);
+  anotar(`${navigator.userAgent}  devicePixelRatio=${devicePixelRatio}`);
+</script>
+</body>
+</html>

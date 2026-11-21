@@ -33,7 +33,7 @@ const (
 	mascaraPresion     = 0x00000004
 	retroDefecto       = 0x1 // TOUCH_FEEDBACK_DEFAULT: el círculo que dibuja Windows
 
-	ladoContacto = 2 // medio lado del área de contacto, en píxeles
+	dpiBase = 96 // DPI de la escala 100 %
 
 	// sostener: un dedo quieto se vuelve a mandar cada tanto para que
 	// Windows no dé el contacto por perdido si la cámara tarda en dar el
@@ -97,13 +97,25 @@ func validarPuntosTactiles(points []platform.TouchPoint) error {
 type estadoTactil struct {
 	abajo [touchSlots]bool
 	pos   [touchSlots]punto
+	medio [touchSlots]int32 // medio lado del área de cada dedo, fijado al apoyar
+	// dpi da el DPI del monitor en un píxel físico; nil es la escala 100 %.
+	dpi func(punto) uint32
 }
 
-func contactoTactil(slot int, p punto, flags uint32) pointerTouchInfo {
+// medioLado pasa platform.DiametroContacto (píxeles lógicos) a medio lado en
+// píxeles físicos con el DPI del monitor: 18 a 100 %, 27 a 150 %, 36 a 200 %.
+func medioLado(dpi uint32) int32 {
+	if dpi == 0 {
+		dpi = dpiBase
+	}
+	return int32(max(math.Round(platform.DiametroContacto*float64(dpi)/dpiBase/2), 1))
+}
+
+func contactoTactil(slot int, p punto, flags uint32, medio int32) pointerTouchInfo {
 	return pointerTouchInfo{
 		info:        pointerInfo{tipo: ptTouch, id: uint32(slot), flags: flags, pixel: p},
 		mascara:     mascaraContacto | mascaraOrientacion | mascaraPresion,
-		contacto:    rect{p.x - ladoContacto, p.y - ladoContacto, p.x + ladoContacto, p.y + ladoContacto},
+		contacto:    rect{p.x - medio, p.y - medio, p.x + medio, p.y + medio},
 		orientacion: 90,
 		presion:     32000,
 	}
@@ -127,12 +139,21 @@ func (s *estadoTactil) cuadro(points []platform.TouchPoint, z zonaTactil) ([]poi
 		case d.Down:
 			p := z.pixel(d.X, d.Y)
 			flags := uint32(punteroEnRango | punteroEnContacto | punteroActualizar)
+			// El área se fija al apoyar y no cambia hasta levantar, aunque
+			// el dedo pase a otro monitor: arrastre, scroll y zoom ven el
+			// mismo contacto.
+			medio := s.medio[slot]
 			if !s.abajo[slot] {
 				flags = punteroEnRango | punteroEnContacto | punteroAbajo
+				var dpi uint32
+				if s.dpi != nil {
+					dpi = s.dpi(p)
+				}
+				medio = medioLado(dpi)
 			}
-			cs = append(cs, contactoTactil(slot, p, flags))
+			cs = append(cs, contactoTactil(slot, p, flags, medio))
 		case s.abajo[slot]:
-			cs = append(cs, contactoTactil(slot, s.pos[slot], punteroArriba))
+			cs = append(cs, contactoTactil(slot, s.pos[slot], punteroArriba, s.medio[slot]))
 		}
 	}
 	return cs, nil
@@ -144,6 +165,7 @@ func (s *estadoTactil) aplicar(cs []pointerTouchInfo) {
 		slot := c.info.id
 		s.abajo[slot] = c.info.flags&punteroArriba == 0
 		s.pos[slot] = c.info.pixel
+		s.medio[slot] = (c.contacto.der - c.contacto.izq) / 2
 	}
 }
 
@@ -152,7 +174,7 @@ func (s *estadoTactil) sostenidos() []pointerTouchInfo {
 	var cs []pointerTouchInfo
 	for slot, abajo := range s.abajo {
 		if abajo {
-			cs = append(cs, contactoTactil(slot, s.pos[slot], punteroEnRango|punteroEnContacto|punteroActualizar))
+			cs = append(cs, contactoTactil(slot, s.pos[slot], punteroEnRango|punteroEnContacto|punteroActualizar, s.medio[slot]))
 		}
 	}
 	return cs
@@ -172,7 +194,9 @@ type tactilVirtual struct {
 
 var _ platform.TouchScreen = (*tactilVirtual)(nil)
 
-func nuevoTactilVirtual() *tactilVirtual { return &tactilVirtual{} }
+func nuevoTactilVirtual() *tactilVirtual {
+	return &tactilVirtual{estado: estadoTactil{dpi: dpiEnPixel}}
+}
 
 func inyectarContactos(cs []pointerTouchInfo) error {
 	if len(cs) == 0 {

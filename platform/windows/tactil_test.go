@@ -172,3 +172,43 @@ func TestAbsolutoVirtual(t *testing.T) {
 		}
 	}
 }
+
+func TestEstadoTactilAreaDeContacto(t *testing.T) {
+	for _, c := range []struct {
+		dpi   uint32
+		medio int32
+	}{{0, 18}, {96, 18}, {144, 27}, {192, 36}} {
+		if m := medioLado(c.dpi); m != c.medio {
+			t.Errorf("medioLado(%d) = %d, quiero %d", c.dpi, m, c.medio)
+		}
+	}
+	// El DPI se pide al apoyar, en el píxel del dedo; mover y levantar
+	// conservan el área aunque el monitor de debajo tenga otra escala.
+	dpi := uint32(192)
+	s := estadoTactil{dpi: func(punto) uint32 { return dpi }}
+	paso := func(points []platform.TouchPoint) pointerTouchInfo {
+		t.Helper()
+		cs, err := s.cuadro(points, zonaTactil{ancho: 1001, alto: 1001})
+		if err != nil || len(cs) != 1 {
+			t.Fatalf("cuadro: %v %+v", err, cs)
+		}
+		s.aplicar(cs)
+		return cs[0]
+	}
+	if c := paso([]platform.TouchPoint{{Slot: 0, X: .5, Y: .5, Down: true}}); c.contacto != (rect{464, 464, 536, 536}) {
+		t.Fatalf("área al apoyar a 200 %%: %+v", c.contacto)
+	}
+	dpi = 96
+	if c := paso([]platform.TouchPoint{{Slot: 0, X: .6, Y: .5, Down: true}}); c.contacto != (rect{564, 464, 636, 536}) {
+		t.Fatalf("área al mover: %+v", c.contacto)
+	}
+	if cs := s.sostenidos(); cs[0].contacto != (rect{564, 464, 636, 536}) {
+		t.Fatalf("área sostenida: %+v", cs[0].contacto)
+	}
+	if c := paso(nil); c.contacto != (rect{564, 464, 636, 536}) || c.info.flags != punteroArriba {
+		t.Fatalf("área al levantar: %+v", c)
+	}
+	if c := paso([]platform.TouchPoint{{Slot: 0, X: .5, Y: .5, Down: true}}); c.contacto != (rect{482, 482, 518, 518}) {
+		t.Fatalf("un toque nuevo toma la escala de su monitor: %+v", c.contacto)
+	}
+}

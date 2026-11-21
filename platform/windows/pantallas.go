@@ -192,3 +192,33 @@ func pantallaVirtual() zonaTactil {
 	h, _, _ := getSystemMetrics.Call(smCyVirtual)
 	return zonaTactil{int32(x), int32(y), int32(w), int32(h)}
 }
+
+var (
+	monitorFromPoint = user32Entrada.NewProc("MonitorFromPoint")
+	shcorePantallas  = windows.NewLazySystemDLL("shcore.dll")
+	getDpiForMonitor = shcorePantallas.NewProc("GetDpiForMonitor") // Windows 8.1+
+)
+
+const (
+	monitorMasCercano = 2 // MONITOR_DEFAULTTONEAREST
+	dpiEfectivo       = 0 // MDT_EFFECTIVE_DPI: el de la escala que elige la persona
+)
+
+// dpiEnPixel da el DPI efectivo del monitor que contiene el píxel físico p
+// (dentro de conDPIFisico) o 0 si no se puede saber (se toma el 100 %).
+func dpiEnPixel(p punto) uint32 {
+	if getDpiForMonitor.Find() != nil {
+		return 0
+	}
+	// POINT va por valor: en x64 cabe en un registro, x abajo e y arriba.
+	pt := uintptr(uint32(p.x)) | uintptr(uint32(p.y))<<32
+	hmon, _, _ := monitorFromPoint.Call(pt, monitorMasCercano)
+	if hmon == 0 {
+		return 0
+	}
+	var x, y uint32
+	if r, _, _ := getDpiForMonitor.Call(hmon, dpiEfectivo, uintptr(unsafe.Pointer(&x)), uintptr(unsafe.Pointer(&y))); r != 0 {
+		return 0
+	}
+	return x
+}

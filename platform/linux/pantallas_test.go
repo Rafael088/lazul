@@ -71,9 +71,9 @@ func TestCodigoDirigir(t *testing.T) {
 	}
 }
 
-type tactilRecreado struct{ veces int }
+type tactilRecreado struct{ veces, ancho int }
 
-func (r *tactilRecreado) Recrear() error { r.veces++; return nil }
+func (r *tactilRecreado) Recrear(ancho int) error { r.veces++; r.ancho = ancho; return nil }
 
 func hyprctlFalso(eval *[]string, respuesta string, monitores string) func(context.Context, string, ...string) ([]byte, error) {
 	return func(_ context.Context, programa string, args ...string) ([]byte, error) {
@@ -104,6 +104,9 @@ func TestTargetDirigeTactilPunteroYFoco(t *testing.T) {
 	}
 	if tactil.veces != 1 {
 		t.Errorf("el táctil se recreó %d veces, quiere 1", tactil.veces)
+	}
+	if tactil.ancho != 1440 {
+		t.Errorf("el táctil recibió un ancho lógico de %d, quiere 1440 (eDP-1 a escala 2)", tactil.ancho)
 	}
 	if puntero.destino == nil || puntero.destino.Name != "eDP-1" || puntero.caja.Width != 3360 {
 		t.Fatalf("puntero dirigido a %+v en %+v", puntero.destino, puntero.caja)
