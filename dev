@@ -111,7 +111,8 @@ ts_check() {
 }
 
 pista_check() {
-	node --check pista/pista.mjs && node --test pista/pista.test.mjs
+	node --check pista/pista.mjs desktop/app/frontend/app.js &&
+		node --test pista/pista.test.mjs desktop/app/frontend/rendimiento.test.mjs
 }
 
 cmd_check() {

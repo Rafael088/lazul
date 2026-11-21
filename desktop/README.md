@@ -180,7 +180,9 @@ otro también pueda mandarte, empareja al revés.
   vaivén). No cuenta mientras pellizcas ni al mover el puntero despacio, y tras
   un barrido hay 1 s de pausa para que el rebote de la mano no lo deshaga. Si
   cambias el foco de monitor con el ratón o el teclado, el panel lo sigue
-  (lo mira una vez por segundo). En Linux el barrido también mueve el foco
+  (lo mira una vez por segundo, fuera del camino de los cuadros: aunque
+  `hyprctl` tarde o se cuelgue, la mano sigue procesándose). En Linux el
+  barrido también mueve el foco
   (`hl.dsp.focus`) y la salida del táctil virtual (`hl.device`, con
   `hyprctl eval`); el táctil se recrea para tomarla (~0,7 s). En Windows los
   toques (`InjectTouchInput`) y el puntero van a las coordenadas de ese
@@ -238,9 +240,16 @@ La meta: menos de 1 activación sin querer en 30 min de trabajo normal.
 3. Pulsa **Terminar prueba** y **Resumen**: dice PASA o NO PASA.
 
 La línea de rendimiento muestra cuadros/s, CPU del árbol completo de Lazul,
-milisegundos de Hand y Pose y cuántos episodios quedaron bloqueados por falta
-de torso, fuera del torso o fuera del panel. El resumen guarda esas
-activaciones evitadas por motivo junto a las activaciones falsas.
+promedio de manos detectadas, milisegundos de Hand y Pose, el intervalo real
+de Pose y cuántos episodios quedaron bloqueados por falta de torso, fuera del
+torso o fuera del panel. El resumen guarda esas activaciones evitadas por
+motivo junto a las activaciones falsas.
+
+Pose corre normalmente una vez cada 3 cuadros. Si Hand tarda 24 ms o más,
+Lazul la espacia temporalmente a una vez cada 6 cuadros para aliviar la GPU;
+el detector de manos sigue aceptando dos, porque el zoom las necesita. En
+Windows el reloj de la cámara mantiene 30 Hz sin sumar otros 33 ms después de
+cada inferencia.
 
 Cuando el panel deja una mano fuera, el registro dice también **por qué**:
 `fuera_borde` (la palma rebasó el rectángulo), `cerca` o `lejos` (está a otra

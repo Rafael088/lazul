@@ -3,7 +3,7 @@
 //  inferencia     lo que tarda detectForVideo
 //  cuadro→puntos  desde que el cuadro llega a la página (requestVideoFrameCallback) hasta tener los puntos
 //  captura→puntos desde metadata.captureTime, si el navegador lo da
-import { FilesetResolver, HandLandmarker } from "./vendor/vision_bundle.mjs";
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from "./vendor/vision_bundle.mjs";
 
 const $ = (id) => document.getElementById(id);
 const estado = (t) => { $("estado").textContent = t; };
@@ -37,14 +37,23 @@ async function main() {
   estado("cargando MediaPipe…");
   const t0 = performance.now();
   const fileset = await FilesetResolver.forVisionTasks("./vendor/wasm");
-  let lm, delegado = cfg.delegado;
-  const crear = (d) => HandLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate: d },
-    runningMode: "VIDEO", numHands: 1,
-    // WebKitGTK no da WebGL2 en OffscreenCanvas (lo que MediaPipe usa por defecto): se le pasa un canvas normal.
-    canvas: info.webgl.offscreen_webgl2 === true ? undefined : document.createElement("canvas") });
-  try { lm = await crear(delegado); }
-  catch (e) { log("delegado " + delegado + " falló: " + e); delegado = "CPU"; lm = await crear("CPU"); }
+  let lm, pm = null, delegado = cfg.delegado;
+	const crear = async (d) => {
+		const canvas = () => info.webgl.offscreen_webgl2 === true ? undefined : document.createElement("canvas");
+		const mano = await HandLandmarker.createFromOptions(fileset, {
+			baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate: d },
+			runningMode: "VIDEO", numHands: cfg.manos, canvas: canvas() });
+		if (!cfg.pose_cada) return [mano, null];
+		try {
+			const pose = await PoseLandmarker.createFromOptions(fileset, {
+				baseOptions: { modelAssetPath: "./vendor/pose_landmarker_lite.task", delegate: d },
+				runningMode: "VIDEO", numPoses: 1, minPoseDetectionConfidence: 0.5,
+				minTrackingConfidence: 0.5, canvas: canvas() });
+			return [mano, pose];
+		} catch (e) { if (mano.close) mano.close(); throw e; }
+	};
+	try { [lm, pm] = await crear(delegado); }
+	catch (e) { log("delegado " + delegado + " falló: " + e); delegado = "CPU"; [lm, pm] = await crear("CPU"); }
   info.delegado_usado = delegado;
   info.carga_ms = Math.round(performance.now() - t0);
 
@@ -69,8 +78,9 @@ async function main() {
     info.camara = { ancho: s.width, alto: s.height, fps_pedidos: s.frameRate, etiqueta: st.getVideoTracks()[0].label };
   }
 
-  const inf = [], c2p = [], cap2p = [], puente = [];
-  let resultados = 0, cuadrosMano = 0, cuadrosCamara = 0, midiendo = false, tMedida = 0, ultimoTs = -1;
+  const inf = [], infPose = [], c2p = [], cap2p = [], puente = [];
+	let resultados = 0, cuadrosMano = 0, cuadrosCamara = 0, poses = 0, midiendo = false, tMedida = 0, ultimoTs = -1;
+	let ultimaPose = null, cuadrosSinPose = 0, manoMediaMs = 0;
   const puntos = $("puntos").getContext("2d");
 
   function pintar(r) {
@@ -88,10 +98,10 @@ async function main() {
     return false;
   };
   let ultimoAura = 0, ultimoSondeo = 0, vistaSondeada = null;
-  const cuadroJSON = (r, ts) => ({ t: ts, manos: r.landmarks.map((ps, i) => ({
+	const cuadroJSON = (r, ts, cuerpo) => ({ t: ts, manos: r.landmarks.map((ps, i) => ({
     derecha: !!(r.handednesses?.[i]?.[0]?.categoryName === "Right"),
     p: ps.map((p) => [p.x, p.y, p.z]),
-  })), cuerpo: { p: Array.from({ length: 33 }, (_, i) => [.3 + i / 100, .2 + i / 200, 0, 1]) } });
+	})), cuerpo });
   const pintarIndicador = (v) => {
     const el = $("indicador"); el.hidden = false;
     el.textContent = v?.indicador?.activo ? "mano en el panel" : "inactivo";
@@ -103,9 +113,9 @@ async function main() {
     el.hidden = !p;
     if (p) el.style.transform = `translate3d(${(p.x - .5) * 400}px, ${(p.y - .5) * 240}px, 0)`;
   };
-  async function partes(r, ts) {
+	async function partes(r, ts, cuerpo) {
     if (cfg.variante === "base" || cfg.variante === "copia" || cfg.variante === "aura") return;
-    const ini = performance.now(), c = cuadroJSON(r, ts);
+		const ini = performance.now(), c = cuadroJSON(r, ts, cuerpo);
     if (usa("respuesta") || cfg.variante === "indicador") {
       const v = await go().Responder(c);
       if (usa("indicador")) pintarIndicador(v);
@@ -134,11 +144,26 @@ async function main() {
     const a = performance.now();
     const r = lm.detectForVideo(fuente, ts);
     const b = performance.now();
+		const manoMs = b - a;
+		manoMediaMs = manoMediaMs ? manoMediaMs * .8 + manoMs * .2 : manoMs;
+		let poseMs = 0, cadaPose = cfg.pose_cada;
+		if (pm && cfg.pose_adaptativa && manoMediaMs >= cfg.umbral_mano_ms) cadaPose *= 2;
+		if (pm && (!ultimaPose || ++cuadrosSinPose >= cadaPose)) {
+			const p0 = performance.now();
+			ultimaPose = pm.detectForVideo(fuente, ts);
+			poseMs = performance.now() - p0;
+			cuadrosSinPose = 0;
+			if (midiendo) { poses++; infPose.push(poseMs); }
+		}
+		const puntosPose = (ultimaPose?.landmarks || [])[0];
+		const cuerpo = pm
+			? (puntosPose ? { p: puntosPose.map((p) => [p.x, p.y, p.z, p.visibility ?? 1]) } : null)
+			: { p: Array.from({ length: 33 }, (_, i) => [.3 + i / 100, .2 + i / 200, 0, 1]) };
     if (usa("aura")) pintarAura(r, b);
-    await partes(r, ts);
+		await partes(r, ts, cuerpo);
     if (!midiendo) return;
     resultados++; if (r.landmarks.length) cuadrosMano++;
-    inf.push(b - a); c2p.push(b - tCuadro);
+		inf.push(manoMs); c2p.push(b - tCuadro);
     if (tCaptura != null) cap2p.push(b - tCaptura);
   }
 
@@ -209,7 +234,9 @@ async function main() {
   const web = { ...info, segundos: +seg.toFixed(2), resultados, fps: +(resultados / seg).toFixed(2),
     error_bucle: errorBucle,
     fps_camara: cfg.modo === "imagen" ? null : +(cuadrosCamara / seg).toFixed(2),
-    cuadros_con_mano: cuadrosMano, errores_cuadro: errores, inferencia_ms: resumen(inf), puente_go_ms: resumen(puente), cuadro_a_puntos_ms: resumen(c2p), captura_a_puntos_ms: resumen(cap2p) };
+		cuadros_con_mano: cuadrosMano, poses, pose_cada_real: poses ? +(resultados / poses).toFixed(2) : null,
+		errores_cuadro: errores, inferencia_ms: resumen(inf), pose_ms: resumen(infPose), puente_go_ms: resumen(puente),
+		cuadro_a_puntos_ms: resumen(c2p), captura_a_puntos_ms: resumen(cap2p) };
   estado(JSON.stringify(web, null, 1));
   await go().Reportar(web);
 }

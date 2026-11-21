@@ -2,6 +2,8 @@
 // clasificar, emparejar, mandar) queda en Go. Los cuadros no salen de esta
 // página: a Go llegan puntos de manos y Pose. Por defecto solo se ve el indicador;
 // la vista de cámara se abre para acomodarse y se cierra al terminar.
+import { cuadrosEntrePose, mediaSuave, planearSiguienteCuadro } from "./rendimiento.mjs";
+
 const $ = (id) => document.getElementById(id);
 const hayGo = () => !!(window.go && window.go.main);
 const go = () => window.go.main.App;
@@ -69,8 +71,7 @@ async function alternarAjuste(on = !vistaCamara) {
 // ---------- cámara + MediaPipe ----------
 let cfg, lm = null, pm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
 const puntos = () => $("puntos").getContext("2d");
-const CADA_POSE = 3;
-let ultimaPose = null, cuadrosSinPose = 0;
+let ultimaPose = null, cuadrosSinPose = 0, manoMediaMs = 0;
 
 function pintar(manos, cuerpo) {
   const c = puntos();
@@ -142,12 +143,13 @@ function procesar(fuente, w, h) {
 	const inicioMano = performance.now();
   const r = lm.detectForVideo(fuente, ts);
 	const manoMs = performance.now() - inicioMano;
+	manoMediaMs = mediaSuave(manoMediaMs, manoMs);
 	// Pose solo confirma que hay una persona y dónde está su torso: cambia
-	// despacio, así que corre 1 de cada CADA_POSE cuadros y entre medias se
-	// reutiliza. Con la mano y la pose en cada cuadro, en el portátil bajaba
-	// a 7 fps cuando el sistema estaba cargado.
+	// despacio, así que corre 1 de cada 3 cuadros y entre medias se reutiliza.
+	// Si Hand pasa de 24 ms (GPU compartida o limitada), baja temporalmente a
+	// 1 de cada 6 para devolverle presupuesto sin perder las dos manos.
 	let rp = ultimaPose, poseMs = 0;
-	if (!rp || ++cuadrosSinPose >= CADA_POSE) {
+	if (!rp || ++cuadrosSinPose >= cuadrosEntrePose(manoMediaMs)) {
 		const inicioPose = performance.now();
 		rp = ultimaPose = pm.detectForVideo(fuente, ts);
 		poseMs = performance.now() - inicioPose;
@@ -275,13 +277,16 @@ async function bucleWebview(gen) {
   await video.play();
   $("sincamara").style.display = "none";
   let ultimo = -1;
+	let objetivo = performance.now();
   const paso = () => {
     if (gen !== generacion) return;
     if (video.currentTime !== ultimo && video.readyState >= 2) {
       ultimo = video.currentTime;
       procesar(video, video.videoWidth || 640, video.videoHeight || 480);
     }
-    setTimeout(paso, 33);
+		const plan = planearSiguienteCuadro(performance.now(), objetivo);
+		objetivo = plan.objetivo;
+		setTimeout(paso, plan.espera);
   };
   paso();
 }
@@ -341,7 +346,7 @@ function pintarEstado(e) {
   // ruta independiente y limitada.
   mostrarVista(e.vista);
   const evitadas = Object.values(e.evitadas || {}).reduce((a, b) => a + b, 0);
-  const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano ${(100 * e.con_mano).toFixed(0)} % · zona ${(100 * e.en_zona).toFixed(0)} % · CPU ${e.cpu_core.toFixed(0)} % núcleo / ${e.cpu_total.toFixed(1)} % total · mano ${e.mano_ms.toFixed(1)} ms + Pose ${e.pose_ms.toFixed(1)} ms · evitadas ${evitadas}` : "";
+  const fps = e.fps ? `${e.fps.toFixed(1)} cuadros/s · mano ${(100 * e.con_mano).toFixed(0)} % (${e.manos_media.toFixed(2)} manos) · zona ${(100 * e.en_zona).toFixed(0)} % · CPU ${e.cpu_core.toFixed(0)} % núcleo / ${e.cpu_total.toFixed(1)} % total · mano ${e.mano_ms.toFixed(1)} ms + Pose ${e.pose_ms.toFixed(1)} ms / ${e.pose_cada.toFixed(1)} cuadros · evitadas ${evitadas}` : "";
   texto("fps", (e.camara ? "Cámara: " + e.camara + " " : "") + fps);
 }
 
