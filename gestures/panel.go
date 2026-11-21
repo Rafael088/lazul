@@ -196,12 +196,19 @@ type AjustesOneEuro struct {
 	MinCutoff        float64
 	Beta             float64
 	DerivativeCutoff float64
+	// ZonaQuieta (unidades del panel) es el radio que el punto filtrado
+	// puede moverse sin mover la salida: se come el temblor que el filtro
+	// deja pasar con la mano quieta. Al salir de ella la salida lo sigue a
+	// esa distancia, sin saltos.
+	ZonaQuieta float64
 }
 
-// 0,7 y 0,7 salen de medir con la mano quieta (temblor) y al mover rápido
-// (retraso): bajar el corte reduce el temblor; la Beta alta lo devuelve al
-// subir la velocidad, sin añadir retraso (cotejo-ifh3nu).
-var AjustesOneEuroPorDefecto = AjustesOneEuro{MinCutoff: 0.7, Beta: 0.7, DerivativeCutoff: 1.0}
+// 0,7 de corte y 1,2 de Beta con 0,006 de zona quieta (unos 9 px en una
+// pantalla de 1440) salen de ./dev replay -toques (línea TEMBLOR): con la
+// mano quieta el paso por cuadro bajó de p50 0,0012 / p90 0,0025 a
+// 0,0001 / 0,0014, y la Beta más alta dejó el retraso al mover rápido por
+// debajo del de antes (p50 0,099 → 0,085). Aciertos, falsos y bordes iguales.
+var AjustesOneEuroPorDefecto = AjustesOneEuro{MinCutoff: 0.7, Beta: 1.2, DerivativeCutoff: 1.0, ZonaQuieta: 0.006}
 
 type filtroOneEuro1D struct {
 	iniciado           bool
@@ -241,6 +248,8 @@ func (f *filtroOneEuro1D) filtrar(tiempo, valor float64, a AjustesOneEuro) float
 type FiltroOneEuroPanel struct {
 	Ajustes AjustesOneEuro
 	x, y    filtroOneEuro1D
+	salida  PuntoPanel
+	hay     bool
 }
 
 func NuevoFiltroOneEuroPanel() FiltroOneEuroPanel {
@@ -255,6 +264,15 @@ func (f *FiltroOneEuroPanel) Filtrar(tMs int64, p PuntoPanel) PuntoPanel {
 	}
 	t := float64(tMs) / 1000
 	x, y := f.x.filtrar(t, p.X, a), f.y.filtrar(t, p.Y, a)
+	if f.hay && a.ZonaQuieta > 0 {
+		dx, dy := x-f.salida.X, y-f.salida.Y
+		if d := math.Hypot(dx, dy); d <= a.ZonaQuieta {
+			x, y = f.salida.X, f.salida.Y
+		} else {
+			k := 1 - a.ZonaQuieta/d
+			x, y = f.salida.X+dx*k, f.salida.Y+dy*k
+		}
+	}
 	// Los extremos son objetivos absolutos, no muestras que deban quedarse
 	// cortas por la inercia del filtro. También se actualiza su estado para
 	// que el siguiente cuadro parta del borde alcanzado.
@@ -266,7 +284,8 @@ func (f *FiltroOneEuroPanel) Filtrar(tMs int64, p PuntoPanel) PuntoPanel {
 		y = acotar01(p.Y)
 		f.y.filtrado = y
 	}
-	return PuntoPanel{X: acotar01(x), Y: acotar01(y)}
+	f.salida, f.hay = PuntoPanel{X: acotar01(x), Y: acotar01(y)}, true
+	return f.salida
 }
 
 func (f *FiltroOneEuroPanel) Reiniciar() { *f = NuevoFiltroOneEuroPanel() }

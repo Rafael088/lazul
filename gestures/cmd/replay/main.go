@@ -95,7 +95,11 @@ func informeToques(dir string, gs []gestures.Grabacion, detalle bool) {
 	fmt.Printf("  la duración va del apoyo al levantar, con el soltar del embrague (%d cuadros/%d ms) dentro\n",
 		gestures.AjustesEmbraguePorDefecto.CuadrosParaSoltar, gestures.AjustesEmbraguePorDefecto.MsParaSoltar)
 	fmt.Printf("  toques en %d de %d tomas\n", total.TomasConToques, total.Tomas)
-	fmt.Println(lineaPrecision(gestures.PrecisionDe(tomas)))
+	prec := gestures.PrecisionDe(tomas)
+	fmt.Println(lineaPrecision(prec))
+	fmt.Printf("TEMBLOR con la mano quieta p50 %.5f p90 %.5f (n=%d) · RETRASO al mover rápido p50 %.4f p90 %.4f (n=%d)\n",
+		gestures.Percentil(prec.Temblor, .5), gestures.Percentil(prec.Temblor, .9), len(prec.Temblor),
+		gestures.Percentil(prec.Retraso, .5), gestures.Percentil(prec.Retraso, .9), len(prec.Retraso))
 }
 
 // lineaPrecision es la métrica de cotejo-uy84og en una línea: aciertos en

@@ -135,6 +135,34 @@ func TestOneEuroReduceTemblorSinPerderElMovimiento(t *testing.T) {
 	}
 }
 
+func TestZonaQuietaDejaElPunteroQuietoYSigueSinSaltos(t *testing.T) {
+	f := NuevoFiltroOneEuroPanel()
+	ancla := f.Filtrar(0, PuntoPanel{X: .5, Y: .5})
+	// Un temblor menor que la zona quieta no mueve la salida.
+	for i := 1; i < 60; i++ {
+		d := .003
+		if i%2 == 0 {
+			d = -d
+		}
+		if p := f.Filtrar(int64(i*33), PuntoPanel{X: .5 + d, Y: .5 - d}); p != ancla {
+			t.Fatalf("cuadro %d: el temblor movió el puntero a %+v", i, p)
+		}
+	}
+	// Un movimiento real sí: avanza sin pasos más grandes que el de la mano.
+	prev := ancla
+	for i := 60; i < 90; i++ {
+		x := .5 + float64(i-59)*.01
+		p := f.Filtrar(int64(i*33), PuntoPanel{X: x, Y: .5})
+		if p.X < prev.X || p.X-prev.X > .02 {
+			t.Fatalf("cuadro %d: paso %.4f", i, p.X-prev.X)
+		}
+		prev = p
+	}
+	if prev.X < .74 {
+		t.Fatalf("no siguió el movimiento: %.3f", prev.X)
+	}
+}
+
 func TestOneEuroAlcanzaLosExtremos(t *testing.T) {
 	f := NuevoFiltroOneEuroPanel()
 	f.Filtrar(0, PuntoPanel{X: .5, Y: .5})

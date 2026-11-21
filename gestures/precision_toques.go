@@ -48,6 +48,19 @@ type PrecisionToques struct {
 	Bordes         int       // salidas por un borde con el puntero en el borde
 	BordesPosibles int       // salidas por un borde
 	Saltos         []float64 // salto al apoyar de cada toque de una mano
+	// Temblor: paso del puntero por cuadro con la mano quieta; Retraso:
+	// distancia entre el puntero y la mano cruda al moverla rápido.
+	Temblor, Retraso []float64
+}
+
+// Percentil da el percentil q (0..1) de v, o 0 si está vacío.
+func Percentil(v []float64, q float64) float64 {
+	if len(v) == 0 {
+		return 0
+	}
+	s := append([]float64(nil), v...)
+	sort.Float64s(s)
+	return s[int(math.Round(q*float64(len(s)-1)))]
 }
 
 // SaltoPercentil da el percentil p (0..1) del salto al apoyar, o 0 sin
@@ -80,6 +93,8 @@ func PrecisionDe(tomas []TomaToques) PrecisionToques {
 		p.Bordes += t.Bordes
 		p.BordesPosibles += t.BordesPosibles
 		p.Saltos = append(p.Saltos, t.Saltos...)
+		p.Temblor = append(p.Temblor, t.Temblor...)
+		p.Retraso = append(p.Retraso, t.Retraso...)
 	}
 	return p
 }
@@ -171,7 +186,44 @@ type punteroApp struct {
 	filtro FiltroOneEuroPanel
 	pos    PuntoPanel
 	tiene  bool
+	// Medición de temblor y retraso (no cambia el puntero).
+	crudos           []muestraCruda
+	salidaPrevia     PuntoPanel
+	haySalidaPrevia  bool
+	temblor, retraso []float64
 }
+
+type muestraCruda struct {
+	t int64
+	p PuntoPanel
+}
+
+// Ventana para decidir si la mano está quieta o se mueve rápido.
+const (
+	ventanaTemblorMs = 500
+	quietaMax        = 0.012 // recorrido neto de la mano cruda en la ventana
+	rapidaMin        = 0.6   // velocidad de la mano cruda, panel por segundo
+)
+
+func (p *punteroApp) medir(t int64, crudo, salida PuntoPanel) {
+	p.crudos = append(p.crudos, muestraCruda{t, crudo})
+	for len(p.crudos) > 1 && t-p.crudos[0].t > ventanaTemblorMs {
+		p.crudos = p.crudos[1:]
+	}
+	if p.haySalidaPrevia && len(p.crudos) >= 5 {
+		a := p.crudos[0]
+		neto := math.Hypot(crudo.X-a.p.X, crudo.Y-a.p.Y)
+		dt := float64(t-a.t) / 1000
+		if neto < quietaMax {
+			p.temblor = append(p.temblor, math.Hypot(salida.X-p.salidaPrevia.X, salida.Y-p.salidaPrevia.Y))
+		} else if dt > 0 && neto/dt > rapidaMin {
+			p.retraso = append(p.retraso, math.Hypot(salida.X-crudo.X, salida.Y-crudo.Y))
+		}
+	}
+	p.salidaPrevia, p.haySalidaPrevia = salida, true
+}
+
+func (p *punteroApp) cortarMedida() { p.crudos, p.haySalidaPrevia = p.crudos[:0], false }
 
 func (p *punteroApp) cuadro(r ResultadoEmbrague) {
 	if r.TienePos {
@@ -182,9 +234,17 @@ func (p *punteroApp) cuadro(r ResultadoEmbrague) {
 		pos := p.filtro.Filtrar(r.TMs, entrada)
 		if r.Dentro {
 			p.pos, p.tiene = pos, true
+			if entrada.X > 0 && entrada.X < 1 && entrada.Y > 0 && entrada.Y < 1 {
+				p.medir(r.TMs, entrada, pos)
+			} else {
+				p.cortarMedida()
+			}
+		} else {
+			p.cortarMedida()
 		}
 	} else {
 		p.filtro.Reiniciar()
+		p.cortarMedida()
 	}
 	if !r.Dentro && r.Fase != EmbragueAgarrando {
 		p.filtro.Reiniciar()

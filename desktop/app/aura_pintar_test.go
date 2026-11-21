@@ -25,13 +25,18 @@ func TestPintarAura(t *testing.T) {
 		if _, _, _, a := at(0, 0); a != 0 {
 			t.Errorf("agarrando=%v: esquina con alfa %d", agarrando, a)
 		}
-		// Centro azul y visible; premultiplicado: ningún canal pasa al alfa.
-		bb, g, r, a := at(lado/2, lado/2)
-		if a < 100 || bb > a || g > a || r > a {
-			t.Errorf("agarrando=%v: centro BGRA %d,%d,%d,%d", agarrando, bb, g, r, a)
+		// El aro es blanco y visible (a 8 px CSS del centro); premultiplicado:
+		// ningún canal pasa al alfa.
+		bb, g, r, a := at(lado/2+int(8*1.5), lado/2)
+		if agarrando {
+			bb, g, r, a = at(lado/2, lado/2)
 		}
-		if !agarrando && bb <= r {
-			t.Errorf("el halo suave es azul: BGRA %d,%d,%d,%d", bb, g, r, a)
+		if a < 180 || bb > a || g > a || r > a || bb != r || r != g {
+			t.Errorf("agarrando=%v: aro BGRA %d,%d,%d,%d", agarrando, bb, g, r, a)
+		}
+		// Suelto, el centro queda libre: no tapa lo que se apunta.
+		if _, _, _, a := at(lado/2, lado/2); !agarrando && a != 0 {
+			t.Errorf("el centro del aro suelto tiene alfa %d", a)
 		}
 		if ruta := os.Getenv("LAZUL_AURA_PNG"); ruta != "" {
 			img := image.NewNRGBA(image.Rect(0, 0, lado, lado))
@@ -74,7 +79,7 @@ func TestPintarAuraEscalaUnaVez(t *testing.T) {
 	if r := float64(dos) / float64(uno); r < 3.6 || r > 4.4 {
 		t.Fatalf("a escala 2 hay %.2f veces los píxeles de escala 1; se esperaba ~4", r)
 	}
-	// El halo suave cabe en la superficie con margen (radio 60 % del lado / 2).
+	// El aro cabe en la superficie con margen.
 	b := pintarAura(ladoAura, 1, false)
 	if a := b[(ladoAura/2*ladoAura+ladoAura-1)*4+3]; a != 0 {
 		t.Errorf("el borde de la superficie tiene alfa %d", a)

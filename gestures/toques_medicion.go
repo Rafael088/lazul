@@ -76,6 +76,7 @@ type TomaToques struct {
 	// Alcance y salto al apoyar (precision_toques.go).
 	Bordes, BordesPosibles int
 	Saltos                 []float64
+	Temblor, Retraso       []float64
 }
 
 // ConteoToques resume una o varias tomas.
@@ -166,6 +167,8 @@ func ToquesDeToma(g Grabacion, tamano float64) (TomaToques, error) {
 		Bordes:         seg.bordes,
 		BordesPosibles: seg.posibles,
 		Saltos:         seg.saltos,
+		Temblor:        puntero.temblor,
+		Retraso:        puntero.retraso,
 	}, nil
 }
 

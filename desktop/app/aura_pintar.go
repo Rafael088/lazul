@@ -3,37 +3,20 @@ package main
 import "math"
 
 // Dibujo del aura sin navegador, para Windows: la misma figura que
-// frontend/aura.html (halo radial Lapis sobre Noche y anillo fino), pintada
-// una vez por estado en un mapa BGRA premultiplicado que la ventana por capas
-// solo mueve. Las medidas están en píxeles CSS; escala pasa a píxeles físicos.
+// frontend/aura.html (aro blanco chico con un contorno oscuro fino; relleno
+// y más chico al pellizcar), pintada una vez por estado en un mapa BGRA
+// premultiplicado que la ventana por capas solo mueve. Las medidas están en
+// píxeles CSS; escala pasa a píxeles físicos.
 
 // ladoAura es el lado de la superficie en píxeles CSS (como LAZUL_AURA_LADO).
-const ladoAura = 180
-
-type colorAura struct{ r, g, b, a float64 } // r, g, b en 0..255; a en 0..1
-
-type parada struct {
-	en float64 // fracción del radio del degradado
-	c  colorAura
-}
-
-var (
-	lapis = colorAura{49, 95, 220, 1}
-	noche = colorAura{16, 20, 40, 1}
-	hielo = colorAura{232, 236, 255, 1}
-
-	haloSuave = []parada{{0, conA(lapis, .58)}, {.42, conA(lapis, .30)}, {.62, conA(noche, .12)}, {.72, conA(noche, 0)}}
-	haloVivo  = []parada{{0, conA(hielo, .80)}, {.34, conA(lapis, .62)}, {.56, conA(lapis, .22)}, {.74, conA(noche, 0)}}
-)
-
-func conA(c colorAura, a float64) colorAura { c.a = a; return c }
+const ladoAura = 48
 
 // px es un píxel premultiplicado en 0..1.
 type px struct{ r, g, b, a float64 }
 
-func premult(c colorAura) px {
-	return px{c.r / 255 * c.a, c.g / 255 * c.a, c.b / 255 * c.a, c.a}
-}
+// blanco y oscuro con alfa a, ya premultiplicados.
+func blanco(a float64) px { return px{a, a, a, a} }
+func oscuro(a float64) px { return px{0, 0, 0, a} }
 
 // sobre compone s encima de d (los dos premultiplicados).
 func sobre(d, s px) px {
@@ -41,95 +24,42 @@ func sobre(d, s px) px {
 	return px{s.r + d.r*k, s.g + d.g*k, s.b + d.b*k, s.a + d.a*k}
 }
 
-// degradado evalúa un radial-gradient en t (fracción del radio), con la
-// interpolación premultiplicada que usa CSS.
-func degradado(ps []parada, t float64) px {
-	if t <= ps[0].en {
-		return premult(ps[0].c)
-	}
-	for i := 1; i < len(ps); i++ {
-		if t <= ps[i].en {
-			a, b := premult(ps[i-1].c), premult(ps[i].c)
-			f := (t - ps[i-1].en) / (ps[i].en - ps[i-1].en)
-			return px{a.r + (b.r-a.r)*f, a.g + (b.g-a.g)*f, a.b + (b.b-a.b)*f, a.a + (b.a-a.a)*f}
-		}
-	}
-	return premult(ps[len(ps)-1].c)
-}
+func escalar(p px, f float64) px { return px{p.r * f, p.g * f, p.b * f, p.a * f} }
 
-// brillo es la sombra difusa de CSS (box-shadow con desenfoque b) a una
-// distancia d del borde, como una gaussiana de sigma b/2.
-func brillo(d, b float64) float64 {
-	if b <= 0 {
-		return 0
-	}
-	s := b / 2
-	return math.Exp(-d * d / (2 * s * s))
+// cobertura de la corona entre r0 y r1 para un píxel a distancia r, con un
+// píxel físico de suavizado en cada borde.
+func cobertura(r, r0, r1, escala float64) float64 {
+	dentro := math.Min(math.Max((r-r0)*escala+.5, 0), 1)
+	fuera := math.Min(math.Max((r1-r)*escala+.5, 0), 1)
+	return dentro * fuera
 }
 
 // pintarAura devuelve lado×lado píxeles BGRA premultiplicados, de arriba
-// abajo, con el aura centrada. agarrando enciende el halo y agranda el anillo.
+// abajo, con el aro centrado. agarrando lo encoge y lo rellena.
 func pintarAura(lado int, escala float64, agarrando bool) []byte {
-	// Figura calibrada para una superficie de 240 px CSS: k la escala a
-	// ladoAura. Sale de ladoAura y no de lado (píxeles físicos) para no
-	// multiplicar dos veces por la escala de la pantalla.
-	k := float64(ladoAura) / 240
-	// Halo: caja del 60 % del lado con border-radius 50 %; el degradado
-	// «circle» llega a la esquina más lejana (r·√2).
-	radioHalo, paradas := 72*k, haloSuave
-	// Anillo: caja del 25 % del lado con 2 px de borde y sus dos sombras.
-	radioAro, borde := 30*k, 2*k
-	colorBorde := colorAura{127, 168, 255, .78}
-	type sombra struct {
-		c      colorAura
-		b      float64
-		dentro bool
-	}
-	sombras := []sombra{{conA(lapis, .55), 12 * k, false}, {conA(lapis, .35), 8 * k, true}}
+	// Aro: caja de 18 px con borde de 2 px (radio exterior 9). Al pellizcar
+	// la caja se escala a 0,72 y se rellena.
+	radio, borde, relleno := 9.0, 2.0, 0.0
 	if agarrando {
-		radioHalo, paradas = 72*1.35*k, haloVivo
-		radioAro, borde = 30*1.45*k, 2*1.45*k
-		colorBorde = colorAura{232, 236, 255, .96}
-		sombras = []sombra{{conA(lapis, .95), 22 * 1.45 * k, false}, {conA(hielo, .9), 7 * 1.45 * k, false}}
+		radio, borde, relleno = 9*.72, 2*.72, .92
 	}
-	radioDeg := radioHalo * math.Sqrt2
-
 	out := make([]byte, lado*lado*4)
 	centro := float64(lado) / 2
 	for y := 0; y < lado; y++ {
 		for x := 0; x < lado; x++ {
-			// Distancia al centro en píxeles CSS, en el centro del píxel.
 			dx, dy := (float64(x)+.5-centro)/escala, (float64(y)+.5-centro)/escala
 			r := math.Hypot(dx, dy)
 			var p px
-			if r <= radioHalo {
-				h := degradado(paradas, r/radioDeg)
-				// Medio píxel de suavizado en el borde del círculo.
-				if f := (radioHalo - r) * escala; f < 1 {
-					h = px{h.r * f, h.g * f, h.b * f, h.a * f}
-				}
-				p = h
+			// Sombra difusa debajo (0 1px 3px) y contorno de 1 px fuera del aro.
+			if d := r - radio; d > -1 && d < 4 {
+				s := math.Exp(-math.Max(d, 0) * math.Max(d, 0) / (2 * 1.5 * 1.5))
+				p = sobre(p, oscuro(.30*s*cobertura(r, radio-1, radio+4, escala)))
 			}
-			for _, s := range sombras {
-				var d float64
-				switch {
-				case s.dentro && r < radioAro-borde:
-					d = radioAro - borde - r
-				case !s.dentro && r > radioAro:
-					d = r - radioAro
-				default:
-					continue
-				}
-				if a := s.c.a * brillo(d, s.b); a > 0 {
-					p = sobre(p, premult(conA(s.c, a)))
-				}
+			p = sobre(p, oscuro(.28*cobertura(r, radio, radio+1, escala)))
+			if relleno > 0 {
+				p = sobre(p, blanco(relleno*cobertura(r, -1, radio-borde/2, escala)))
 			}
-			// Borde del anillo con suavizado de un píxel físico.
-			fuera := (r - radioAro) * escala
-			dentro := (radioAro - borde - r) * escala
-			if cob := math.Min(math.Max(.5-fuera, 0), 1) * math.Min(math.Max(.5-dentro, 0), 1); cob > 0 {
-				p = sobre(p, premult(conA(colorBorde, colorBorde.a*cob)))
-			}
+			p = sobre(p, blanco(.92*cobertura(r, radio-borde, radio, escala)))
 			i := (y*lado + x) * 4
 			out[i+0] = byte(math.Round(math.Min(p.b, 1) * 255))
 			out[i+1] = byte(math.Round(math.Min(p.g, 1) * 255))
