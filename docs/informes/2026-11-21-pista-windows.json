@@ -1,0 +1,147 @@
+{
+  "esquema": 1,
+  "inicio": "2026-11-21T23:53:04.904Z",
+  "fin": "2026-11-21T23:54:34.359Z",
+  "blancos_total": 14,
+  "aciertos_primera": 14,
+  "precision_primera_pct": 100,
+  "fallos": 0,
+  "toques_fuera_blanco": 0,
+  "tiempo_promedio_ms": 4588,
+  "tiempo_mediana_ms": 3620,
+  "tiempo_p95_ms": 11010,
+  "reposo": {
+    "duracion_planeada_ms": 600000,
+    "duracion_real_ms": 20650,
+    "completo": false,
+    "toques_falsos": 0
+  },
+  "blancos": [
+    {
+      "id": "enlace-28",
+      "tipo": "enlace",
+      "tamano_px": 28,
+      "posicion": "centro arriba",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 2828
+    },
+    {
+      "id": "boton-44",
+      "tipo": "botón",
+      "tamano_px": 44,
+      "posicion": "centro derecha",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 2295
+    },
+    {
+      "id": "icono-32",
+      "tipo": "ícono",
+      "tamano_px": 32,
+      "posicion": "centro abajo",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 3652
+    },
+    {
+      "id": "enlace-40",
+      "tipo": "enlace",
+      "tamano_px": 40,
+      "posicion": "centro izquierda",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 2362
+    },
+    {
+      "id": "icono-arriba",
+      "tipo": "ícono",
+      "tamano_px": 36,
+      "posicion": "borde arriba",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 3620
+    },
+    {
+      "id": "boton-derecha",
+      "tipo": "botón",
+      "tamano_px": 48,
+      "posicion": "borde derecha",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 7104
+    },
+    {
+      "id": "enlace-abajo",
+      "tipo": "enlace",
+      "tamano_px": 34,
+      "posicion": "borde abajo",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 4286
+    },
+    {
+      "id": "icono-izquierda",
+      "tipo": "ícono",
+      "tamano_px": 28,
+      "posicion": "borde izquierda",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 2991
+    },
+    {
+      "id": "esquina-si",
+      "tipo": "botón",
+      "tamano_px": 44,
+      "posicion": "esquina superior izquierda",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 3417
+    },
+    {
+      "id": "esquina-sd",
+      "tipo": "ícono",
+      "tamano_px": 32,
+      "posicion": "esquina superior derecha",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 6265
+    },
+    {
+      "id": "esquina-id",
+      "tipo": "enlace",
+      "tamano_px": 36,
+      "posicion": "esquina inferior derecha",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 4687
+    },
+    {
+      "id": "esquina-ii",
+      "tipo": "botón",
+      "tamano_px": 52,
+      "posicion": "esquina inferior izquierda",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 11010
+    },
+    {
+      "id": "boton-36",
+      "tipo": "botón",
+      "tamano_px": 36,
+      "posicion": "centro abajo",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 2521
+    },
+    {
+      "id": "icono-24",
+      "tipo": "ícono",
+      "tamano_px": 24,
+      "posicion": "centro derecha",
+      "acierto_primera": true,
+      "toques_fuera": 0,
+      "tiempo_ms": 7198
+    }
+  ]
+}
