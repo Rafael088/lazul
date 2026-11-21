@@ -24,7 +24,7 @@ const nombreTactilHyprland = "lazul-tactil-virtual"
 type pantallasHyprland struct {
 	ejecutar func(ctx context.Context, programa string, args ...string) ([]byte, error)
 	puntero  *punteroVirtual
-	tactil   interface{ Recrear() error }
+	tactil   interface{ Recrear(anchoLogico int) error }
 }
 
 var _ platform.Displays = pantallasHyprland{}
@@ -124,7 +124,7 @@ func (p pantallasHyprland) Target(ctx context.Context, name string) error {
 		}
 	}
 	if p.tactil != nil {
-		if err := p.tactil.Recrear(); err != nil {
+		if err := p.tactil.Recrear(d.Width); err != nil {
 			return err
 		}
 	}

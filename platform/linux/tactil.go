@@ -22,6 +22,8 @@ import (
 // multitoque de protocolo B.
 const (
 	absMtSlot     = 0x2f
+	absMtMayor    = 0x30 // ABS_MT_TOUCH_MAJOR
+	absMtMenor    = 0x31 // ABS_MT_TOUCH_MINOR
 	absMtX        = 0x35
 	absMtY        = 0x36
 	absMtTracking = 0x39
@@ -36,7 +38,24 @@ const (
 	maxTouchX  = 2880
 	maxTouchY  = 1800
 	touchSlots = 2
+
+	// anchoLogicoSupuesto es el ancho lógico de la salida cuando aún no se
+	// ha elegido monitor: la principal de 2880 px a escala 2, la misma que
+	// da el rango de maxTouchX.
+	anchoLogicoSupuesto = 1440
 )
+
+// unidadesContacto pasa platform.DiametroContacto (píxeles lógicos) a
+// unidades del táctil. Hyprland estira el rango 0..maxTouchX sobre el ancho
+// lógico de la salida asignada, así que un píxel lógico vale
+// maxTouchX/anchoLogico unidades.
+func unidadesContacto(anchoLogico int) int32 {
+	if anchoLogico <= 0 {
+		anchoLogico = anchoLogicoSupuesto
+	}
+	u := math.Round(float64(platform.DiametroContacto) * maxTouchX / float64(anchoLogico))
+	return int32(min(max(u, 1), maxTouchX))
+}
 
 var _ platform.TouchScreen = (*tactilVirtual)(nil)
 
@@ -44,11 +63,14 @@ var _ platform.TouchScreen = (*tactilVirtual)(nil)
 // input_event. Está separado del dispositivo para probar los bytes sin abrir
 // /dev/uinput.
 type estadoTactil struct {
-	abajo [touchSlots]bool
-	sig   int32
+	abajo    [touchSlots]bool
+	sig      int32
+	contacto int32 // ABS_MT_TOUCH_MAJOR/MINOR de cada dedo, en unidades del táctil
 }
 
-func nuevoEstadoTactil() estadoTactil { return estadoTactil{sig: 1} }
+func nuevoEstadoTactil() estadoTactil {
+	return estadoTactil{sig: 1, contacto: unidadesContacto(0)}
+}
 
 func validarPuntosTactiles(points []platform.TouchPoint) error {
 	if len(points) > touchSlots {
@@ -91,6 +113,10 @@ func (s *estadoTactil) eventos(points []platform.TouchPoint) ([]byte, error) {
 		case dedo.Down && !s.abajo[slot]:
 			evento(evAbs, absMtTracking, s.sig)
 			s.sig++
+			// El área va al apoyar: no cambia mientras el dedo sigue abajo,
+			// así el arrastre, el scroll y el zoom ven el mismo contacto.
+			evento(evAbs, absMtMayor, s.contacto)
+			evento(evAbs, absMtMenor, s.contacto)
 			fallthrough
 		case dedo.Down:
 			evento(evAbs, absMtX, int32(dedo.X*maxTouchX))
@@ -139,6 +165,13 @@ type tactilVirtual struct {
 	estado estadoTactil
 }
 
+// salida guarda el ancho lógico del monitor que recibe el táctil, para que
+// el área de contacto mida lo mismo en píxeles lógicos en cualquier monitor.
+// Se llama con t.mu tomado y antes de recrear el dispositivo.
+func (t *tactilVirtual) salida(anchoLogico int) {
+	t.estado.contacto = unidadesContacto(anchoLogico)
+}
+
 func nuevoTactilVirtual() *tactilVirtual {
 	t := &tactilVirtual{estado: nuevoEstadoTactil()}
 	// Red de seguridad para quien no cierre explícitamente. Close sigue
@@ -175,6 +208,7 @@ func (t *tactilVirtual) abrirDispositivo() {
 		{uiSetEvbit, evAbs},
 		{uiSetAbsbit, absX}, {uiSetAbsbit, absY},
 		{uiSetAbsbit, absMtSlot}, {uiSetAbsbit, absMtX}, {uiSetAbsbit, absMtY}, {uiSetAbsbit, absMtTracking},
+		{uiSetAbsbit, absMtMayor}, {uiSetAbsbit, absMtMenor},
 		{uiSetPropbit, inputPropDirect},
 	}
 	for _, paso := range pasos {
@@ -190,6 +224,7 @@ func (t *tactilVirtual) abrirDispositivo() {
 	}{
 		{absX, maxTouchX, 10}, {absY, maxTouchY, 10},
 		{absMtX, maxTouchX, 10}, {absMtY, maxTouchY, 10},
+		{absMtMayor, maxTouchX, 10}, {absMtMenor, maxTouchX, 10},
 		{absMtSlot, touchSlots - 1, 0}, {absMtTracking, 65535, 0},
 	}
 	for _, eje := range ejes {
@@ -270,10 +305,12 @@ func (t *tactilVirtual) Close() error {
 
 // Recrear destruye el dispositivo (si existe) y lo vuelve a crear, para que
 // el compositor lo vea nuevo y le aplique la salida que se le acaba de
-// asignar. Sin dispositivo no hace nada: el primer Prepare ya la verá.
-func (t *tactilVirtual) Recrear() error {
+// asignar; anchoLogico es el ancho de esa salida (0 si no se sabe). Sin
+// dispositivo solo guarda el ancho: el primer Prepare ya verá la salida.
+func (t *tactilVirtual) Recrear(anchoLogico int) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.salida(anchoLogico)
 	if t.f == nil {
 		return nil
 	}

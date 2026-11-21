@@ -150,6 +150,14 @@ type TouchPoint struct {
 	Down bool
 }
 
+// DiametroContacto es el lado del área de contacto de cada dedo táctil, en
+// píxeles lógicos (los CSS a escala 1). Con un dedo «gordo» el navegador y
+// el sistema pueden llevar un toque que cae casi encima de un botón o
+// enlace chico hasta él (touch adjustment de Chromium/Edge, targeting de
+// Windows). Cada adaptador lo pasa a sus unidades según la escala del
+// monitor. Un dedo de verdad mide unos 30-40 px lógicos.
+const DiametroContacto = 36
+
 // TouchScreen inyecta cuadros completos de hasta dos dedos. Prepare crea el
 // dispositivo con antelación, porque el compositor puede tardar en verlo.
 // Frame sustituye el estado anterior: toda ranura omitida queda levantada.
