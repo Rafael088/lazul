@@ -68,6 +68,11 @@ const (
 	TresSinAccion = "sin_accion" // un monitor y el sistema no sabe cambiar de espacio
 )
 
+// MotivoApagado es el intento de los tres dedos que no dispara porque el
+// interruptor de la L está apagado. Es distinto de ocupado: ocupado es que el
+// pellizco agarra o se calibra; apagado, que el panel no mueve nada.
+const MotivoApagado = "apagado"
+
 // NuevasPantallas prepara el control sobre d y s (que pueden ser nil).
 func NuevasPantallas(d platform.Displays, s platform.Spaces) *Pantallas {
 	return &Pantallas{Displays: d, Spaces: s, detector: gestures.NuevoDetectorTresDedos()}
@@ -241,9 +246,10 @@ func (p *Pantallas) consultarFoco() {
 // cuadro sin la mano en esa pose, para que el panel no toque ni arrastre con
 // ella ni el clasificador la tome por otro gesto. libre es falso mientras el
 // pellizco agarra o se calibra: entonces el gesto no cambia nada y el
-// intento se anota como ocupado. El segundo valor es true si el control
-// cambió de monitor.
-func (p *Pantallas) Cuadro(c gestures.Cuadro, libre bool, ahora time.Time) (gestures.Cuadro, bool) {
+// intento se anota como ocupado. apagado es el interruptor de la L: con el
+// panel apagado tampoco cambia nada y el intento se anota como apagado. El
+// segundo valor es true si el control cambió de monitor.
+func (p *Pantallas) Cuadro(c gestures.Cuadro, libre, apagado bool, ahora time.Time) (gestures.Cuadro, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	cambio := p.cambio
@@ -258,6 +264,8 @@ func (p *Pantallas) Cuadro(c gestures.Cuadro, libre bool, ahora time.Time) (gest
 		switch {
 		case in.Motivo != gestures.MotivoDisparo:
 			p.anotarIntento(PantallaNo, in.Motivo, *in, nil)
+		case apagado:
+			p.anotarIntento(PantallaNo, MotivoApagado, *in, nil)
 		case !libre:
 			p.anotarIntento(PantallaNo, gestures.MotivoOcupado, *in, nil)
 		default:
