@@ -468,6 +468,8 @@ func ClaseError(err error) string {
 		return "sin_ventana"
 	case errors.Is(err, platform.ErrAccionInvalida):
 		return "accion_invalida"
+	case errors.Is(err, platform.ErrSinAccesibilidad):
+		return "sin_accesibilidad"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "tiempo"
 	case errors.Is(err, core.ErrHuellaCambiada), errors.Is(err, core.ErrNoEmparejado):
