@@ -148,6 +148,7 @@ func TestRegistroSinDatosDeCamaraNiPantalla(t *testing.T) {
 	}
 	pasar(t, v, Encadenar(gs[:20], 300), time.Now())
 	v.Parar(time.Now())
+	reg.Anotar(Linea{Tipo: TipoRendimiento, FPS: 30, ManoMs: 14, Manos: 1, ModoManos: "busca", Busquedas: 11})
 	reg.Cerrar()
 	b, err := os.ReadFile(ruta)
 	if err != nil {
@@ -156,7 +157,8 @@ func TestRegistroSinDatosDeCamaraNiPantalla(t *testing.T) {
 	permitidas := map[string]bool{"t": true, "tipo": true, "sesion": true, "pose": true, "modo": true, "gesto": true, "dir": true,
 		"conf": true, "act": true, "resultado": true, "que": true, "destino": true, "error": true, "ms": true, "cuadros": true,
 		"con_mano": true, "prueba": true, "falsa": true, "fps": true, "cpu_core": true, "cpu_total": true,
-		"mano_ms": true, "pose_ms": true, "manos_media": true, "pose_cada": true}
+		"mano_ms": true, "pose_ms": true, "manos_media": true, "pose_cada": true,
+		"modo_manos": true, "busquedas": true}
 	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		var m map[string]any
 		if err := json.Unmarshal([]byte(l), &m); err != nil {

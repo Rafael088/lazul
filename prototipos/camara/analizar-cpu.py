@@ -72,6 +72,10 @@ def main():
         return 3
 
     print(f"sesión {sesion}")
+    # Antes de cb8m9r no se anotaba: seguía siempre dos.
+    modos = sorted({x.get("modo_manos", "dos") for x in muestras})
+    buscadas = sum(x.get("busquedas", 0) for x in muestras)
+    print(f"manos: {'+'.join(modos)} · {buscadas} búsquedas de la segunda")
     print(f"{'condición':25}   n  CPU %  >100    fps  <25 Hand ms Pose ms")
     grupos = {}
     for panel in (True, False):
