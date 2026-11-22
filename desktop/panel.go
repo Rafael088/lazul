@@ -87,6 +87,11 @@ type Panel struct {
 	// los botones chicos y lleva a ellos el toque que cae casi encima). Es
 	// opcional: nil o apagado, el panel se porta como siempre.
 	Iman *Iman
+	// Borde, si no es nil, apaga el redimensionado al tocar el borde de las
+	// ventanas (Hyprland) mientras el panel está encendido y lo devuelve al
+	// apagarlo. Es opcional: nil, el panel no toca la configuración del
+	// compositor.
+	Borde *Borde
 
 	// apagado: el interruptor de la L. Mientras esté apagado Cuadro no toca
 	// nada (salvo para calibrar). NuevoPanel lo deja apagado.
@@ -488,15 +493,23 @@ func sinL(c gestures.Cuadro) gestures.Cuadro {
 // toque suelto; al encender el embrague empieza de cero. Repetir el mismo
 // estado no hace nada.
 func (p *Panel) Encender(on bool) {
+	// El borde se cambia fuera del candado: habla con el compositor y no
+	// debe frenar el estado del panel. Solo ocurre al cambiar el modo, no
+	// en cada cuadro.
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if on == !p.apagado {
+		p.mu.Unlock()
 		return
 	}
 	p.apagado = !on
+	borde := p.Borde
 	if on {
 		p.embrague = nil
 		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "enciende"})
+		p.mu.Unlock()
+		if borde != nil {
+			_ = borde.Encender()
+		}
 		return
 	}
 	p.soltarBoton()
@@ -509,6 +522,10 @@ func (p *Panel) Encender(on bool) {
 	p.arrastre, p.zoom = "", ""
 	p.filtro.Reiniciar()
 	p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "apaga"})
+	p.mu.Unlock()
+	if borde != nil {
+		_ = borde.Restaurar()
+	}
 }
 
 // aplicar traduce el resultado del embrague a los efectos reales del sistema.

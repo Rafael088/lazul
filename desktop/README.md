@@ -101,6 +101,30 @@ espacio de nombres `lazul-aura`. Si el compositor no soporta layer-shell (X11,
 o un Wayland sin `wlr-layer-shell`), el aura no se crea y la app sigue igual:
 la señal visual vuelve a ser la píldora del indicador.
 
+### Hyprland: el toque pegado al borde de las ventanas
+
+Omarchy trae `general:resize_on_border = true` y un área de agarre de 8 px
+(`general:extend_border_grab_area`). Con eso, un toque táctil de Lazul a menos
+de 8 px del borde de una ventana **redimensiona** la ventana en vez de hacer
+clic, y los botones o pestañas pegados al borde quedan casi inalcanzables.
+
+No hay que tocar `~/.config/hypr`: mientras el panel está encendido, Lazul
+lee el valor con `hyprctl getoption general:resize_on_border`; si está
+encendido lo apaga en caliente con `hyprctl eval` y `hl.config`
+(`hl.config({ general = { resize_on_border = false } })`, el mismo mecanismo
+que `hl.dsp`). Al apagarlo con la L o cerrar la app, devuelve el valor que
+había. Si la app se cae, el original queda guardado en `borde.json`, al lado
+del registro (`~/.local/state/lazul`), y se restaura al arrancar. La píldora lo
+avisa una vez («borde: clic») para que no sorprenda que el borde ya no
+arrastre. Si el dueño ya lo tenía apagado a mano, Lazul no lo enciende al
+terminar.
+
+Para comprobarlo en caliente:
+
+```
+hyprctl getoption general:resize_on_border
+```
+
 ## Emparejar los dos PCs (solo para transferencias)
 
 El modo táctil actúa en el mismo equipo y no necesita emparejar nada.

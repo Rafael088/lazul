@@ -87,6 +87,25 @@ func TestIndicadorIgnoraMovimientoQueNoEstaActivo(t *testing.T) {
 	}
 }
 
+func TestIndicadorAvisoDuraYNoTocaElModo(t *testing.T) {
+	var i Indicador
+	t0 := time.Date(2026, 11, 21, 10, 0, 0, 0, time.UTC)
+	i.Aplicar(gestures.EventoTactil{Accion: gestures.TactilModo, Activo: true}, t0)
+	i.Avisar("borde: clic", t0)
+	v := i.Vista(t0.Add(time.Second))
+	if v.Aviso != "borde: clic" || !v.Activo || v.Destello || v.Gesto != "" {
+		t.Fatalf("con aviso = %+v; quería el aviso sin tocar el modo", v)
+	}
+	if v := i.Vista(t0.Add(DuracionAviso)); v.Aviso != "" {
+		t.Fatalf("a los %.0f s el aviso seguía: %+v", DuracionAviso.Seconds(), v)
+	}
+	i.Avisar("borde: clic", t0)
+	i.Apagar()
+	if v := i.Vista(t0.Add(time.Second)); v.Aviso != "" || v.Activo {
+		t.Fatalf("apagar dejó aviso o modo: %+v", v)
+	}
+}
+
 func TestIndicadorApagarLimpiaTodo(t *testing.T) {
 	var i Indicador
 	t0 := time.Now()

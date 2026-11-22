@@ -108,13 +108,16 @@ type Estado struct {
 }
 
 type App struct {
-	ctx     context.Context
-	cfg     Config
-	nucleo  *desktop.Nucleo
-	flujo   flujoCamara
-	reg     *desktop.Registro
-	cap     *captura
-	panel   *desktop.Panel
+	ctx    context.Context
+	cfg    Config
+	nucleo *desktop.Nucleo
+	flujo  flujoCamara
+	reg    *desktop.Registro
+	cap    *captura
+	panel  *desktop.Panel
+	// borde apaga general:resize_on_border de Hyprland mientras el panel
+	// está encendido (nil donde el sistema no lo ofrece).
+	borde   *desktop.Borde
 	aura    *Aura
 	entrada entradaVentana
 	// pantallas decide qué monitor controla el panel (tres dedos y foco).
@@ -945,6 +948,7 @@ func correr(o opciones) error {
 	rutaReg := filepath.Join(dirEstado, desktop.NombreRegistro)
 	rutaVentana := filepath.Join(dirEstado, desktop.NombreEstadoVentana)
 	rutaPanel := filepath.Join(dirEstado, desktop.NombreCalibracionPanel)
+	rutaBorde := filepath.Join(dirEstado, desktop.NombreBorde)
 	if o.resumen {
 		ls, err := desktop.LeerRegistroDe(rutaReg)
 		if err != nil {
@@ -1003,6 +1007,22 @@ func correr(o opciones) error {
 	if !o.abrir {
 		sis.LaunchApp = anotador{}
 	}
+	// Mientras el panel esté encendido, un toque a menos de 8 px del borde de
+	// una ventana la redimensionaba en vez de hacer clic (Omarchy trae
+	// general:resize_on_border). Se apaga en caliente con hyprctl y se
+	// devuelve al apagarlo. Primero, lo que dejó una ejecución que se cayó.
+	if sis.BorderResize != nil {
+		app.borde = desktop.NuevoBorde(sis.BorderResize, rutaBorde, reg)
+		app.borde.Aviso = func(texto string) {
+			app.ind.Avisar(texto, time.Now())
+			decir("Hyprland: general:resize_on_border apagado mientras el panel está encendido (se devuelve al apagarlo)")
+		}
+		if restaurado, err := app.borde.Recuperar(); err != nil {
+			decir("aviso: no se pudo devolver general:resize_on_border: %v", err)
+		} else if restaurado {
+			decir("se devolvió general:resize_on_border de una ejecución anterior")
+		}
+	}
 	app.nucleo, err = desktop.NuevoNucleo(desktop.Opciones{Dir: dirConf, Nombre: o.nombre, Escucha: o.escucha, Sistema: sis, Reg: reg,
 		Permiso: app.pedirPermiso(o.permitir), Adelantar: o.adelantar, MDNS: o.mdns})
 	if err != nil {
@@ -1024,6 +1044,7 @@ func correr(o opciones) error {
 		app.panel.Acciones = sis.TactileActions
 		app.panel.Tactil = sis.TouchScreen
 		app.panel.Reg = reg
+		app.panel.Borde = app.borde
 		if !app.cfg.Reproducir {
 			// Antes de preparar el táctil: así nace ya con la salida del
 			// monitor con el foco y no hay que recrearlo.
@@ -1151,6 +1172,11 @@ func correr(o opciones) error {
 			app.flujo.Parar(time.Now())
 			if app.panel != nil {
 				app.panel.Parar()
+			}
+			// Si se cierra con el panel encendido, devolver el borde igual
+			// que al apagarlo (Parar no cambia el interruptor).
+			if app.borde != nil {
+				_ = app.borde.Restaurar()
 			}
 			e := app.nucleo.Estado()
 			decir("fin · última acción: %s · último recibido: %s", e.Accion, e.Recibido)
