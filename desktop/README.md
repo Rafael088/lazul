@@ -33,6 +33,12 @@ La app arranca como una píldora de `236 × 64` en la esquina inferior derecha
 En el modo táctil, además, un halo transparente sigue la mano cuando entra en el panel calibrado (nada fuera, suave dentro y
 encendido al agarrar). Esa superficie no recibe clics ni foco y no tapa la
 píldora.
+En Windows, la ventana nativa del indicador tampoco roba el foco. Su región de
+entrada se recorta a la píldora redonda: si WebView2 conserva por error el
+tamaño grande de la vista de cámara, toda la parte transparente deja pasar los
+clics. Al abrir **Acomodar la cámara** se restaura la ventana interactiva
+completa; al volver al indicador se recorta otra vez y el foco regresa a la app
+que se estaba usando.
 Esa posición se guarda en `ventana.json`, junto al estado de la app
 (`~/.local/state/lazul` en Linux o `%LOCALAPPDATA%\lazul` en Windows). En
 Wayland Wails no garantiza que el compositor acepte restaurar la posición.
@@ -307,6 +313,11 @@ ni nombres de archivos o ventanas.
   `desktop/app/frontend/aura.html`. En Windows es una ventana por capas
   (`desktop/app/aura_windows.go`) que no recibe clics ni toques, con la misma
   figura dibujada en Go (`aura_pintar.go`). En un Linux sin cgo no se dibuja.
+- En Windows, `desktop/app/entrada_ventana_windows.go` identifica la ventana
+  principal por PID y por la clase `LazulIndicador`. Mientras está colapsada le
+  pone `WS_EX_NOACTIVATE`, la saca de Alt+Tab y aplica una región redonda del
+  tamaño de la píldora. La app arranca oculta y solo se muestra con
+  `SW_SHOWNOACTIVATE`, después de aplicar esas protecciones.
 - `./dev app e2e win|linux`: la app de verdad en los dos PCs sin cámara: el
   PC que manda pasa grabaciones reales (activar, agarrar, soltar) por el mismo
   camino que la cámara, y la captura tiene que llegar al otro.
