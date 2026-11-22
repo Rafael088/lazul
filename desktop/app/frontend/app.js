@@ -3,6 +3,7 @@
 // página: a Go llegan puntos de manos y Pose. Por defecto solo se ve el indicador;
 // la vista de cámara se abre para acomodarse y se cierra al terminar.
 import { cuadrosEntrePose, mediaSuave, planearSiguienteCuadro } from "./rendimiento.mjs";
+import { SIGUE_BUSCA, estadoInicial, identificar, seguirCuadro } from "./seguimiento.mjs";
 
 const $ = (id) => document.getElementById(id);
 const hayGo = () => !!(window.go && window.go.main);
@@ -75,6 +76,8 @@ async function alternarAjuste(on = !vistaCamara) {
 let cfg, lm = null, pm = null, encendida = false, generacion = 0, t0 = performance.now(), ultimoTs = -1, cola = Promise.resolve(), pendientes = 0;
 const puntos = () => $("puntos").getContext("2d");
 let ultimaPose = null, cuadrosSinPose = 0, manoMediaMs = 0;
+// lm = { dos } con -manos dos; { una, dos, busca } siguiendo una (seguimiento.mjs).
+let seguimiento = estadoInicial(), conocidas = [], busquedas = 0;
 
 function pintar(manos, cuerpo) {
   const c = puntos();
@@ -141,10 +144,30 @@ function mostrarVista(v) {
   }
 }
 
+const manosDe = (r) => r.landmarks.map((pts, i) => {
+  const hd = (r.handedness || r.handednesses || [])[i];
+  return { derecha: !!(hd && hd[0] && hd[0].categoryName === "Right"), p: pts.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]) };
+});
+
+function detectarManos(fuente, ts, aspecto) {
+  const dos = () => manosDe(lm.dos.detectForVideo(fuente, ts));
+  if (!lm.una) return dos();
+  const r = seguirCuadro(seguimiento, ts, aspecto, {
+    dos,
+    una: () => manosDe(lm.una.detectForVideo(fuente, ts)),
+    busca: () => manosDe(lm.busca.detect(fuente)),
+  });
+  seguimiento = r.estado;
+  if (r.buscada) busquedas++;
+  const id = identificar(conocidas, r.manos, ts, aspecto);
+  conocidas = id.conocidas;
+  return id.manos;
+}
+
 function procesar(fuente, w, h) {
   let ts = performance.now(); if (ts <= ultimoTs) ts = ultimoTs + 0.01; ultimoTs = ts;
 	const inicioMano = performance.now();
-  const r = lm.detectForVideo(fuente, ts);
+  const manos = detectarManos(fuente, ts, w / h);
 	const manoMs = performance.now() - inicioMano;
 	manoMediaMs = mediaSuave(manoMediaMs, manoMs);
 	// Pose solo confirma que hay una persona y dónde está su torso: cambia
@@ -158,16 +181,13 @@ function procesar(fuente, w, h) {
 		poseMs = performance.now() - inicioPose;
 		cuadrosSinPose = 0;
 	}
-  const manos = r.landmarks.map((pts, i) => {
-    const hd = (r.handedness || r.handednesses || [])[i];
-    return { derecha: !!(hd && hd[0] && hd[0].categoryName === "Right"), p: pts.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]) };
-  });
 	const pose = (rp.landmarks || [])[0];
 	const cuerpo = pose ? { p: pose.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5), +(p.visibility ?? 1).toFixed(4)]) } : null;
   if (vistaCamara) pintar(manos, cuerpo);
-  const cuadro = { t: Math.round(ts - t0), manos, cuerpo, mano_ms: manoMs, pose_ms: poseMs, ancho: w, alto: h };
+  const cuadro = { t: Math.round(ts - t0), manos, cuerpo, mano_ms: manoMs, pose_ms: poseMs, busquedas, ancho: w, alto: h };
   // En orden y sin amontonar: si Go se atrasa, se salta el cuadro.
   if (pendientes > 4) return;
+  busquedas = 0; // contadas en este cuadro; las de uno saltado van en el siguiente
   pendientes++;
   // Cuadro solo entrega puntos. La vista y el indicador se leen con Estado
   // cada 500 ms: devolver y deserializar toda la vista aquí duplicaba trabajo
@@ -185,16 +205,32 @@ async function cargarMediaPipe() {
   // WebKitGTK no da WebGL2 en OffscreenCanvas (lo que MediaPipe usa por defecto): se le pasa un canvas normal.
   const crear = async (delegate) => {
 		const canvas = () => offscreen ? undefined : document.createElement("canvas");
-		const mano = await HandLandmarker.createFromOptions(fileset, {
-			baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate }, runningMode: "VIDEO", numHands: 2,
-			canvas: canvas() });
+		const detectores = {};
+		const crearMano = async (nombre, runningMode, numHands) => {
+			detectores[nombre] = await HandLandmarker.createFromOptions(fileset, {
+				baseOptions: { modelAssetPath: "./vendor/hand_landmarker.task", delegate }, runningMode, numHands, canvas: canvas() });
+		};
 		try {
+			await crearMano("dos", "VIDEO", 2);
+			if (cfg.manos === SIGUE_BUSCA) {
+				await crearMano("una", "VIDEO", 1);
+				await crearMano("busca", "IMAGE", 2);
+				// La primera inferencia de un grafo prepara la gráfica: se paga
+				// aquí, no en el cuadro en que aparece la segunda mano.
+				const vacio = document.createElement("canvas");
+				vacio.width = 640; vacio.height = 480;
+				vacio.getContext("2d").fillRect(0, 0, 640, 480);
+				ultimoTs = Math.max(ultimoTs + 0.01, performance.now());
+				detectores.dos.detectForVideo(vacio, ultimoTs);
+				detectores.una.detectForVideo(vacio, ultimoTs);
+				detectores.busca.detect(vacio);
+			}
 			const pose = await PoseLandmarker.createFromOptions(fileset, {
 				baseOptions: { modelAssetPath: "./vendor/pose_landmarker_lite.task", delegate }, runningMode: "VIDEO", numPoses: 1,
 				minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5, canvas: canvas() });
-			return [mano, pose];
+			return [detectores, pose];
 		} catch (e) {
-			if (mano.close) mano.close();
+			for (const d of Object.values(detectores)) { try { d.close(); } catch {} }
 			throw e;
 		}
 	};
@@ -211,13 +247,14 @@ async function cargarMediaPipe() {
     }
   }
   delegadoMP = delegado;
-  log("MediaPipe Hands + Pose listo (" + delegado + ")");
+  log("MediaPipe Hands + Pose listo (" + delegado + ", manos " + cfg.manos + ")");
   try { await go().MediaPipeListo(delegado, fallos, detalle); } catch {}
 }
 
 async function encender() {
   const gen = ++generacion;
   encendida = true;
+  seguimiento = estadoInicial(); conocidas = []; busquedas = 0;
   $("camara").textContent = "Apagar cámara";
   try {
     await cargarMediaPipe();

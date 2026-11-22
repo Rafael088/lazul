@@ -95,6 +95,10 @@ type Linea struct {
 	PoseMs   float64 `json:"pose_ms,omitempty"`
 	Manos    float64 `json:"manos_media,omitempty"` // cantidad media detectada; nunca puntos
 	PoseCada float64 `json:"pose_cada,omitempty"`   // cuadros por ejecución real de Pose
+	// ModoManos: en rendimiento, cómo se siguieron las manos (busca o dos).
+	// Busquedas: cuántas veces se buscó la segunda en esa muestra.
+	ModoManos string `json:"modo_manos,omitempty"`
+	Busquedas int    `json:"busquedas,omitempty"`
 	// Prueba: en la prueba de trabajo normal (toda activación cuenta como
 	// falsa y no se manda nada).
 	Prueba bool `json:"prueba,omitempty"`

@@ -15,7 +15,7 @@
 // desktop/README.md.
 //
 //	lazul [-nombre N] [-camara auto|webview|proceso|no] [-dispositivo /dev/video0]
-//	      [-modo auto|tactil|transferencia]
+//	      [-modo auto|tactil|transferencia] [-manos busca|dos]
 //	      [-estado DIR] [-escucha :53317] [-abrir=false] [-mdns=false]
 //
 // Para medir sin nadie delante (./dev app e2e): -reproducir graba1,graba2 pasa
@@ -76,7 +76,14 @@ type Config struct {
 	SO         string `json:"so"`
 	Registro   string `json:"registro"`
 	Modo       string `json:"modo"` // tactil | transferencia
+	Manos      string `json:"manos"`
 }
+
+// Valores de -manos (los mismos de frontend/seguimiento.mjs).
+const (
+	manosBusca = "busca" // sigue una y busca la segunda cada ~0,5 s
+	manosDos   = "dos"   // siempre numHands 2
+)
 
 // Solicitud de emparejamiento esperando a la persona.
 type Solicitud struct {
@@ -143,6 +150,7 @@ type App struct {
 	sumaPoseMs    float64
 	sumaManos     int
 	poses         int
+	busquedas     int
 	metricas      int
 	manosMedia    float64
 	poseCada      float64
@@ -201,8 +209,10 @@ type CuadroJS struct {
 	} `json:"cuerpo"`
 	ManoMs float64 `json:"mano_ms"`
 	PoseMs float64 `json:"pose_ms"`
-	Ancho  int     `json:"ancho"`
-	Alto   int     `json:"alto"`
+	// Búsquedas de la segunda mano desde el cuadro anterior que llegó.
+	Busquedas int `json:"busquedas"`
+	Ancho     int `json:"ancho"`
+	Alto      int `json:"alto"`
 }
 
 // Cuadro pasa un cuadro de la cámara por el clasificador. No devuelve la vista:
@@ -233,6 +243,7 @@ func (a *App) Cuadro(cj CuadroJS) {
 	a.sumaManoMs += cj.ManoMs
 	a.sumaPoseMs += cj.PoseMs
 	a.sumaManos += len(c.Manos)
+	a.busquedas += cj.Busquedas
 	if cj.PoseMs > 0 {
 		a.poses++
 	}
@@ -827,7 +838,8 @@ func (a *App) medir(ctx context.Context) {
 		a.mu.Lock()
 		n, m, z := a.cuadros, a.conMano, a.enZona
 		sumaMano, sumaPose, sumaManos, poses, nm := a.sumaManoMs, a.sumaPoseMs, a.sumaManos, a.poses, a.metricas
-		a.cuadros, a.conMano, a.enZona = 0, 0, 0
+		busquedas := a.busquedas
+		a.cuadros, a.conMano, a.enZona, a.busquedas = 0, 0, 0, 0
 		a.sumaManoMs, a.sumaPoseMs, a.sumaManos, a.poses, a.metricas = 0, 0, 0, 0, 0
 		a.fps = float64(n) / 5
 		a.fracMano, a.fracZona = 0, 0
@@ -858,11 +870,11 @@ func (a *App) medir(ctx context.Context) {
 				ei.Encendido, ei.Lecturas, ei.MsLectura, ei.Fallos, ei.Objetivos, ei.Chicos, ei.Ajustes, ei.Dudas)
 		}
 		if n > 0 {
-			decir("cámara: %.1f cuadros/s, mano en %d de %d (%.2f manos), zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms (cada %.1f cuadros)",
-				float64(n)/5, m, n, manosMedia, z, core, total, manoMs, poseMs, poseCada)
+			decir("cámara: %.1f cuadros/s, mano en %d de %d (%.2f manos), zona en %d; CPU %.1f%% de un núcleo (%.1f%% total), inferencia mano %.1f ms + Pose %.1f ms (cada %.1f cuadros); manos %s, %d búsquedas",
+				float64(n)/5, m, n, manosMedia, z, core, total, manoMs, poseMs, poseCada, a.cfg.Manos, busquedas)
 			a.reg.Anotar(desktop.Linea{Tipo: desktop.TipoRendimiento, Sesion: a.flujo.Sesion(), Prueba: a.flujo.EnPrueba(),
 				FPS: float64(n) / 5, CPUCore: core, CPUTotal: total, ManoMs: manoMs, PoseMs: poseMs,
-				Manos: manosMedia, PoseCada: poseCada})
+				Manos: manosMedia, PoseCada: poseCada, ModoManos: a.cfg.Manos, Busquedas: busquedas})
 		}
 	}
 }
@@ -908,6 +920,7 @@ func main() {
 	soloHuella := flag.Bool("solo-huella", false, "mostrar la huella de este equipo y salir")
 	resumen := flag.Bool("resumen", false, "mostrar el resumen del registro y salir")
 	iman := flag.Bool("iman", true, "imán sobre los botones: frenar el puntero sobre los chicos y llevarles el toque que cae casi encima")
+	manos := flag.String("manos", manosBusca, "busca | dos (busca: sigue una mano y busca la segunda cada ~0,5 s; dos: sigue siempre dos, para comparar la CPU)")
 	flag.Parse()
 
 	if *archivoSalida != "" {
@@ -917,7 +930,7 @@ func main() {
 		}
 	}
 	if err := correr(opciones{*nombre, *estado, *escucha, *camara, *dispositivo, *modoApp, *abrir, *usarMDNS, *adelantar, *titulo, *reproducir,
-		*grabaciones, *permitir, *mostrarCodigo, *emparejarCon, *codigo, *duracion, *eco, *soloHuella, *resumen, *iman}); err != nil {
+		*grabaciones, *permitir, *mostrarCodigo, *emparejarCon, *codigo, *duracion, *eco, *soloHuella, *resumen, *iman, *manos}); err != nil {
 		decir("error: %v", err)
 		os.Exit(1)
 	}
@@ -931,6 +944,7 @@ type opciones struct {
 	emparejarCon, codigo                               string
 	duracion                                           time.Duration
 	eco, soloHuella, resumen, iman                     bool
+	manos                                              string
 }
 
 func correr(o opciones) error {
@@ -993,8 +1007,11 @@ func correr(o opciones) error {
 	if modoControl != "tactil" && modoControl != "transferencia" {
 		return fmt.Errorf("-modo: %q no es auto, tactil ni transferencia", o.modo)
 	}
+	if o.manos != manosBusca && o.manos != manosDos {
+		return fmt.Errorf("-manos: %q no es busca ni dos", o.manos)
+	}
 	app := &App{
-		cfg:     Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg, Modo: modoControl},
+		cfg:     Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg, Modo: modoControl, Manos: o.manos},
 		reg:     reg,
 		ind:     &desktop.Indicador{},
 		tactil:  gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto),
