@@ -220,6 +220,19 @@ type TargetFinder interface {
 	Targets(ctx context.Context) (TargetSet, error)
 }
 
+// BorderResize enciende y apaga el redimensionado al tocar el borde de una
+// ventana (Hyprland: general:resize_on_border, con extend_border_grab_area).
+// Con él encendido, un toque a menos de 8 px del borde redimensiona la
+// ventana en vez de hacer clic; por eso Lazul lo apaga mientras el panel
+// está encendido y devuelve el valor original al apagarlo. Es opcional:
+// donde no exista, nil y nada cambia.
+type BorderResize interface {
+	// ResizeOnBorder dice si hoy está encendido.
+	ResizeOnBorder(ctx context.Context) (bool, error)
+	// SetResizeOnBorder lo cambia en caliente.
+	SetResizeOnBorder(ctx context.Context, on bool) error
+}
+
 // Sistema junta las capacidades de un equipo. Cada paquete de sistema
 // expone New() Sistema.
 type Sistema struct {
@@ -232,4 +245,5 @@ type Sistema struct {
 	TouchScreen     TouchScreen
 	Displays        Displays
 	Targets         TargetFinder
+	BorderResize    BorderResize
 }

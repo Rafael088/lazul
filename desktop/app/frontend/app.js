@@ -39,6 +39,9 @@ function mostrarIndicador(ind) {
   // Con el panel calibrado, encendido añade lo que hace la mano.
   const p = panelUltimo;
   const sufijo = (modoEntradaPanel === "respaldo" ? " · respaldo" : "") + (delegadoMP === "CPU" ? " · CPU lenta" : "");
+  // El aviso (por ejemplo, que se apagó el redimensionado en el borde) dura
+  // unos segundos; el destello del gesto manda mientras exista.
+  const nota = ind && ind.destello ? etiquetaGesto(ind) : (ind && ind.aviso ? ind.aviso : "");
   if (p.calibrado && !p.calibrando) {
     const encendido = !!p.encendido;
     const tocando = encendido && p.fase === "agarrando";
@@ -46,7 +49,7 @@ function mostrarIndicador(ind) {
     let t = "apagado";
     if (encendido) t = tocando ? (p.manos_armadas === 2 ? "encendido · 2 dedos" : "encendido · tocando") : (p.dentro ? "encendido · mano en el panel" : "encendido");
     $("indicador-estado").textContent = t + sufijo;
-    $("indicador-gesto").textContent = "";
+    $("indicador-gesto").textContent = nota;
     return;
   }
   const activo = !!(ind && ind.activo);
@@ -54,7 +57,7 @@ function mostrarIndicador(ind) {
   $("indicador-estado").textContent = (p.calibrando ? "calibrando" : (activo ? "encendido" : "apagado")) + sufijo;
   // El gesto ya no destella aquí: el aura (halo sobre la pantalla) es la
   // señal visual. Queda la etiqueta como recordatorio en la píldora.
-  $("indicador-gesto").textContent = ind && ind.destello ? etiquetaGesto(ind) : "";
+  $("indicador-gesto").textContent = nota;
 }
 
 async function alternarAjuste(on = !vistaCamara) {
