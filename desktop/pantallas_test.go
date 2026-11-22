@@ -150,7 +150,7 @@ func tresRecorrido(t *testing.T, t0 int64, derecha bool, palmas float64) []gestu
 func pasarPantallas(p *Pantallas, cs []gestures.Cuadro, libre bool, t0 time.Time) int {
 	cambios := 0
 	for _, c := range cs {
-		if _, cambio := p.Cuadro(c, libre, t0.Add(time.Duration(c.TMs)*time.Millisecond)); cambio {
+		if _, cambio := p.Cuadro(c, libre, false, t0.Add(time.Duration(c.TMs)*time.Millisecond)); cambio {
 			cambios++
 		}
 	}
@@ -349,7 +349,7 @@ func TestPantallasQuitaLaManoDeTresDedos(t *testing.T) {
 	for _, c := range tres(t, 0, true) {
 		hay := len(c.Manos)
 		c.Manos = append(c.Manos, abierta)
-		fuera, _ := p.Cuadro(c, true, t0)
+		fuera, _ := p.Cuadro(c, true, false, t0)
 		if hay == 1 && len(fuera.Manos) != 1 {
 			t.Fatalf("a los %d ms pasan %d manos, quiere solo la abierta", c.TMs, len(fuera.Manos))
 		}
@@ -367,10 +367,10 @@ func TestPantallasSigueAlFoco(t *testing.T) {
 	quieto := []gestures.Cuadro{{TMs: 0}}
 	// La persona hace clic en la externa: al siguiente vistazo, el panel va allí.
 	f.enfocar("DP-1")
-	if _, c := p.Cuadro(quieto[0], true, t0.Add(500*time.Millisecond)); c {
+	if _, c := p.Cuadro(quieto[0], true, false, t0.Add(500*time.Millisecond)); c {
 		t.Fatal("se consultó el foco antes de ConsultarFocoCada")
 	}
-	if _, c := p.Cuadro(quieto[0], true, t0.Add(ConsultarFocoCada)); c {
+	if _, c := p.Cuadro(quieto[0], true, false, t0.Add(ConsultarFocoCada)); c {
 		t.Fatal("la consulta asíncrona anunció un cambio antes de terminar")
 	}
 	if !esperarPantallas(p) {
@@ -392,7 +392,7 @@ func TestPantallasTresDedosSinMoverFocoNoSeDeshace(t *testing.T) {
 		t.Fatal("los tres dedos no cambiaron")
 	}
 	for i := 1; i <= 3; i++ {
-		p.Cuadro(gestures.Cuadro{TMs: int64(i) * 1000}, true, t0.Add(time.Duration(i)*1100*time.Millisecond))
+		p.Cuadro(gestures.Cuadro{TMs: int64(i) * 1000}, true, false, t0.Add(time.Duration(i)*1100*time.Millisecond))
 	}
 	if d, _ := p.Actual(); d.Name != "DP-1" {
 		t.Fatalf("el seguimiento del foco deshizo el cambio: actual = %s", d.Name)
@@ -419,7 +419,7 @@ func TestPantallasSinCompositorAnotaUnaVez(t *testing.T) {
 	t0 := time.Unix(0, 0)
 	p.Iniciar(t0)
 	for i := 1; i <= 5; i++ {
-		if _, c := p.Cuadro(gestures.Cuadro{}, true, t0.Add(time.Duration(i)*ConsultarFocoCada)); c {
+		if _, c := p.Cuadro(gestures.Cuadro{}, true, false, t0.Add(time.Duration(i)*ConsultarFocoCada)); c {
 			t.Fatal("sin monitores hubo cambio")
 		}
 		esperarPantallas(p)
@@ -470,7 +470,7 @@ func TestPantallasConsultarFocoNuncaBloqueaElCuadro(t *testing.T) {
 	p.Iniciar(t0) // La primera lista prepara el estado sin bloquear.
 
 	inicio := time.Now()
-	p.Cuadro(gestures.Cuadro{}, true, t0.Add(ConsultarFocoCada))
+	p.Cuadro(gestures.Cuadro{}, true, false, t0.Add(ConsultarFocoCada))
 	if tarda := time.Since(inicio); tarda > 50*time.Millisecond {
 		t.Fatalf("consultar monitores bloqueó el cuadro durante %v", tarda)
 	}
@@ -493,7 +493,7 @@ func TestPantallasConsultarParaTresDedosNuncaBloqueaElCuadro(t *testing.T) {
 
 	inicio := time.Now()
 	for _, c := range tres(t, 0, true) {
-		p.Cuadro(c, true, t0.Add(time.Duration(c.TMs)*time.Millisecond))
+		p.Cuadro(c, true, false, t0.Add(time.Duration(c.TMs)*time.Millisecond))
 	}
 	if tarda := time.Since(inicio); tarda > 50*time.Millisecond {
 		t.Fatalf("consultar monitores para los tres dedos bloqueó cuadros durante %v", tarda)

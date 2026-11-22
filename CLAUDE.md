@@ -78,7 +78,7 @@ puño: dos cuadros sueltos unidos por la gracia no agarran.
 
 Es el modo por defecto en Linux y Windows. La L sostenida es un interruptor:
 arranca apagado, otra L lo apaga y no hay apagado por tiempo. Apagado, el panel
-no mueve el puntero ni toca; los tres dedos hoy no miran el interruptor.
+no mueve el puntero ni toca; los tres dedos tampoco cambian de pantalla.
 
 `./dev app` permite calibrar dos esquinas de un panel imaginario. La
 palma solo cuenta si está dentro del panel y del torso hombros-caderas que

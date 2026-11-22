@@ -294,8 +294,9 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 		// calibrando o en la prueba de trabajo normal, no cambia de pantalla.
 		e := a.panel.Estado()
 		libre := e.Calibrado && !e.Calibrando && e.Fase != string(gestures.EmbragueAgarrando) && !a.flujo.EnPrueba()
+		apagado := !e.Encendido
 		var cambio bool
-		filtrado, cambio = a.pantallas.Cuadro(filtrado, libre, ahora)
+		filtrado, cambio = a.pantallas.Cuadro(filtrado, libre, apagado, ahora)
 		if cambio {
 			if d, ok := a.pantallas.Actual(); ok {
 				decir("el panel pasa al monitor %s", d.Name)
