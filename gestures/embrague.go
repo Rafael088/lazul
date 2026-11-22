@@ -25,6 +25,9 @@ import (
 //     apuntaba la mano abierta (cotejo-uy84og).
 //   - Dos manos pellizcando y separándose o juntándose son un zoom; el resto
 //     de los casos es un arrastre, con la dirección del eje que más se movió.
+//   - El puntero tiene una mano dueña (cotejo-goem2w): no se lo quita otra
+//     que llega o pellizca, solo lo cede si se va (elegirDuena). Cada dedo,
+//     en cambio, sale siempre de su propia mano (Armadas).
 //
 // La apertura y el estado de cada mano salen de MedidorPellizco (pellizco.go):
 // aquí no se duplica el umbral ni la histéresis.
@@ -128,11 +131,16 @@ type ResultadoEmbrague struct {
 	// Armadas es cada una de esas manos con su clave y su posición, ordenadas
 	// por clave para que el orden no cambie entre cuadros. ToquesDe las usa
 	// para mantener un dedo por mano.
-	Armadas  []ManoArmada `json:"armadas,omitempty"`
-	X        float64      `json:"x"`
-	Y        float64      `json:"y"`
-	Arrastre *Arrastre    `json:"arrastre,omitempty"`
-	Zoom     *Zoom        `json:"zoom,omitempty"`
+	Armadas []ManoArmada `json:"armadas,omitempty"`
+	X       float64      `json:"x"`
+	Y       float64      `json:"y"`
+	// Puntero es la mano dueña de X e Y, que no tiene por qué ser la que
+	// pellizca. Relevo dice que en este cuadro pasaron a otra mano: quien las
+	// filtre empieza de cero para no arrastrar el salto.
+	Puntero  ClaveMano `json:"puntero"`
+	Relevo   bool      `json:"relevo,omitempty"`
+	Arrastre *Arrastre `json:"arrastre,omitempty"`
+	Zoom     *Zoom     `json:"zoom,omitempty"`
 }
 
 // estadoManoEmbrague sigue una mano entre cuadros. La clave es la misma que
@@ -177,6 +185,19 @@ type MedidorEmbrague struct {
 	manos    map[ClaveMano]*estadoManoEmbrague
 	panel    map[ClaveMano]*MapeadorPanel
 	zoom     estadoZoom
+	duena    duenaPuntero
+}
+
+// duenaPuntero es la mano que mueve el puntero. clave sobrevive a la pérdida
+// para saber si la siguiente es un relevo.
+type duenaPuntero struct {
+	clave    ClaveMano
+	hay      bool
+	tVista   int64
+	ausente  int // cuadros seguidos sin verla en el panel
+	palma    MuestraPanel
+	manos    int        // cuántas había en su último cuadro
+	posicion PuntoPanel // último punto que dio
 }
 
 // NuevoMedidorEmbrague arranca con la calibración del panel.
@@ -209,6 +230,8 @@ type manoMedida struct {
 	dentro     bool
 	dentroReal bool
 	ok         bool
+	palma      MuestraPanel
+	llega      bool // no estaba en el cuadro anterior
 }
 
 // Cuadro avanza el embrague con las manos de un cuadro. Devuelve la fase y
@@ -229,7 +252,9 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 			if mapa == nil {
 				mapa = NuevoMapeadorPanel(m.Calibracion)
 				m.panel[clave] = mapa
+				md.llega = true
 			}
+			md.palma = muestra
 			md.pos, md.gesto, md.dentro = mapa.mapear(muestra)
 			_, md.dentroReal = m.Calibracion.Mapear(muestra)
 			md.ok = true
@@ -286,6 +311,8 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 		}
 	}
 
+	r.Relevo = m.elegirDuena(medidas, c.TMs)
+	r.Puntero = m.duena.clave
 	m.completarResultado(medidas, armadas, &r)
 	return r
 }
@@ -473,36 +500,104 @@ func (m *MedidorEmbrague) arrastreDe(est *estadoManoEmbrague) *Arrastre {
 	return a
 }
 
-// completarResultado elige la mano del puntero (la que agarra, si hay una) y
-// deja la fase que lee el aura.
-func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*estadoManoEmbrague, r *ResultadoEmbrague) {
-	var elegida *manoMedida
-	var desfase PuntoPanel
-	for i := range medidas {
-		if elegida == nil {
-			elegida = &medidas[i]
-		}
-		for _, est := range armadas {
-			if est.clave == medidas[i].clave {
-				elegida = &medidas[i]
-				desfase = est.desfase
+// elegirDuena mantiene la mano del puntero y dice si pasó a otra. Estar
+// quieta no cuenta: quieta es como se apunta. La dueña solo lo cede cuando
+// lleva fuera de la vista o del panel lo mismo que se exige para soltar un
+// pellizco (cuadros y tiempo). Sin dueña lo toma la primera mano que esté en
+// el panel o, si alguna ya agarra, la primera de esas.
+func (m *MedidorEmbrague) elegirDuena(medidas []manoMedida, t int64) (relevo bool) {
+	armada := func(md *manoMedida) bool { return m.manos[md.clave].armada }
+	enPanel := func(md *manoMedida) bool { return md.ok && (md.dentro || armada(md)) }
+	d := &m.duena
+	if d.hay {
+		for i := range medidas {
+			if medidas[i].clave == d.clave && enPanel(&medidas[i]) {
+				d.tVista, d.ausente, d.palma = t, 0, medidas[i].palma
+				d.manos = len(medidas)
+				return false
 			}
+		}
+		// La misma mano con otro lado: en el cuadro siguiente hay las mismas
+		// manos, la clave de la dueña ya no está y otra nace encima, a menos de
+		// media palma. No es un relevo y el filtro sigue, salvo que llegue
+		// apoyando: ese toque es suyo y no hereda el filtro. La app ya fija el
+		// lado (seguimiento.mjs); esto es para el orden crudo de la cámara.
+		if d.ausente == 0 && d.manos == len(medidas) && !claveEn(medidas, d.clave) {
+			for i := range medidas {
+				md := &medidas[i]
+				if md.llega && enPanel(md) &&
+					math.Hypot(md.palma.X-d.palma.X, md.palma.Y-d.palma.Y) < d.palma.Tamano/2 {
+					d.clave, d.tVista, d.palma = md.clave, t, md.palma
+					return armada(md)
+				}
+			}
+		}
+		d.ausente++
+		if d.ausente < m.Ajustes.CuadrosParaSoltar || t-d.tVista < m.Ajustes.MsParaSoltar {
+			return false
+		}
+		d.hay = false
+	}
+	var nueva *manoMedida
+	for i := range medidas {
+		md := &medidas[i]
+		if enPanel(md) && (nueva == nil || (armada(md) && !armada(nueva))) {
+			nueva = md
 		}
 	}
-	if elegida != nil {
+	if nueva == nil {
+		return false
+	}
+	relevo = nueva.clave != d.clave
+	*d = duenaPuntero{clave: nueva.clave, hay: true, tVista: t, palma: nueva.palma, manos: len(medidas)}
+	return relevo
+}
+
+func claveEn(medidas []manoMedida, clave ClaveMano) bool {
+	for _, md := range medidas {
+		if md.clave == clave {
+			return true
+		}
+	}
+	return false
+}
+
+// completarResultado pone el puntero en su mano dueña y deja la fase que lee
+// el aura.
+func (m *MedidorEmbrague) completarResultado(medidas []manoMedida, armadas []*estadoManoEmbrague, r *ResultadoEmbrague) {
+	d := &m.duena
+	var elegida *manoMedida
+	for i := range medidas {
+		if !d.hay || medidas[i].clave == d.clave {
+			elegida = &medidas[i]
+			break
+		}
+	}
+	switch {
+	case elegida != nil:
 		r.Dentro = elegida.dentro
 		if elegida.ok {
-			// Agarrando, el puntero es el dedo: palma más el desfase del ancla.
-			r.TienePos, r.X, r.Y = true, elegida.pos.X+desfase.X, elegida.pos.Y+desfase.Y
-			// Cerrando el pellizco (ya no abierta del todo y sin armar), el
-			// puntero se queda en el ancla: lo que se mueve la palma al
-			// cerrar no mueve lo que la persona apuntó.
-			if est := m.manos[elegida.clave]; est != nil && len(armadas) == 0 && m.anclaVigente(est, r.TMs) &&
-				float64(elegida.estado.Apertura) < m.Ajustes.Pellizco.UmbralAbrir {
-				r.X, r.Y = est.ancla.X, est.ancla.Y
+			p, est := elegida.pos, m.manos[elegida.clave]
+			if est.armada {
+				// Agarrando, el puntero es el dedo: palma más el desfase del ancla.
+				p.X, p.Y = p.X+est.desfase.X, p.Y+est.desfase.Y
+			} else if m.anclaVigente(est, r.TMs) && float64(elegida.estado.Apertura) < m.Ajustes.Pellizco.UmbralAbrir {
+				// Cerrando el pellizco (ya no abierta del todo y sin armar), el
+				// puntero se queda en el ancla: lo que se mueve la palma al
+				// cerrar no mueve lo que la persona apuntó.
+				p = est.ancla
 			}
+			r.TienePos, r.X, r.Y = true, p.X, p.Y
+			d.posicion = p
 		}
-	} else if len(armadas) == 1 && armadas[0].tienePos {
+	case len(medidas) > 0:
+		// La dueña falta y hay otra a la vista: el puntero la espera quieto,
+		// sin irse a la otra.
+		for _, md := range medidas {
+			r.Dentro = r.Dentro || md.dentro
+		}
+		r.TienePos, r.X, r.Y = true, d.posicion.X, d.posicion.Y
+	case d.hay && len(armadas) == 1 && armadas[0].clave == d.clave && armadas[0].tienePos:
 		// La mano que agarra desapareció: el puntero se queda donde estaba y
 		// el botón sigue pulsado hasta que se cumpla el soltar.
 		a := armadas[0]
@@ -524,4 +619,5 @@ func (m *MedidorEmbrague) Parar() {
 	m.manos = map[ClaveMano]*estadoManoEmbrague{}
 	m.panel = map[ClaveMano]*MapeadorPanel{}
 	m.zoom = estadoZoom{}
+	m.duena = duenaPuntero{}
 }

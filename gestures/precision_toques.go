@@ -226,6 +226,10 @@ func (p *punteroApp) medir(t int64, crudo, salida PuntoPanel) {
 func (p *punteroApp) cortarMedida() { p.crudos, p.haySalidaPrevia = p.crudos[:0], false }
 
 func (p *punteroApp) cuadro(r ResultadoEmbrague) {
+	if r.Relevo {
+		p.filtro.Reiniciar()
+		p.cortarMedida()
+	}
 	if r.TienePos {
 		entrada := PuntoPanel{X: r.X, Y: r.Y}
 		if !r.Dentro && r.Fase == EmbragueAgarrando {
