@@ -117,12 +117,11 @@ export function seguirCuadro(estado, t, aspecto, correr) {
 // Lo mismo que el embrague aguanta una mano perdida antes de soltar.
 export const MEMORIA_MS = 250;
 const CERCA_PALMAS = 2.5;
-const QUIETA_PALMAS = 0.5;
-const QUIETA_MS = 500;
 
 // previas es lo que devolvió la llamada anterior en `conocidas` ([] al empezar).
 // La primera mano es la que lee la L y la que mueve el puntero: una que llega
-// va detrás, salvo que la que estaba lleve medio segundo quieta.
+// va siempre detrás, aunque la que estaba esté quieta, porque quieta es como
+// se apunta. Si la primera está fuera del panel la quita su filtro, en Go.
 export function identificar(previas, manos, t, aspecto) {
   const vivas = previas.filter((c) => t - c.t <= MEMORIA_MS);
   const vistas = manos.map((m) => ({ m, ...medir(m, aspecto) }));
@@ -141,19 +140,14 @@ export function identificar(previas, manos, t, aspecto) {
   for (const { v, c } of pares) {
     if (v.id || usadas.has(c)) continue;
     usadas.add(c);
-    const movida = Math.hypot(v.x - c.ancla.x, v.y - c.ancla.y) > QUIETA_PALMAS * v.tam;
-    v.id = { derecha: c.derecha, rango: c.rango, ancla: movida ? { x: v.x, y: v.y, t } : c.ancla };
+    v.id = { derecha: c.derecha, rango: c.rango };
     presentes.push(v);
   }
+  let siguiente = Math.max(-1, ...vivas.map((c) => c.rango)) + 1;
   for (const v of vistas) {
     if (v.id) continue;
     const derecha = presentes.some((o) => o.id.derecha === v.m.derecha) ? !v.m.derecha : v.m.derecha;
-    let rango = Math.max(-1, ...vivas.map((c) => c.rango)) + 1;
-    if (presentes.length) {
-      const primera = presentes.reduce((a, b) => (a.id.rango <= b.id.rango ? a : b));
-      rango = t - primera.id.ancla.t >= QUIETA_MS ? primera.id.rango - 1 : primera.id.rango + 1;
-    }
-    v.id = { derecha, rango, ancla: { x: v.x, y: v.y, t } };
+    v.id = { derecha, rango: siguiente++ };
     presentes.push(v);
   }
   presentes.sort((a, b) => a.id.rango - b.id.rango);

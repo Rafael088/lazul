@@ -155,17 +155,46 @@ test("al salir no se cambia a otra mano, y si vuelve la segunda se cancela", () 
   assert.equal(debeBuscar(e, 9999, 1), false);
 });
 
-test("mano equivocada: enganchada a la quieta, la otra queda primera en 500 ms", () => {
+test("apuntar quieto: la mano que llega se sigue pero no roba el puntero", () => {
   for (let antes = 20; antes < 40; antes++) {
     const c = camara();
     for (let i = 0; i < antes; i++) c.paso([mano(0.15, false)]);
     let tarda = null;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 90; i++) {
       const r = c.paso([mano(0.15, false), mano(0.6 + i * 0.003)]);
-      if (r.manos[0].derecha) { tarda = i * 1000 / 30; break; }
+      assert.equal(r.manos[0].derecha, false, `cuadro ${antes}+${i}`);
+      if (r.manos.length === 2 && tarda === null) tarda = i * 1000 / 30;
     }
     assert.ok(tarda !== null && tarda <= 500.01, `cuadro ${antes}: ${tarda}`);
   }
+});
+
+test("una mano fantasma no mueve el puntero ni por un cuadro", () => {
+  for (const dura of [1, 3, 30]) {
+    let previas = [];
+    for (let i = 0; i < 100; i++) {
+      // Apuntar: quieta o avanzando muy despacio.
+      const ms = [mano(0.3 + i * 0.0002)];
+      if (i >= 40 && i < 40 + dura) ms.push(mano(0.75, false));
+      const r = identificar(previas, ms, i * 33, ASPECTO);
+      previas = r.conocidas;
+      assert.equal(r.manos[0].derecha, true, `dura ${dura}, cuadro ${i}`);
+    }
+  }
+});
+
+test("la primera se va: manda la otra y no lo pierde si vuelve una mano", () => {
+  const c = camara();
+  for (let i = 0; i < 20; i++) c.paso([mano(0.15, false), mano(0.7)]);
+  for (let i = 0; i < 15; i++) assert.equal(c.paso([mano(0.7)]).manos[0].derecha, true);
+  for (let i = 0; i < 60; i++) assert.equal(c.paso([mano(0.15, false), mano(0.7)]).manos[0].derecha, true);
+});
+
+test("dos que aparecen a la vez conservan el orden de MediaPipe", () => {
+  let r = identificar([], [mano(0.8, false), mano(0.2)], 0, ASPECTO);
+  assert.deepEqual(r.manos.map((m) => m.derecha), [false, true]);
+  r = identificar(r.conocidas, [mano(0.2), mano(0.8, false)], 33, ASPECTO);
+  assert.deepEqual(r.manos.map((m) => m.derecha), [false, true]);
 });
 
 test("una mano en movimiento conserva el puntero cuando llega otra", () => {
