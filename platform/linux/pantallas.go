@@ -31,6 +31,7 @@ var _ platform.Displays = pantallasHyprland{}
 
 // monitorHyprland son los campos de hyprctl monitors -j que hacen falta.
 type monitorHyprland struct {
+	ID        int     `json:"id"`
 	Nombre    string  `json:"name"`
 	X         int     `json:"x"`
 	Y         int     `json:"y"`
@@ -48,11 +49,32 @@ type monitorHyprland struct {
 // y alto cambiados si está girado 90° o 270°), que es el que usa el
 // escritorio de Hyprland para x e y. Los apagados y los espejos no cuentan.
 func leerMonitoresHyprland(datos []byte) ([]platform.Display, error) {
+	ms, err := monitoresLogicos(datos)
+	if err != nil {
+		return nil, err
+	}
+	ds := make([]platform.Display, 0, len(ms))
+	for _, m := range ms {
+		ds = append(ds, m.Display)
+	}
+	return ds, nil
+}
+
+// monitorLogico es un monitor encendido con su id de Hyprland y su escala.
+type monitorLogico struct {
+	platform.Display
+	ID     int
+	Escala float64
+}
+
+// monitoresLogicos es leerMonitoresHyprland con el id y la escala de cada
+// monitor, que hacen falta para ubicar los objetivos del imán.
+func monitoresLogicos(datos []byte) ([]monitorLogico, error) {
 	var ms []monitorHyprland
 	if err := json.Unmarshal(datos, &ms); err != nil {
 		return nil, fmt.Errorf("leer los monitores de hyprctl: %w", err)
 	}
-	var ds []platform.Display
+	var ds []monitorLogico
 	for _, m := range ms {
 		if m.Apagado || (m.Duplicado != "" && m.Duplicado != "none") || m.Ancho <= 0 || m.Alto <= 0 {
 			continue
@@ -66,7 +88,10 @@ func leerMonitoresHyprland(datos []byte) ([]platform.Display, error) {
 		if m.Giro%2 == 1 {
 			ancho, alto = alto, ancho
 		}
-		ds = append(ds, platform.Display{Name: m.Nombre, X: m.X, Y: m.Y, Width: ancho, Height: alto, Focused: m.EnFoco})
+		ds = append(ds, monitorLogico{
+			Display: platform.Display{Name: m.Nombre, X: m.X, Y: m.Y, Width: ancho, Height: alto, Focused: m.EnFoco},
+			ID:      m.ID, Escala: escala,
+		})
 	}
 	return ds, nil
 }

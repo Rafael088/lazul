@@ -18,5 +18,6 @@ func New() platform.Sistema {
 		TouchScreen:     tactil,
 		Displays:        pantallasHyprland{ejecutar: ejecutarTactilReal, puntero: puntero, tactil: tactil},
 		Spaces:          espaciosHyprland{ejecutar: ejecutarTactilReal},
+		Targets:         objetivosHyprland{hypr: consultarHyprland, a11y: &a11yDBus{}, puntero: puntero},
 	}
 }

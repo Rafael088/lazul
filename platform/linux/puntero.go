@@ -37,6 +37,18 @@ func (p *punteroVirtual) dirigir(d *platform.Display, caja platform.Display) {
 	p.destino, p.caja = d, caja
 }
 
+// monitorDestino es el monitor elegido con Displays.Target, o nil si
+// (0,0)-(1,1) es el escritorio de siempre.
+func (p *punteroVirtual) monitorDestino() *platform.Display {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.destino == nil {
+		return nil
+	}
+	d := *p.destino
+	return &d
+}
+
 const (
 	evAbs            = 0x03
 	absX             = 0x00
