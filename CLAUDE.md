@@ -1,9 +1,12 @@
 # Lazul — mapa para agentes
 
-Lazul convierte una webcam en el control de los equipos de la red local: con
-gestos de la mano agarras una captura, texto, una URL o una app en un equipo y
-la sueltas en otro. Todo en local. La 0.1.0: 2 PCs (Windows y Linux Hyprland),
-gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
+Lazul convierte la pantalla de un PC Windows o Linux (Hyprland) en una pantalla
+táctil que se maneja en el aire, con la webcam y sin hardware extra. Es para
+cuando no tienes el ratón a mano (clase, presentar, PC lejos); no promete
+reemplazarlo. La 0.2.0 pasa con los 8 criterios de dec-uaex (`cotejo leer dec-uaex`),
+límite 2026-12-07; antes de eso, ni landing ni video. Agarrar y soltar entre
+equipos (0.1.0) sigue con `-modo transferencia`: no es el núcleo ni se promete
+todavía (dec-0j4m). El video y los puntos de la mano nunca salen del equipo.
 
 ## Un solo punto de entrada: `./dev`
 
@@ -18,7 +21,7 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`): los gestos 0.1 y las tomas del modelo nuevo de manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a dos manos, movimiento normal y tres dedos a cada lado) |
 | `./dev pista` | abre en el navegador la pista local de precisión: 14 blancos de distintos tamaños en centro, bordes y esquinas, seguidos de una zona de reposo; descarga el resumen JSON sin datos de cámara |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
-| `./dev app [args]` | la app de escritorio (en Linux con gráfica NVIDIA, MediaPipe corre en ella por EGL; `LAZUL_GPU=intel` para la integrada); en Linux abre el modo táctil (scroll, zoom y diapositivas) y `-modo transferencia` conserva el recorrido entre PCs; `./dev app win` la copia a `%USERPROFILE%\Lazul`; `./dev app resumen` dice las activaciones de los últimos 30 min; `./dev app compilar`; `./dev app e2e win\|linux` prueba la transferencia con grabaciones |
+| `./dev app [args]` | la app de escritorio (en Linux con gráfica NVIDIA, MediaPipe corre en ella por EGL; `LAZUL_GPU=intel` para la integrada); en Linux y Windows abre el modo táctil y `-modo transferencia` conserva el recorrido entre PCs; `./dev app win` la copia a `%USERPROFILE%\Lazul`; `./dev app resumen` dice las activaciones de los últimos 30 min; `./dev app compilar`; `./dev app e2e win\|linux` prueba la transferencia con grabaciones |
 | `./dev win test\|check\|contrato` | copia el árbol al PC Windows (`ssh win`) y corre ahí; `contrato` corre en la sesión del escritorio |
 
 Salida breve: una línea por paso; el registro completo queda en `.dev/<paso>.log`.
@@ -34,7 +37,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `proto/testdata/sobre_v1.bin` | el mismo Sobre que leen y escriben Go y TS | regenerar con `go test ./proto/go/lazulv1 -actualizar` |
 | `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen, Displays (monitores: listar y dirigir táctil y puntero a uno), Spaces (los tres dedos con un monitor: escritorio o app), TargetFinder (botones y enlaces de la ventana con foco, para el imán) y errores; `pantallas.go`: vecino por lado y mapeo por monitor, puros | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
-| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles, puntero absoluto y pantalla táctil multitoque uinput; Windows deja TouchScreen como no soportado para activar el respaldo; Windows lee los objetivos del imán por UI Automation (`objetivos.go`) y Linux por AT-SPI más la posición de la ventana de Hyprland (`objetivos.go`, `atspi.go`; Chromium necesita `--force-renderer-accessibility`; `accesibilidad.go` enciende `org.a11y.Status.IsEnabled` al arrancar con el imán y nunca lo apaga); terminados cuando `./dev contrato` / `./dev win contrato` pasan |
+| `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles, puntero absoluto y pantalla táctil multitoque uinput; Windows tiene la pantalla táctil por `InjectTouchInput` (`tactil.go`, hasta 2 dedos); Windows lee los objetivos del imán por UI Automation (`objetivos.go`) y Linux por AT-SPI más la posición de la ventana de Hyprland (`objetivos.go`, `atspi.go`; Chromium necesita `--force-renderer-accessibility`; `accesibilidad.go` enciende `org.a11y.Status.IsEnabled` al arrancar con el imán y nunca lo apaga); terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
 | `platform/internal/documento/` | nivel 2: elige el documento abierto (nombre en el título, mismos tipos que `core/seguro.go`) | una prueba exige las mismas extensiones que el receptor |
 | `platform/falso/`, `platform/vacio/` | sistema en memoria (para sim y pruebas) y el que no hace nada | |
@@ -54,13 +57,13 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `pista/` | página local para medir aciertos a la primera, fallos, toques fuera, tiempo por blanco y toques falsos en reposo | se abre con `./dev pista`; el resumen puro se prueba con Node dentro de `./dev check`; no lee cámara ni coordenadas |
 | `fixtures/gestos/` | grabaciones reales `*.jsonl` de los gestos 0.1 | las sintéticas van en `gestures/testdata/sinteticas` |
 | `fixtures/pellizco/` | tomas reales del modelo nuevo: cabecera con `toma` (y `panel` si hay calibración) y el estado del pellizco de cada mano por cuadro | se graban con `./dev grabar`; los puntos crudos de las dos manos van siempre |
-| `desktop/` | lógica de la app de escritorio, con pruebas: zona de torso MediaPipe Pose + `Panel` (calibración persistente, puntero absoluto y pellizco → TouchScreen, con respaldo de botón/teclado), `Tactil` (cuadro → acción local, apagado sin mano y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (activaciones falsas/evitadas con el motivo de cada salida del panel — fuera_borde, cerca o lejos — y costo fps/CPU, JSONL en la carpeta de estado), `Iman` (`iman.go`: asistencia de puntería nivel 2 — caché por ventana de los objetivos de `platform.TargetFinder`, freno del puntero sobre los chicos y `AjustarToque`, que no corrige con duda; `-iman=false` lo apaga), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, posiciones, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
+| `desktop/` | lógica de la app de escritorio, con pruebas: zona de torso MediaPipe Pose + `Panel` (calibración persistente, puntero absoluto y pellizco → TouchScreen, con respaldo de botón/teclado), `Tactil` (cuadro → acción local, interruptor de la L sin apagado por tiempo y registro), `Indicador` (modo táctil activo/inactivo y destello por gesto), `Vivo` (transferencia anterior), `Registro` y `Resumir` (activaciones falsas/evitadas con el motivo de cada salida del panel — fuera_borde, cerca o lejos — y costo fps/CPU, JSONL en la carpeta de estado), `Iman` (`iman.go`: asistencia de puntería nivel 2 — caché por ventana de los objetivos de `platform.TargetFinder`, freno del puntero sobre los chicos y `AjustarToque`, que no corrige con duda; `-iman=false` lo apaga), `Nucleo` (receptor en :53317 + controlador con el Enrutador, `destinos.json`) | el registro nunca lleva imágenes, posiciones, URL ni rutas (una prueba lo exige); cómo usarla: `desktop/README.md` |
 | `desktop/app/` | la ventana Wails (módulo aparte: cgo y WebKitGTK); abre como indicador pequeño y la vista de cámara es opcional; cámara por ffmpeg en Linux y getUserMedia en Windows; MediaPipe en la webview (`traer-assets.sh`, no se versiona) | fuera de `./dev check`; compila con `./dev app compilar` |
 | `herramientas/` | scripts de apoyo (`win-escritorio.ps1`) y `toque-contacto.html`, la página que dice qué área de dedo recibe el navegador y si corrige el toque a blancos chicos | |
 | `prototipos/camara/` | prueba de cámara medida (módulo aparte) | no romper; fuera de `./dev check` |
 | `.cotejo/` | tareas, decisiones, arquitectura (Cotejo) | se escribe con el CLI `cotejo`, no a mano |
 
-## Gestos (dec-rwrs)
+## Gestos del modo transferencia (dec-rwrs)
 
 `Clasificar` arranca en reposo; solo la L sostenida (400 ms) activa. En
 activo (5 s), el puño agarra y la pinza arrastrada manda la app; agarrando,
@@ -71,13 +74,17 @@ a unos 90° y con las puntas separadas. El puño exige el índice de verdad
 recogido (a medio doblar no lo es) y que el sostén de 150 ms sea al menos 70 %
 puño: dos cuadros sueltos unidos por la gracia no agarran.
 
-## Modo táctil (dec-gzgl)
+## Modo táctil (dec-fa72, dec-yp1a, dec-uaex)
 
-En Linux, `./dev app` permite calibrar dos esquinas de un panel imaginario. La
+Es el modo por defecto en Linux y Windows. La L sostenida es un interruptor:
+arranca apagado, otra L lo apaga y no hay apagado por tiempo. Apagado, el panel
+no mueve el puntero ni toca; los tres dedos hoy no miran el interruptor.
+
+`./dev app` permite calibrar dos esquinas de un panel imaginario. La
 palma solo cuenta si está dentro del panel y del torso hombros-caderas que
 MediaPipe Pose ve en el mismo cuadro (sin caderas visibles, sentado, el torso se estima
 bajando 1,25 anchos de hombro; calibrando, la mano no pasa por este filtro; con el panel
-ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonces mueve un puntero absoluto uinput
+ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonces mueve un puntero absoluto
 sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
 y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`; su tercer paso («junta los dedos») guarda la apertura del pellizco del dueño y `AjustesPellizcoPara` fija a su mano los umbrales de cerrar (por defecto 0,20) y firme (0,12: apoya desde el 1.er cuadro; el tibio espera 3).
 Con dos monitores, `desktop.Pantallas` decide cuál controla el panel: el del
@@ -99,19 +106,22 @@ El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
 mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
 la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen
 no se prepara, `Panel` conserva el botón principal y Ctrl +/-, lo muestra y lo
-registra sin coordenadas. Parar o recalibrar levanta todas las ranuras. Además,
-cada cuadro pasa por `ClasificarTactil`: la L
-sostenida alterna el modo; el agarre (pulgar, índice y medio con las puntas
-juntas) hace scroll continuo con la rueda virtual mientras se sostiene, según
-cuánto se aleje la mano del punto de agarre; una pinza que abre/cierra
-hace zoom; dos dedos en horizontal mandan Page Up/Page Down para las
-diapositivas. Las acciones se aplican localmente a la ventana con foco mediante
-`platform.TactileActions`. El modo se apaga tras 3 s sin mano. Cada gesto y su
-resultado se anota en `factibilidad.jsonl`, sin contenido de cámara o pantalla.
+registra sin coordenadas. Parar, apagar o recalibrar levanta todas las ranuras.
+
+Con las manos que pasan el panel corre además `ClasificarTactil`: la L y, con el
+modo encendido, los gestos anteriores al táctil virtual, que siguen activos
+(agarre de pulgar, índice y medio = scroll con la rueda virtual; pinza que
+abre/cierra = zoom por teclado; dos dedos en horizontal = Re Pág/Av Pág). Van a
+la ventana con foco por `platform.TactileActions`. Cada gesto y su resultado se
+anota en `factibilidad.jsonl`, sin contenido de cámara o pantalla.
 
 ## Cómo se habla todo
 
-webview (MediaPipe Hands + Pose) → filtro torso+panel → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
+Táctil (todo en el equipo): webview (MediaPipe Hands + Pose) → filtro de torso →
+`desktop.Pantallas` (tres dedos) → `Panel.Filtrar` → `desktop.Tactil` (L y gestos)
+→ `Panel.Cuadro` (puntero, imán, toques) → `platform`.
+
+Transferencia: webview (MediaPipe Hands + Pose) → filtro torso+panel → `gestures.Clasificar` → `EventoGesto` → núcleo Go →
 `Sobre{Orden}` por WebSocket sobre TLS 1.3 (huella fijada en los dos lados) →
 receptor → `platform` → `Sobre{Respuesta}`. Antes, una vez por par de equipos:
 mDNS → `/pareja` con el código de 6 dígitos → la persona en el receptor permite.
@@ -119,13 +129,14 @@ Los archivos (capturas) no van en el Sobre: viajan por el protocolo de LocalSend
 (`core/localsend`, mismo puerto TLS) y después `Entregar{Archivo}` con su sha256;
 el receptor solo lo acepta si llegó entero.
 
-## Pendiente en otras tareas
+## Límites conocidos
 
-- Adaptadores: Linux `cotejo-42s7rt`, Windows `cotejo-232tso` (hacer pasar el contrato; no tocar `platform/contrato` para que pase).
-- Grabaciones reales `cotejo-x2hyu0` (con `./dev grabar`; después ajustar umbrales y el sostén de la L con `./dev replay -barrer`); catálogo de apps `cotejo-qxb94p`.
-- Precisión real 93,9 % (< 95 %): más tomas o ajustar con las que fallan (informe de `cotejo-sb2kdm`).
-- Niveles 1 y 2 del gesto 4 hechos (`cotejo-82qb85`, `niveles.go` de cada adaptador); quedan sus límites. Windows: URL por UI Automation (Chrome y Edge probados; Firefox y Brave sin probar, no están en el PC), documento si su ruta va en la línea de órdenes o en el título (doble clic sí; abierto desde el menú de la app no; Office por COM no). Linux: URL leída de la sesión que el navegador ya guarda (sin depuración remota ni cambiar nada): Chromium y Edge con hasta ~2,5 s de atraso, Firefox y Zen hasta 15 s, y solo si el título guardado es el de la ventana (privadas: nunca); documento por título, argumentos o `/proc/<pid>/fd` (imv, evince, mpv probados). Flatpak/snap sin probar.
-- Abrir en pantalla ya no frena la Orden: el adaptador lanza (`xdg-open`, `ShellExecute`) y contesta ok tras 25–50 ms de gracia (`esperaLanzar`); un fallo inmediato (comando o archivo inexistente, código de ShellExecute ≤ 32) sí se devuelve; uno que llega después se pierde. Medido con `LAZUL_ABRIR=1 ./dev e2e`: la Orden Entregar baja de 260–545 ms a ~20–60 ms (Windows: la búsqueda en frío del ejecutable puede sumar hasta ~200 ms la primera vez).
+- Lo pendiente está en Cotejo (`cotejo tareas --proyecto lazul`), no en este mapa.
+- El sandbox de los agentes no tiene cámara ni GPU: fps y CPU reales se miden con
+  `./dev app` en el escritorio y se leen de `factibilidad.jsonl`
+  (`"tipo":"rendimiento"`).
+- Transferencia, gesto 4. Windows: URL por UI Automation (Firefox y Brave sin probar); documento solo si su ruta va en la línea de órdenes o en el título (Office por COM no). Linux: URL de la sesión guardada del navegador (Chromium y Edge con hasta ~2,5 s de atraso, Firefox y Zen hasta 15 s; privadas nunca). Flatpak/snap sin probar.
+- Transferencia: abrir en pantalla contesta ok tras 25–50 ms de gracia (`esperaLanzar`); un fallo que llega después se pierde.
 
 ## Reglas
 
