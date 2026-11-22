@@ -34,3 +34,18 @@ Datos crudos: `2026-11-21-pista-linux.json`, `2026-11-21-pista-windows.json`.
 1. Repetir el reposo de 10 min (con las dos apps abiertas) para confirmar 0 falsos.
 2. Llevar el imán a Linux (AT-SPI + hyprctl) si los fallos del centro se repiten.
 3. Ver el lag de Windows con y3qiti.
+
+## Segunda pista (19:40, master ec73063: imán en Linux, tres dedos, lag, borde)
+
+| | Linux | Windows |
+|---|---|---|
+| Aciertos a la primera | **14/14** | **14/14** |
+| Toques fuera del blanco | 0 | 0 |
+| Tiempo mediano / p95 | 2,8 s / 5,5 s | 3,3 s / 7,5 s |
+| Reposo | 2,2 min, 1 falso (un clic de ratón sin querer, no de Lazul) | 0,5 min, 0 falsos |
+| fps (mediana / mínimo) | 29,6 / 3,6 | 19,4 / 5,8 |
+
+- Los dos al 100 % y más rápidos que la primera pista (Linux 3,6 → 2,8 s).
+- Zen tuvo que reiniciarse con `org.a11y.Status IsEnabled = true` para que el imán lo viera (cotejo-0v57aq).
+- El dueño nota en los dos sistemas que el puntero se pega a los bordes de las aplicaciones (cotejo-5qo9wn).
+- El reposo de 10 min sigue sin completarse.
