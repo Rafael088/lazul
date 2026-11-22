@@ -10,7 +10,7 @@
 //
 // Con la cámara se ven las dos manos. Las tomas del modelo nuevo de
 // manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a
-// dos manos y movimiento normal) van a -dir-pellizco, se marcan con "toma"
+// dos manos, movimiento normal y tres dedos a cada lado) van a -dir-pellizco, se marcan con "toma"
 // en la cabecera y guardan el estado del pellizco de cada mano en cada
 // cuadro (gestures/pellizco.go). El panel calibrado, cuando exista, llena
 // "panel" en la cabecera; sin él, el campo queda vacío.

@@ -24,6 +24,8 @@ const GUIAS = {
   "toma:entrar-panel": "Empieza con la mano fuera del panel imaginario y entra en él sin pellizcar; puedes cruzarlo hasta el otro lado. Sin pellizco: solo entrar.",
   "toma:salir-panel": "Empieza con la mano dentro del panel imaginario, sin pellizcar, y sácala hacia fuera. Sin pellizco: solo salir.",
   "toma:zoom-dos-manos": "Con las dos manos a la vista, pellizca con las dos y sepáralas para acercar; vuelve a juntarlas para alejar. Dos o tres ciclos por toma, sin soltar el pellizco.",
+  "toma:tres-derecha": "Estira índice, medio y anular con el pulgar y el meñique recogidos y desliza la mano hacia tu derecha más o menos un palmo, sin prisa; luego baja la mano. Un deslizamiento por toma.",
+  "toma:tres-izquierda": "Estira índice, medio y anular con el pulgar y el meñique recogidos y desliza la mano hacia tu izquierda más o menos un palmo, sin prisa; luego baja la mano. Un deslizamiento por toma.",
   "toma:normal": "Dos minutos de trabajo normal frente a la cámara, con una o las dos manos a la vista: escribir, tomar café, hablar con las manos. Sin pellizcos a propósito.",
 };
 const NOTA_PANEL = "Sin calibración del panel: la toma guarda los puntos crudos de las dos manos y el estado del pellizco; «panel» queda vacío en la cabecera.";

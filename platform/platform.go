@@ -192,6 +192,14 @@ type Displays interface {
 	Target(ctx context.Context, name string) error
 }
 
+// Spaces hace lo que el sistema hace con los tres dedos en el panel táctil
+// cuando hay un solo monitor: Hyprland cambia al escritorio de al lado (el
+// de la derecha es el siguiente) y Windows cambia de app (Alt+Tab; hacia la
+// izquierda, Alt+Mayús+Tab). Es opcional.
+type Spaces interface {
+	Switch(ctx context.Context, direction NavigationDirection) error
+}
+
 // Target es un elemento que se puede tocar (botón, enlace, casilla,
 // pestaña…) de la ventana con el foco. X, Y, Width y Height van normalizados
 // como los de TouchPoint: (0,0)-(1,1) es el monitor que recibe el táctil.
@@ -231,5 +239,6 @@ type Sistema struct {
 	AbsolutePointer AbsolutePointer
 	TouchScreen     TouchScreen
 	Displays        Displays
+	Spaces          Spaces
 	Targets         TargetFinder
 }

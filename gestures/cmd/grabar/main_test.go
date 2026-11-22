@@ -170,6 +170,7 @@ func TestPaginaTieneLasTomasViejasYNuevas(t *testing.T) {
 		"ACTIVAR", "AGARRAR", "SOLTAR", "MANDAR_APP", "NINGUNO:pinza", "NINGUNO:senalar", "NINGUNO:normal",
 		"toma:arrastrar-arriba", "toma:arrastrar-abajo", "toma:arrastrar-izquierda", "toma:arrastrar-derecha",
 		"toma:entrar-panel", "toma:salir-panel", "toma:zoom-dos-manos", "toma:normal",
+		"toma:tres-derecha", "toma:tres-izquierda",
 	} {
 		if !strings.Contains(pagina, `value="`+valor+`"`) {
 			t.Errorf("la página no ofrece %q", valor)

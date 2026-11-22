@@ -2,7 +2,7 @@
 // positivos. Por defecto mide las reales (fixtures/gestos) y las sintéticas
 // (gestures/testdata/sinteticas), cada una por su lado.
 //
-//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer] [-tactil] [-toques]
+//	./dev replay [-dir D1,D2] [-v] [-sostener-l MS] [-barrer] [-tactil] [-toques] [-pantalla]
 package main
 
 import (
@@ -22,12 +22,16 @@ func main() {
 	detalle := flag.Bool("v", false, "una línea por grabación fallida (con -toques, una por toque)")
 	tactil := flag.Bool("tactil", false, "mide modo táctil: L, scroll, zoom y barrido")
 	toques := flag.Bool("toques", false, "mide los toques de fixtures/pellizco: embrague y ToquesDe")
+	pantalla := flag.Bool("pantalla", false, "mide los tres dedos (cambiar de pantalla): disparos e intentos por motivo")
 	sostenerL := flag.Int64("sostener-l", gestures.AjustesPorDefecto.SostenerL, "ms que se sostiene la L para activar")
 	barrer := flag.Bool("barrer", false, "mide la L con varios tiempos de sostén (200 a 800 ms)")
 	flag.Parse()
-	if *tactil && *toques {
-		fmt.Fprintln(os.Stderr, "error: -tactil y -toques miden cosas distintas; elige una")
+	if n := cuantas(*tactil, *toques, *pantalla); n > 1 {
+		fmt.Fprintln(os.Stderr, "error: -tactil, -toques y -pantalla miden cosas distintas; elige una")
 		os.Exit(2)
+	}
+	if *pantalla && *dirs == dirsPredeterminados {
+		*dirs = "fixtures/gestos,fixtures/pellizco"
 	}
 	if *tactil && *dirs == dirsPredeterminados {
 		*dirs += ",gestures/testdata/tactiles"
@@ -49,20 +53,78 @@ func main() {
 			fmt.Printf("%s: sin grabaciones (se graban con ./dev grabar, tarea cotejo-x2hyu0)\n", dir)
 			continue
 		}
-		if *toques {
+		if *pantalla {
+			informePantalla(dir, gs, *detalle)
+		} else if *toques {
 			informeToques(dir, gs, *detalle)
 		} else if *tactil {
 			informeTactil(dir, gs, *detalle)
 		} else {
 			informe(dir, gs, aj, *detalle)
 		}
-		if *barrer && !*tactil && !*toques {
+		if *barrer && !*tactil && !*toques && !*pantalla {
 			barrido(gs, aj)
 		}
 	}
 	if fallo {
 		os.Exit(1)
 	}
+}
+
+func cuantas(bs ...bool) int {
+	n := 0
+	for _, b := range bs {
+		if b {
+			n++
+		}
+	}
+	return n
+}
+
+// informePantalla: disparos de los tres dedos e intentos por motivo. En las
+// grabaciones sin el gesto todo disparo es falso.
+func informePantalla(dir string, gs []gestures.Grabacion, detalle bool) {
+	ms := gestures.MedirTresDedos(gs)
+	motivos := map[string]int{}
+	disparos, conPose, cuadros := 0, 0, 0
+	positivas, aciertos, falsos := 0, 0, 0
+	for _, m := range ms {
+		if m.Quiere != gestures.PantallaNinguna {
+			positivas++
+			if m.Acierto() {
+				aciertos++
+			} else if detalle {
+				fmt.Printf("  %s: quiere %s y hubo %d disparos (intentos %v)\n", m.Archivo, m.Quiere, len(m.Disparos), m.Motivos)
+			}
+		} else {
+			falsos += len(m.Disparos)
+		}
+		for k, v := range m.Motivos {
+			motivos[k] += v
+		}
+		disparos += len(m.Disparos)
+		cuadros += m.Cuadros
+		if m.Cuadros > 0 {
+			conPose++
+		}
+		if detalle {
+			for _, in := range m.Disparos {
+				fmt.Printf("  %s: disparo a la %s, %.2f palmas en %d ms (%d cuadros)\n", m.Archivo, in.Lado, in.Palmas, in.Ms, in.Cuadros)
+			}
+		}
+	}
+	claves := make([]string, 0, len(motivos))
+	for k := range motivos {
+		claves = append(claves, k)
+	}
+	sort.Strings(claves)
+	var partes []string
+	for _, k := range claves {
+		partes = append(partes, fmt.Sprintf("%s %d", k, motivos[k]))
+	}
+	fmt.Printf("%s: %d grabaciones · tres dedos en %d (%d cuadros) · disparos %d · intentos: %s\n",
+		dir, len(gs), conPose, cuadros, disparos, strings.Join(partes, ", "))
+	fmt.Printf("  PANTALLA aciertos %d/%d tomas del gesto · FALSOS %d en %d sin el gesto\n", aciertos, positivas, falsos, len(ms)-positivas)
 }
 
 // informeToques: una línea por toma con los toques que salen y cómo se

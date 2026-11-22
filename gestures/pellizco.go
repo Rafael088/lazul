@@ -272,6 +272,9 @@ var TomasPellizco = []string{
 	"salir-panel",
 	"zoom-dos-manos",
 	"normal",
+	// Cambiar de pantalla con tres dedos (tres.go): deslizar a ese lado.
+	"tres-derecha",
+	"tres-izquierda",
 }
 
 // TomaPellizcoValida dice si la etiqueta es una de las tomas del modelo nuevo.
