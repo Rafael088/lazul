@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Rafael088/lazul/platform"
 	"github.com/godbus/dbus/v5"
 )
 
@@ -60,6 +61,45 @@ var rolesObjetivo = []int{
 	45,  // RADIO_MENU_ITEM
 	11,  // COMBO_BOX
 	129, // PUSH_BUTTON_MENU
+}
+
+// rolObjetivo traduce los números propios de AT-SPI a categorías comunes
+// con Windows. No se propaga ningún nombre del elemento.
+func rolObjetivo(r uint32) platform.TargetRole {
+	switch r {
+	case 43:
+		return platform.TargetRoleButton
+	case 62:
+		return platform.TargetRoleToggleButton
+	case 88:
+		return platform.TargetRoleLink
+	case 7:
+		return platform.TargetRoleCheckBox
+	case 44:
+		return platform.TargetRoleRadioButton
+	case 37:
+		return platform.TargetRoleTab
+	case 33:
+		return platform.TargetRoleMenu
+	case 35, 8, 45:
+		return platform.TargetRoleMenuItem
+	case 11:
+		return platform.TargetRoleComboBox
+	case 129:
+		return platform.TargetRoleSplitButton
+	case rolMarco:
+		return platform.TargetRoleFrame
+	case rolDialogo:
+		return platform.TargetRoleDialog
+	case rolVentana:
+		return platform.TargetRoleWindow
+	case 48: // ATSPI_ROLE_SCROLL_BAR
+		return platform.TargetRoleScrollBar
+	case 50: // ATSPI_ROLE_SEPARATOR
+		return platform.TargetRoleSeparator
+	default:
+		return ""
+	}
 }
 
 // refA11y es un objeto de AT-SPI: el nombre de su conexión y su ruta.
@@ -264,7 +304,7 @@ func (a *a11yDBus) leer(ctx context.Context, c *dbus.Conn, pid int, titulo strin
 	if err := objeto(c, m).CallWithContext(ctx, ifazComponente+".GetExtents", 0, coordVentana).Store(&ext); err != nil {
 		return rectA11y{}, nil, fmt.Errorf("tamaño de la ventana: %w", err)
 	}
-	marco := rectA11y{float64(ext.X), float64(ext.Y), float64(ext.W), float64(ext.H)}
+	marco := rectA11y{x: float64(ext.X), y: float64(ext.Y), ancho: float64(ext.W), alto: float64(ext.H)}
 
 	var refs []refA11y
 	err = objeto(c, m).CallWithContext(ctx, ifazColeccion+".GetMatches", 0,
@@ -283,11 +323,17 @@ func (a *a11yDBus) leer(ctx context.Context, c *dbus.Conn, pid int, titulo strin
 		refs = refs[:maxElementosA11y]
 	}
 	rs := make([]rectA11y, 0, len(refs))
-	for _, r := range lote(ctx, c, refs, ifazComponente+".GetExtents", coordVentana) {
+	extensiones := lote(ctx, c, refs, ifazComponente+".GetExtents", coordVentana)
+	rolesObjetivo := lote(ctx, c, refs, ifazAccesible+".GetRole")
+	for i, r := range extensiones {
 		if r == nil || r.Store(&ext) != nil {
 			continue
 		}
-		rs = append(rs, rectA11y{float64(ext.X), float64(ext.Y), float64(ext.W), float64(ext.H)})
+		var rol uint32
+		if rolesObjetivo[i] != nil {
+			_ = rolesObjetivo[i].Store(&rol)
+		}
+		rs = append(rs, rectA11y{x: float64(ext.X), y: float64(ext.Y), ancho: float64(ext.W), alto: float64(ext.H), rol: rolObjetivo(rol)})
 	}
 	if err := ctx.Err(); err != nil {
 		return rectA11y{}, nil, err

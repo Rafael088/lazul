@@ -18,11 +18,18 @@ const anchoPrueba, altoPrueba = 1440.0, 900.0
 
 // obj es un objetivo en píxeles lógicos.
 func obj(x, y, w, h float64) platform.Target {
-	return platform.Target{X: x / anchoPrueba, Y: y / altoPrueba, Width: w / anchoPrueba, Height: h / altoPrueba}
+	return objRol(platform.TargetRoleButton, x, y, w, h)
+}
+
+func objRol(rol platform.TargetRole, x, y, w, h float64) platform.Target {
+	return platform.Target{X: x / anchoPrueba, Y: y / altoPrueba, Width: w / anchoPrueba, Height: h / altoPrueba, Role: rol}
 }
 
 func conjuntoPrueba(ventana uint64, ts ...platform.Target) platform.TargetSet {
-	return platform.TargetSet{Window: ventana, Targets: ts, LogicalWidth: anchoPrueba, LogicalHeight: altoPrueba}
+	return platform.TargetSet{
+		Window: ventana, Targets: ts, LogicalWidth: anchoPrueba, LogicalHeight: altoPrueba,
+		WindowBounds: platform.TargetBounds{Width: 1, Height: 1},
+	}
 }
 
 // px pasa píxeles lógicos a un punto normalizado.
@@ -82,6 +89,34 @@ func TestAjustarToqueConObjetivosSinteticos(t *testing.T) {
 	}
 }
 
+func TestImanExcluyeMarcoRolesNoContenidoYObjetivosPegadosAlBorde(t *testing.T) {
+	o := NuevosObjetivosIman(conjuntoPrueba(1,
+		obj(0, 200, 24, 24),                                    // borde izquierdo
+		obj(700, 0, 24, 24),                                    // borde superior
+		obj(anchoPrueba-24, 300, 24, 24),                       // borde derecho
+		obj(900, altoPrueba-24, 24, 24),                        // borde inferior
+		objRol(platform.TargetRoleFrame, 200, 200, 24, 24),     // marco
+		objRol(platform.TargetRoleScrollBar, 250, 200, 24, 24), // barra
+		objRol(platform.TargetRoleSeparator, 300, 200, 24, 24), // separador
+		objRol(platform.TargetRoleTab, 350, 200, 80, 24),       // pestaña de la app
+		objRol(platform.TargetRoleLink, 500, 300, 80, 24),      // contenido real
+	))
+	if o.CantObjetivo != 1 || o.CantChicos != 1 {
+		t.Fatalf("objetivos %d (chicos %d), quería solo el enlace de contenido", o.CantObjetivo, o.CantChicos)
+	}
+	if got, res := o.AjustarToque(px(30, 212)); res != AjusteNada || !mismoPunto(got, px(30, 212)) {
+		t.Fatalf("el borde izquierdo atrajo el toque: %v, %q", got, res)
+	}
+	if got, res := o.AjustarToque(px(590, 312)); res != AjusteMovido || !mismoPunto(got, px(568, 312)) {
+		t.Fatalf("el enlace interior no atrajo: %v, %q", got, res)
+	}
+	var f FrenoIman
+	f.Aplicar(o, px(5, 212))
+	if got := f.Aplicar(o, px(15, 212)); !mismoPunto(got, px(15, 212)) {
+		t.Fatalf("el borde frenó el puntero: %v", got)
+	}
+}
+
 func TestFrenoImanVaMasLentoSobreUnBotonYVuelveConLaMano(t *testing.T) {
 	o := NuevosObjetivosIman(conjuntoPrueba(1, obj(100, 100, 40, 24)))
 	var f FrenoIman
@@ -104,6 +139,40 @@ func TestFrenoImanVaMasLentoSobreUnBotonYVuelveConLaMano(t *testing.T) {
 	// Sin lista vigente, va con la mano.
 	if got := f.Aplicar(nil, px(500, 500)); !mismoPunto(got, px(500, 500)) {
 		t.Fatalf("sin lista frenó: %v", got)
+	}
+}
+
+func TestRegistroImanDiceRolYTamanoSinRepetirElFreno(t *testing.T) {
+	p, _, _, _ := panelConIman(t, objRol(platform.TargetRoleLink, 100, 100, 40, 24))
+	ruta := filepath.Join(t.TempDir(), "iman.jsonl")
+	reg, err := AbrirRegistro(ruta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Reg = reg
+	o := p.objetivosIman()
+	p.freno.aplicar(o, px(105, 110))
+	for _, x := range []float64{110, 115, 120} {
+		_, objetivo := p.freno.aplicar(o, px(x, 110))
+		if objetivo != nil {
+			p.anotarObjetivoIman("iman_frena", objetivo)
+		}
+	}
+	p.ajustarIman(px(150, 112))
+	if err := reg.Cerrar(); err != nil {
+		t.Fatal(err)
+	}
+	ls := lineas(t, ruta)
+	if len(ls) != 2 {
+		t.Fatalf("registro = %+v, quería un freno y un ajuste", ls)
+	}
+	for _, l := range ls {
+		if l.Tipo != TipoPanel || l.Rol != string(platform.TargetRoleLink) || l.Ancho != 40 || l.Alto != 24 {
+			t.Errorf("detalle incompleto: %+v", l)
+		}
+	}
+	if ls[0].Resultado != "iman_frena" || ls[1].Resultado != "iman_ajusta" {
+		t.Fatalf("resultados = %q, %q", ls[0].Resultado, ls[1].Resultado)
 	}
 }
 
@@ -329,7 +398,7 @@ func TestImanNoTocaObjetivosQueNoSeQuerian(t *testing.T) {
 		for x < 1300 {
 			w := 16 + r.Float64()*24
 			ts = append(ts, obj(x, 100, w, 24))
-			rects = append(rects, rectIman{x, 100, x + w, 124})
+			rects = append(rects, rectIman{x0: x, y0: 100, x1: x + w, y1: 124})
 			x += w + 4 + r.Float64()*36
 		}
 		y := 200.0
@@ -337,7 +406,7 @@ func TestImanNoTocaObjetivosQueNoSeQuerian(t *testing.T) {
 			h := 16 + r.Float64()*8
 			w := 60 + r.Float64()*200
 			ts = append(ts, obj(400, y, w, h))
-			rects = append(rects, rectIman{400, y, 400 + w, y + h})
+			rects = append(rects, rectIman{x0: 400, y0: y, x1: 400 + w, y1: y + h})
 			y += h + 2 + r.Float64()*20
 		}
 		o := NuevosObjetivosIman(conjuntoPrueba(uint64(pagina), ts...))

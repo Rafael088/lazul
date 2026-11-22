@@ -41,6 +41,10 @@ const (
 	// AdentroIman: en un objetivo largo (un enlace de varias palabras) el
 	// toque no va al centro, que puede estar lejos, sino a esto del borde.
 	AdentroIman = 12.0
+	// MargenBordeVentanaIman: un objetivo que llega a esta banda del marco
+	// no pertenece con suficiente certeza al contenido (botones de título,
+	// pestañas laterales, asas o barras del sistema) y se descarta.
+	MargenBordeVentanaIman = 8.0
 	// GananciaFrenoIman: cuánto avanza el puntero encima de un objetivo
 	// chico por cada píxel que avanza la mano.
 	GananciaFrenoIman = 0.5
@@ -69,8 +73,25 @@ const (
 	RepetirToqueIman = 500 * time.Millisecond
 )
 
-// rectIman es un objetivo en píxeles lógicos.
-type rectIman struct{ x0, y0, x1, y1 float64 }
+// rectIman es un objetivo en píxeles lógicos. rol es una categoría
+// genérica; nunca contiene texto de la pantalla.
+type rectIman struct {
+	x0, y0, x1, y1 float64
+	rol            platform.TargetRole
+}
+
+type detalleObjetivoIman struct {
+	rol         platform.TargetRole
+	ancho, alto int
+}
+
+func (r rectIman) detalle() detalleObjetivoIman {
+	rol := r.rol
+	if rol == "" {
+		rol = "unknown"
+	}
+	return detalleObjetivoIman{rol: rol, ancho: int(math.Round(r.x1 - r.x0)), alto: int(math.Round(r.y1 - r.y0))}
+}
 
 func (r rectIman) contiene(x, y float64) bool {
 	return x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1
@@ -85,6 +106,27 @@ func (r rectIman) distancia(x, y float64) float64 {
 func (r rectIman) chico() bool {
 	w, h := r.x1-r.x0, r.y1-r.y0
 	return math.Min(w, h) <= LadoChicoIman && math.Max(w, h) <= LadoLargoMaxIman
+}
+
+func rolFueraDelContenido(rol platform.TargetRole) bool {
+	switch rol {
+	case platform.TargetRoleFrame, platform.TargetRoleDialog, platform.TargetRoleWindow,
+		platform.TargetRoleScrollBar, platform.TargetRoleSeparator, platform.TargetRoleTab:
+		return true
+	default:
+		return false
+	}
+}
+
+func pegadoAlBorde(r, ventana rectIman) bool {
+	if ventana.x1 <= ventana.x0 || ventana.y1 <= ventana.y0 {
+		return false
+	}
+	izquierda := r.x0 <= ventana.x0+MargenBordeVentanaIman && r.x1 >= ventana.x0-MargenBordeVentanaIman
+	derecha := r.x1 >= ventana.x1-MargenBordeVentanaIman && r.x0 <= ventana.x1+MargenBordeVentanaIman
+	arriba := r.y0 <= ventana.y0+MargenBordeVentanaIman && r.y1 >= ventana.y0-MargenBordeVentanaIman
+	abajo := r.y1 >= ventana.y1-MargenBordeVentanaIman && r.y0 <= ventana.y1+MargenBordeVentanaIman
+	return izquierda || derecha || arriba || abajo
 }
 
 // destino es el punto del objetivo al que va el toque: el centro en un
@@ -116,13 +158,18 @@ func NuevosObjetivosIman(s platform.TargetSet) *ObjetivosIman {
 	if o.ancho <= 0 || o.alto <= 0 {
 		return o
 	}
+	v := s.WindowBounds
+	ventana := rectIman{v.X * o.ancho, v.Y * o.alto, (v.X + v.Width) * o.ancho, (v.Y + v.Height) * o.alto, ""}
 	for _, t := range s.Targets {
 		if !(t.Width > 0 && t.Height > 0) || math.IsNaN(t.X) || math.IsNaN(t.Y) {
 			continue
 		}
-		r := rectIman{t.X * o.ancho, t.Y * o.alto, (t.X + t.Width) * o.ancho, (t.Y + t.Height) * o.alto}
+		r := rectIman{x0: t.X * o.ancho, y0: t.Y * o.alto, x1: (t.X + t.Width) * o.ancho, y1: (t.Y + t.Height) * o.alto, rol: t.Role}
 		if r.x1 < 0 || r.y1 < 0 || r.x0 > o.ancho || r.y0 > o.alto {
 			continue // fuera de este monitor
+		}
+		if rolFueraDelContenido(r.rol) || pegadoAlBorde(r, ventana) {
+			continue
 		}
 		if repetido(o.todos, r) {
 			continue
@@ -163,13 +210,18 @@ const (
 // cercano si p no cae en ningún objetivo y ese está a RadioIman o menos.
 // Con duda no lo mueve. Devuelve el punto que hay que tocar.
 func (o *ObjetivosIman) AjustarToque(p gestures.PuntoPanel) (gestures.PuntoPanel, ResultadoAjuste) {
+	final, res, _ := o.ajustarToque(p)
+	return final, res
+}
+
+func (o *ObjetivosIman) ajustarToque(p gestures.PuntoPanel) (gestures.PuntoPanel, ResultadoAjuste, *detalleObjetivoIman) {
 	if o == nil || o.ancho <= 0 || o.alto <= 0 {
-		return p, AjusteSinWeb
+		return p, AjusteSinWeb, nil
 	}
 	x, y := p.X*o.ancho, p.Y*o.alto
 	for _, r := range o.todos {
 		if r.contiene(x, y) {
-			return p, AjusteDentro
+			return p, AjusteDentro, nil
 		}
 	}
 	mejor, segunda := -1, math.Inf(1)
@@ -186,27 +238,28 @@ func (o *ObjetivosIman) AjustarToque(p gestures.PuntoPanel) (gestures.PuntoPanel
 		}
 	}
 	if mejor < 0 || d1 > RadioIman {
-		return p, AjusteNada
+		return p, AjusteNada, nil
 	}
 	if segunda-d1 < MargenDudaIman {
-		return p, AjusteDuda
+		return p, AjusteDuda, nil
 	}
 	dx, dy := o.chicos[mejor].destino(x, y)
-	return gestures.PuntoPanel{X: dx / o.ancho, Y: dy / o.alto}, AjusteMovido
+	detalle := o.chicos[mejor].detalle()
+	return gestures.PuntoPanel{X: dx / o.ancho, Y: dy / o.alto}, AjusteMovido, &detalle
 }
 
-// sobreChico dice si p (normalizado) está encima de un objetivo chico.
-func (o *ObjetivosIman) sobreChico(p gestures.PuntoPanel) bool {
+// sobreChico dice qué objetivo chico contiene p (normalizado).
+func (o *ObjetivosIman) sobreChico(p gestures.PuntoPanel) (rectIman, bool) {
 	if o == nil || o.ancho <= 0 {
-		return false
+		return rectIman{}, false
 	}
 	x, y := p.X*o.ancho, p.Y*o.alto
 	for _, r := range o.chicos {
 		if r.contiene(x, y) {
-			return true
+			return r, true
 		}
 	}
-	return false
+	return rectIman{}, false
 }
 
 // FrenoIman hace que el puntero avance más lento encima de un objetivo
@@ -216,25 +269,42 @@ func (o *ObjetivosIman) sobreChico(p gestures.PuntoPanel) bool {
 type FrenoIman struct {
 	salida, anterior gestures.PuntoPanel
 	hay              bool
+	frenando         bool
+	objetivo         rectIman
 }
 
 // Aplicar recibe la posición de la mano (ya filtrada) y devuelve la del
 // puntero. Con o nil (sin lista vigente) el puntero va con la mano.
 func (f *FrenoIman) Aplicar(o *ObjetivosIman, mano gestures.PuntoPanel) gestures.PuntoPanel {
+	salida, _ := f.aplicar(o, mano)
+	return salida
+}
+
+// aplicar devuelve además el objetivo solo cuando el freno entra en él.
+// Así el registro informa la causa sin escribir una línea por cuadro.
+func (f *FrenoIman) aplicar(o *ObjetivosIman, mano gestures.PuntoPanel) (gestures.PuntoPanel, *detalleObjetivoIman) {
 	if o == nil || o.ancho <= 0 || o.alto <= 0 {
 		f.Reiniciar()
-		return mano
+		return mano, nil
 	}
 	if !f.hay {
-		f.salida, f.anterior, f.hay = mano, mano, true
-		return mano
+		f.salida, f.anterior, f.hay, f.frenando = mano, mano, true, false
+		return mano, nil
 	}
 	dx, dy := mano.X-f.anterior.X, mano.Y-f.anterior.Y
 	f.anterior = mano
-	if o.sobreChico(f.salida) {
+	objetivo, sobre := o.sobreChico(f.salida)
+	var detalle *detalleObjetivoIman
+	if sobre {
+		if !f.frenando || objetivo != f.objetivo {
+			d := objetivo.detalle()
+			detalle = &d
+		}
+		f.frenando, f.objetivo = true, objetivo
 		f.salida.X += dx * GananciaFrenoIman
 		f.salida.Y += dy * GananciaFrenoIman
 	} else {
+		f.frenando = false
 		f.salida.X += dx + (mano.X-f.salida.X-dx)*RecuperarFrenoIman
 		f.salida.Y += dy + (mano.Y-f.salida.Y-dy)*RecuperarFrenoIman
 	}
@@ -245,11 +315,11 @@ func (f *FrenoIman) Aplicar(o *ObjetivosIman, mano gestures.PuntoPanel) gestures
 		f.salida.X = mano.X + ex*k/o.ancho
 		f.salida.Y = mano.Y + ey*k/o.alto
 	}
-	return f.salida
+	return f.salida, detalle
 }
 
 // Reiniciar olvida el desfase: el puntero vuelve a ir con la mano.
-func (f *FrenoIman) Reiniciar() { f.hay = false }
+func (f *FrenoIman) Reiniciar() { f.hay, f.frenando = false, false }
 
 // EstadoIman es lo que la app muestra y mide del imán.
 type EstadoIman struct {

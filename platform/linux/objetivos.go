@@ -44,8 +44,12 @@ const (
 	maxHyprctl = 300 * time.Millisecond
 )
 
-// rectA11y es un rectángulo de AT-SPI: izquierda, arriba, ancho y alto.
-type rectA11y struct{ x, y, ancho, alto float64 }
+// rectA11y es un objetivo de AT-SPI: rol genérico y rectángulo (izquierda,
+// arriba, ancho y alto). Nunca conserva el nombre accesible.
+type rectA11y struct {
+	x, y, ancho, alto float64
+	rol               platform.TargetRole
+}
 
 // fuenteA11y lee el árbol de accesibilidad de una ventana. marco es la
 // ventana misma y objetivos lo que se puede tocar, los dos en coordenadas
@@ -197,6 +201,12 @@ func aPantalla(v ventanaHyprland, escala float64, marco rectA11y, rs []rectA11y,
 	if vw <= 1 || vh <= 1 || m.Width <= 1 || m.Height <= 1 {
 		return s
 	}
+	s.WindowBounds = platform.TargetBounds{
+		X:      (vx - float64(m.X)) / float64(m.Width),
+		Y:      (vy - float64(m.Y)) / float64(m.Height),
+		Width:  vw / float64(m.Width),
+		Height: vh / float64(m.Height),
+	}
 	k := 1.0
 	if escala > 1.01 && marco.ancho > 0 && math.Abs(marco.ancho/vw-escala) < 0.05*escala {
 		k = escala
@@ -223,7 +233,7 @@ func aPantalla(v ventanaHyprland, escala float64, marco rectA11y, rs []rectA11y,
 		if nx+nw < 0 || ny+nh < 0 || nx > 1 || ny > 1 {
 			continue
 		}
-		s.Targets = append(s.Targets, platform.Target{X: nx, Y: ny, Width: nw, Height: nh})
+		s.Targets = append(s.Targets, platform.Target{X: nx, Y: ny, Width: nw, Height: nh, Role: r.rol})
 	}
 	return s
 }

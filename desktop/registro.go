@@ -79,6 +79,11 @@ type Linea struct {
 	Cuadros int    `json:"cuadros,omitempty"`
 	ConMano int    `json:"con_mano,omitempty"`
 	Dedos   int    `json:"dedos,omitempty"` // cantidad apoyada; nunca posiciones
+	// Rol, Ancho y Alto describen el objetivo genérico que activó el imán.
+	// No incluyen su texto ni su posición en la pantalla.
+	Rol   string `json:"rol,omitempty"`
+	Ancho int    `json:"ancho,omitempty"`
+	Alto  int    `json:"alto,omitempty"`
 	// Palmas: en un intento de los tres dedos, el recorrido horizontal
 	// alcanzado desde donde empezó la pose, en palmas. Nunca una posición.
 	Palmas   float64 `json:"palmas,omitempty"`
