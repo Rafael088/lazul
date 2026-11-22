@@ -5,8 +5,8 @@ version: 0.1.0
 # lazul
 
 ## Objetivo
-Lazul convierte una webcam en el control de todos los dispositivos de la red local: con gestos de la mano (y voz opcional) agarras una captura, texto, una URL o una app en un equipo y la sueltas en otro. Todo se procesa en local. La 0.1.0 es la fase 1 del MVP: 2 PCs (Windows y Linux Hyprland), gestos 1 a 4 y envío de capturas; pasa con precisión de gestos ≥ 95 % y latencia de comando < 100 ms.
+Lazul convierte la pantalla de un computador Windows o Linux en una pantalla táctil que se maneja en el aire, con la webcam que ya tienes y sin hardware extra. Es para cuando no tienes el ratón a mano: dar clase o presentar de pie, o el PC lejos. No promete reemplazar al ratón. La 0.2.0 pasa si cumple los 8 criterios de dec-uaex a más tardar el 2026-12-07. El táctil completo es gratis; «Un solo espacio» (agarrar en un equipo y soltar en otro) va como «próximamente» y será el servicio de pago (dec-0j4m). El video y los puntos de la mano nunca salen del equipo.
 ## Stack
-Núcleo en Go (red, emparejamiento, protocolo, permisos). Escritorio con Wails: MediaPipe Hand Landmarker en JS dentro de la webview y el clasificador de gestos como función pura. Android en Kotlin (fase 2). Web en Next.js (fase 3). Contratos en proto/ con tipos generados. Repo público con licencia FSL.
+Núcleo en Go. Escritorio con Wails: MediaPipe Hand Landmarker y Pose en JS dentro de la webview; en Linux la cámara entra por ffmpeg (dec-7tgj). Salida por pantalla táctil virtual (dec-yp1a): uinput en Linux (Hyprland) e InjectTouchInput en Windows, con imán por AT-SPI y UI Automation. Contratos en proto/ con tipos generados. Web en Next.js cuando pasen los criterios; Android en Kotlin, después. Repo público con licencia FSL.
 ## Siguiente paso
-Prueba de cámara: Wails + MediaPipe en la webview de Windows (WebView2) y de Hyprland (WebKitGTK), midiendo fps y latencia. Si falla en Linux, plan B: motor de gestos como proceso aparte.
+Hasta el 2026-11-24: medir la CPU en Linux con la versión final, bajarla solo si pasa de un núcleo y congelar la versión. Del 2026-11-25 al 2026-12-07: validar dec-uaex en los dos PC (pista, reposo de 10 min, gestos y uso real). Al pasar: video real y web. Antes de eso, ni landing ni video.
