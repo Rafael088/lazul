@@ -314,8 +314,10 @@ torso o fuera del panel. El resumen guarda esas activaciones evitadas por
 motivo junto a las activaciones falsas.
 
 Pose corre normalmente una vez cada 3 cuadros. Si Hand tarda 24 ms o más,
-Lazul la espacia temporalmente a una vez cada 6 cuadros para aliviar la GPU;
-el detector de manos sigue aceptando dos, porque el zoom las necesita. En
+Lazul la espacia temporalmente a una vez cada 6 cuadros para aliviar la GPU.
+Con una mano a la vista sigue solo esa y busca la segunda cada ~0,5 s; con
+dos sigue las dos, porque el zoom las necesita. `-manos dos` sigue siempre
+dos, para comparar; la línea de rendimiento anota el modo y las búsquedas. En
 Windows el reloj de la cámara mantiene 30 Hz sin sumar otros 33 ms después de
 cada inferencia.
 
