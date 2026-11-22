@@ -162,6 +162,31 @@ func informeToques(dir string, gs []gestures.Grabacion, detalle bool) {
 	fmt.Printf("TEMBLOR con la mano quieta p50 %.5f p90 %.5f (n=%d) · RETRASO al mover rápido p50 %.4f p90 %.4f (n=%d)\n",
 		gestures.Percentil(prec.Temblor, .5), gestures.Percentil(prec.Temblor, .9), len(prec.Temblor),
 		gestures.Percentil(prec.Retraso, .5), gestures.Percentil(prec.Retraso, .9), len(prec.Retraso))
+	fmt.Println(lineaUnaMano(tomas))
+	fmt.Println(lineaSaltos(gestures.SaltosPunteroDe(tomas)))
+}
+
+// lineaUnaMano repite lo anterior solo con las tomas sin segunda mano: ahí no
+// hay a quién pasarle el puntero, así que ninguna regla de dos manos lo mueve.
+func lineaUnaMano(tomas []gestures.TomaToques) string {
+	var solas []gestures.TomaToques
+	for _, t := range tomas {
+		if t.UnaMano {
+			solas = append(solas, t)
+		}
+	}
+	p := gestures.PrecisionDe(solas)
+	return fmt.Sprintf("UNA MANO (%d tomas) aciertos %d/%d · TEMBLOR p50 %.5f p90 %.5f (n=%d) · RETRASO p50 %.4f p90 %.4f (n=%d)",
+		len(solas), p.Aciertos, p.Intentos,
+		gestures.Percentil(p.Temblor, .5), gestures.Percentil(p.Temblor, .9), len(p.Temblor),
+		gestures.Percentil(p.Retraso, .5), gestures.Percentil(p.Retraso, .9), len(p.Retraso))
+}
+
+// lineaSaltos es la métrica de cotejo-goem2w: el puntero no cambia de mano
+// mientras la suya siga a la vista.
+func lineaSaltos(s gestures.SaltosPuntero) string {
+	return fmt.Sprintf("SALTOS del puntero con dos manos (> %.1f de pantalla, %d cuadros): por cambio de mano %d · relevo al irse la suya %d · misma clave %d · ya filtrado %d",
+		gestures.SaltoPunteroMin, s.Cuadros, s.CambioDeMano, s.Relevo, s.MismaClave, s.Filtrado)
 }
 
 // lineaPrecision es la métrica de cotejo-uy84og en una línea: aciertos en
