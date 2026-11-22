@@ -173,22 +173,33 @@ otro también pueda mandarte, empareja al revés.
 - El halo es la señal visual: fuera del panel calibrado no se ve nada; dentro,
   un halo suave sigue la mano; al agarrar (pellizco) se enciende. La píldora
   sigue mostrando el último gesto reconocido, sin tapar la pantalla.
-- **Dos pantallas**: el panel controla el monitor que tiene el foco, y el halo
-  aparece en ese monitor, así se ve cuál se controla. Un **barrido rápido con
-  la mano abierta** hacia tu izquierda o tu derecha pasa el control al monitor
-  de ese lado (unas 2,5 palmas en menos de 350 ms, en horizontal y sin
-  vaivén). No cuenta mientras pellizcas ni al mover el puntero despacio, y tras
-  un barrido hay 1 s de pausa para que el rebote de la mano no lo deshaga. Si
-  cambias el foco de monitor con el ratón o el teclado, el panel lo sigue
-  (lo mira una vez por segundo, fuera del camino de los cuadros: aunque
-  `hyprctl` tarde o se cuelgue, la mano sigue procesándose). En Linux el
-  barrido también mueve el foco
-  (`hl.dsp.focus`) y la salida del táctil virtual (`hl.device`, con
-  `hyprctl eval`); el táctil se recrea para tomarla (~0,7 s). En Windows los
-  toques (`InjectTouchInput`) y el puntero van a las coordenadas de ese
-  monitor; el foco no se mueve. Con un solo monitor no cambia nada. Cada
-  cambio se anota en el registro (`"tipo":"pantalla"`, con el lado, nunca
-  posiciones).
+- **Cambiar de pantalla con tres dedos**: estira índice, medio y anular con
+  el pulgar y el meñique recogidos y desliza la mano hacia tu izquierda o tu
+  derecha más o menos un palmo, sin prisa (como los tres dedos del panel
+  táctil). Cuenta el recorrido desde donde hiciste la pose, no la velocidad;
+  hacia arriba o abajo no cuenta. Un cambio por pose: para otro, baja la mano
+  o deshaz la pose y vuelve a hacerla. Mientras se ve la pose, esa mano no
+  toca ni arrastra en el panel. No cuenta mientras pellizcas.
+  - **Dos pantallas**: el panel controla el monitor que tiene el foco, y el
+    halo aparece en ese monitor, así se ve cuál se controla. Los tres dedos
+    pasan el control al monitor de ese lado. Si cambias el foco de monitor
+    con el ratón o el teclado, el panel lo sigue (lo mira una vez por
+    segundo, fuera del camino de los cuadros: aunque `hyprctl` tarde o se
+    cuelgue, la mano sigue procesándose). En Linux el cambio también mueve el
+    foco (`hl.dsp.focus`) y la salida del táctil virtual (`hl.device`, con
+    `hyprctl eval`); el táctil se recrea para tomarla (~0,7 s). En Windows
+    los toques (`InjectTouchInput`) y el puntero van a las coordenadas de ese
+    monitor; el foco no se mueve.
+  - **Una pantalla**: hace lo del sistema. En Hyprland cambia al escritorio
+    abierto de al lado (a tu derecha, el siguiente: `e+1`); en Windows cambia
+    de app (a tu derecha, Alt+Tab; a tu izquierda, Alt+Mayús+Tab).
+  - Cada intento se anota en el registro (`"tipo":"pantalla"`): `"resultado":"disparo"`
+    con lo que hizo en `motivo` (`monitor`, `espacio`, `sin_vecino`, `error`) o
+    `"resultado":"no"` con por qué no (`corto`: no llegó a una palma; `vertical`;
+    `salto` del seguimiento; `dos_manos` en la pose; `ocupado`: pellizcando o
+    calibrando), el lado, el recorrido en `palmas` y los `ms`; nunca posiciones.
+    Para ajustar los umbrales: graba tomas «tres dedos a la derecha/izquierda»
+    con `./dev grabar` y mídelas con `./dev replay -pantalla -v`.
 - **Imán sobre los botones chicos (Windows)**: Lazul lee con UI Automation
   dónde están los botones, enlaces, casillas, pestañas y menús de la ventana
   con el foco (una vez al cambiar de ventana y cada 1,5 s con la mano en el

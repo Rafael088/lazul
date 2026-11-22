@@ -133,6 +133,7 @@ func TestTomasPellizco(t *testing.T) {
 	quiere := []string{
 		"arrastrar-arriba", "arrastrar-abajo", "arrastrar-izquierda", "arrastrar-derecha",
 		"entrar-panel", "salir-panel", "zoom-dos-manos", "normal",
+		"tres-derecha", "tres-izquierda",
 	}
 	if len(TomasPellizco) != len(quiere) {
 		t.Fatalf("tomas: %v", TomasPellizco)

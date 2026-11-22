@@ -116,7 +116,7 @@ type App struct {
 	cap    *captura
 	panel  *desktop.Panel
 	aura   *Aura
-	// pantallas decide qué monitor controla el panel (barrido y foco).
+	// pantallas decide qué monitor controla el panel (tres dedos y foco).
 	pantallas *desktop.Pantallas
 	// iman es la asistencia de puntería de nivel 2 (nil si el sistema no
 	// sabe leer los objetivos).
@@ -273,12 +273,15 @@ func (a *App) cuadro(c gestures.Cuadro) desktop.Vista {
 		}
 	}
 	if a.panel != nil && a.pantallas != nil {
-		// El barrido se mira antes del panel: la mano sale de él por un lado.
-		// Con el pellizco agarrando, calibrando o en la prueba de trabajo
-		// normal, la mano no cambia de pantalla.
+		// Los tres dedos se miran antes del panel: la mano puede salir de él
+		// por un lado. La mano en esa pose no sigue al panel ni al
+		// clasificador (no toca ni arrastra). Con el pellizco agarrando,
+		// calibrando o en la prueba de trabajo normal, no cambia de pantalla.
 		e := a.panel.Estado()
 		libre := e.Calibrado && !e.Calibrando && e.Fase != string(gestures.EmbragueAgarrando) && !a.flujo.EnPrueba()
-		if a.pantallas.Cuadro(filtrado, libre, ahora) {
+		var cambio bool
+		filtrado, cambio = a.pantallas.Cuadro(filtrado, libre, ahora)
+		if cambio {
 			if d, ok := a.pantallas.Actual(); ok {
 				decir("el panel pasa al monitor %s", d.Name)
 			}
@@ -1010,7 +1013,7 @@ func correr(o opciones) error {
 		if !app.cfg.Reproducir {
 			// Antes de preparar el táctil: así nace ya con la salida del
 			// monitor con el foco y no hay que recrearlo.
-			app.pantallas = desktop.NuevasPantallas(sis.Displays)
+			app.pantallas = desktop.NuevasPantallas(sis.Displays, sis.Spaces)
 			app.pantallas.Reg = reg
 			app.pantallas.AlCambiar = app.auraEnPantalla
 			app.pantallas.Iniciar(time.Now())

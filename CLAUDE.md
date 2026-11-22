@@ -14,8 +14,8 @@ gestos 1 a 4, precisión ≥ 95 % y latencia de comando < 100 ms.
 | `./dev contrato` | contrato de `platform` contra el adaptador de este sistema (necesita escritorio); con `LAZUL_CONTRATO_ABRIR=1` también «en vivo»: abre cada navegador y visor instalado con perfil y archivos temporales (Linux: en el espacio 6 sin foco) y comprueba la URL y el documento leídos |
 | `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS y, al final, de punta a punta con las grabaciones reales (captura por LocalSend, gesto 4 por niveles) |
 | `./dev e2e win\|linux [args]` | de punta a punta entre los 2 PCs de verdad: `win` controla este Linux y recibe Windows (túnel de ssh: el cortafuegos de Windows no deja entrar), `linux` al revés por la red local (puerto 53317). `LAZUL_ABRIR=1` abre de verdad; args del controlador: `-adelantar`, `-intentos N`, `-casos`, `-ventanas` |
-| `./dev replay [-v] [-barrer|-tactil|-toques]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L; `-tactil` mide el modo táctil; `-toques` mide los toques de `fixtures/pellizco` (embrague y `ToquesDe`): tap, pulsación larga, arrastre y pellizcos descartados por empezar fuera del panel; la última línea, `PRECISIÓN`, es la métrica de cotejo-uy84og (aciertos, falsos, de más, bordes y salto al apoyar, por el mismo recorrido que la app; `gestures/precision_toques.go`) |
-| `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`): los gestos 0.1 y las tomas del modelo nuevo de manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a dos manos y movimiento normal) |
+| `./dev replay [-v] [-barrer|-tactil|-toques|-pantalla]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L; `-tactil` mide el modo táctil; `-pantalla` mide los tres dedos (cambiar de pantalla) en `fixtures/gestos` y `fixtures/pellizco`; `-toques` mide los toques de `fixtures/pellizco` (embrague y `ToquesDe`): tap, pulsación larga, arrastre y pellizcos descartados por empezar fuera del panel; la última línea, `PRECISIÓN`, es la métrica de cotejo-uy84og (aciertos, falsos, de más, bordes y salto al apoyar, por el mismo recorrido que la app; `gestures/precision_toques.go`) |
+| `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`): los gestos 0.1 y las tomas del modelo nuevo de manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a dos manos, movimiento normal y tres dedos a cada lado) |
 | `./dev pista` | abre en el navegador la pista local de precisión: 14 blancos de distintos tamaños en centro, bordes y esquinas, seguidos de una zona de reposo; descarga el resumen JSON sin datos de cámara |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
 | `./dev app [args]` | la app de escritorio (en Linux con gráfica NVIDIA, MediaPipe corre en ella por EGL; `LAZUL_GPU=intel` para la integrada); en Linux abre el modo táctil (scroll, zoom y diapositivas) y `-modo transferencia` conserva el recorrido entre PCs; `./dev app win` la copia a `%USERPROFILE%\Lazul`; `./dev app resumen` dice las activaciones de los últimos 30 min; `./dev app compilar`; `./dev app e2e win\|linux` prueba la transferencia con grabaciones |
@@ -32,7 +32,7 @@ Go 1.27 (`.tool-versions`), Node 24, `protoc` para `./dev gen`.
 | `proto/go/lazulv1/` | tipos de Go generados | no editar a mano; `compat_test.go` fija los bytes |
 | `proto/ts/` | tipos de TS generados (`src/`) y prueba de compatibilidad con Go | no editar `src/` a mano |
 | `proto/testdata/sobre_v1.bin` | el mismo Sobre que leen y escriben Go y TS | regenerar con `go test ./proto/go/lazulv1 -actualizar` |
-| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen, Displays (monitores: listar y dirigir táctil y puntero a uno), TargetFinder (botones y enlaces de la ventana con foco, para el imán) y errores; `pantallas.go`: vecino por lado y mapeo por monitor, puros | pequeñas; una por capacidad |
+| `platform/platform.go` | interfaces Screenshot, Clipboard, ActiveApp, LaunchApp, TactileActions, AbsolutePointer, TouchScreen, Displays (monitores: listar y dirigir táctil y puntero a uno), Spaces (los tres dedos con un monitor: escritorio o app), TargetFinder (botones y enlaces de la ventana con foco, para el imán) y errores; `pantallas.go`: vecino por lado y mapeo por monitor, puros | pequeñas; una por capacidad |
 | `platform/contrato/` | pruebas de contrato que todo adaptador pasa | sus meta-tests exigen que `vacio` falle todo y `falso` pase todo |
 | `platform/linux/`, `platform/windows/` | adaptadores, un archivo por capacidad | Linux añade acciones táctiles, puntero absoluto y pantalla táctil multitoque uinput; Windows deja TouchScreen como no soportado para activar el respaldo; Windows lee los objetivos del imán por UI Automation (`objetivos.go`), Linux todavía no; terminados cuando `./dev contrato` / `./dev win contrato` pasan |
 | `platform/internal/navegador/` | nivel 1 del gesto 4: URL de la sesión de Firefox/Zen (`recovery.jsonlz4`) y de Chromium/Edge (`Sessions/Session_*`, SNSS), y de la barra de direcciones (Windows) | puro, sin sistema; la URL nunca se registra (puede llevar tokens) |
@@ -81,13 +81,20 @@ ya calibrado, Pose solo exige ver los dos hombros y la zona es el panel); entonc
 sin botón, como anticipo del contacto. Su tamaño aparente compensa la profundidad
 y un filtro One Euro quita temblor. La calibración se guarda en `panel.json`; su tercer paso («junta los dedos») guarda la apertura del pellizco del dueño y `AjustesPellizcoPara` fija a su mano los umbrales de cerrar (por defecto 0,20) y firme (0,12: apoya desde el 1.er cuadro; el tibio espera 3).
 Con dos monitores, `desktop.Pantallas` decide cuál controla el panel: el del
-foco al arrancar (y lo sigue si el foco cambia); un barrido rápido de una mano
-abierta hacia un lado (`gestures.DetectorBarridoPantalla`: ≥ 2,5 palmas en
-350 ms, horizontal, sin vaivén ni saltos ni pinza; 0 disparos en todas las
-grabaciones reales) pasa al vecino de ese lado con `platform.Displays.Target`
-y mueve el aura. Linux: `hyprctl eval` con `hl.device` (salida del táctil),
+foco al arrancar (y lo sigue si el foco cambia). Los tres dedos
+(`gestures.DetectorTresDedos`, `tres.go`: índice, medio y anular estirados con
+pulgar y meñique recogidos, deslizando ~1 palma a un lado desde donde empezó la
+pose, sin velocidad mínima; un disparo por pose) pasan al vecino de ese lado con
+`platform.Displays.Target` y mueven el aura; con un monitor hacen lo del
+sistema con `platform.Spaces` (Hyprland: `hl.dsp.focus({ workspace = "e±1" })`;
+Windows: Alt+Tab / Alt+Mayús+Tab). Mientras se ve la pose, esa mano no llega al
+panel ni al clasificador. Cada intento va a `factibilidad.jsonl` (`"tipo":"pantalla"`,
+`resultado` disparo —`motivo` monitor, espacio, sin_vecino, error— o no —corto,
+vertical, salto, dos_manos, ocupado—, con `palmas` y `ms`). `./dev replay -pantalla`
+mide aciertos en las tomas `tres-derecha`/`tres-izquierda` y falsos en el resto
+(0 en fixtures/gestos y fixtures/pellizco). Linux: `hyprctl eval` con `hl.device` (salida del táctil),
 `hl.dsp.focus` y el puntero llevado al rectángulo del monitor; Windows: toques
-y puntero en las coordenadas de ese monitor. Un solo monitor: nada cambia.
+y puntero en las coordenadas de ese monitor.
 El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
 mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
 la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen

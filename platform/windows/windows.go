@@ -18,6 +18,7 @@ func New() platform.Sistema {
 		AbsolutePointer: punteroAbsoluto{destino: destino},
 		TouchScreen:     tactil,
 		Displays:        pantallasWindows{destino: destino},
+		Spaces:          espaciosWindows{},
 		Targets:         objetivosWindows{destino: destino},
 	}
 }

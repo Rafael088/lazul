@@ -27,7 +27,7 @@ const (
 	TipoEvitada     = "evitada"     // una mano quedó fuera de la zona; Resultado dice por qué
 	TipoRendimiento = "rendimiento" // muestra periódica de fps, CPU e inferencia
 	TipoPanel       = "panel"       // modo de entrada y apoyar/levantar dedos, nunca posiciones
-	TipoPantalla    = "pantalla"    // el panel pasó a controlar otro monitor (barrido o foco); nunca posiciones
+	TipoPantalla    = "pantalla"    // tres dedos (disparo o por qué no) y cambios de monitor por el foco; nunca posiciones
 	TipoMediaPipe   = "mediapipe"   // con qué delegado arrancó (GPU o CPU) y si la GPU falló
 )
 
@@ -74,11 +74,14 @@ type Linea struct {
 	Error   string `json:"error,omitempty"`
 	// App: en el gesto 4, el id del catálogo de la app mandada o
 	// "fuera_del_catalogo". Nunca nombres, ejecutables, URL ni rutas.
-	App      string  `json:"app,omitempty"`
-	Ms       int64   `json:"ms,omitempty"`
-	Cuadros  int     `json:"cuadros,omitempty"`
-	ConMano  int     `json:"con_mano,omitempty"`
-	Dedos    int     `json:"dedos,omitempty"` // cantidad apoyada; nunca posiciones
+	App     string `json:"app,omitempty"`
+	Ms      int64  `json:"ms,omitempty"`
+	Cuadros int    `json:"cuadros,omitempty"`
+	ConMano int    `json:"con_mano,omitempty"`
+	Dedos   int    `json:"dedos,omitempty"` // cantidad apoyada; nunca posiciones
+	// Palmas: en un intento de los tres dedos, el recorrido horizontal
+	// alcanzado desde donde empezó la pose, en palmas. Nunca una posición.
+	Palmas   float64 `json:"palmas,omitempty"`
 	FPS      float64 `json:"fps,omitempty"`
 	CPUCore  float64 `json:"cpu_core,omitempty"`
 	CPUTotal float64 `json:"cpu_total,omitempty"`
