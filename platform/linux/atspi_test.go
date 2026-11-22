@@ -29,6 +29,7 @@ func busPrueba(t testing.TB) string {
 	if err := os.WriteFile(conf, []byte(`<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
 <busconfig><type>session</type><listen>tcp:host=127.0.0.1,bind=127.0.0.1,port=0</listen>
 <auth>ANONYMOUS</auth><allow_anonymous/>
+<servicedir>/no-existe-lazul</servicedir>
 <policy context="default"><allow send_destination="*" eavesdrop="true"/><allow eavesdrop="true"/><allow own="*"/></policy></busconfig>`), 0o600); err != nil {
 		t.Fatal(err)
 	}

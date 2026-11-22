@@ -243,12 +243,24 @@ otro también pueda mandarte, empareja al revés.
   arrancando con `-iman=false`.
   En Linux la posición de cada botón dentro de la ventana sale de AT-SPI y la
   de la ventana, de Hyprland; la barra, los bordes y nada de Hyprland cuentan
-  como objetivo. **Firefox** se expone solo. **Chromium, Chrome, Brave y las
-  apps de Electron** solo exponen la página si se abren con
-  `--force-renderer-accessibility` (o con `ACCESSIBILITY_ENABLED=1` en el
-  entorno); sin eso el imán ve, a lo sumo, los botones de la barra del
-  navegador. Para dejarlo fijo: añadir la opción a
-  `~/.config/chromium-flags.conf` (o `chrome-flags.conf`, `brave-flags.conf`).
+  como objetivo. **Firefox** se expone solo, pero solo si la sesión tiene la
+  accesibilidad encendida al arrancar. En Hyprland y Omarchy
+  `org.a11y.Status.IsEnabled` viene en `false`, y entonces Firefox y Zen ni
+  siquiera se registran en el bus. Al arrancar con el imán encendido, Lazul
+  lo lee en `/org/a11y/bus` del bus de la sesión y, si está en `false`, lo
+  pone en `true` por D-Bus. No lo apaga al cerrar (otras apps pueden
+  usarlo). Los navegadores que ya estaban abiertos no se registran hacia
+  atrás: hay que reiniciarlos para que el imán los vea, y el indicador lo
+  avisa una vez. La línea `accesibilidad de la sesión` de la salida y el
+  registro (`"tipo":"accesibilidad"`) dicen si Lazul la encendió
+  (`encendida`), si ya estaba (`ya_estaba`) o si el bus no existe
+  (`sin_bus`, falta `at-spi2-core`: se avisa y la app sigue sin imán).
+  **Chromium, Chrome, Brave y las apps de Electron** solo exponen la página
+  si se abren con `--force-renderer-accessibility` (o con
+  `ACCESSIBILITY_ENABLED=1` en el entorno); sin eso el imán ve, a lo sumo,
+  los botones de la barra del navegador. Para dejarlo fijo: añadir la opción
+  a `~/.config/chromium-flags.conf` (o `chrome-flags.conf`,
+  `brave-flags.conf`).
   Si la línea `imán:` dice «no está en el bus de accesibilidad», la app de la
   ventana no se registró en AT-SPI. Para comprobarlo con un navegador
   delante: `LAZUL_IMAN_VIVO=1 go test ./platform/linux -run ObjetivosVivo -v`

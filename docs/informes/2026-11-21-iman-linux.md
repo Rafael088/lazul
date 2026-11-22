@@ -61,7 +61,12 @@ escritorio.
 
 ## Chromium y Electron
 
-Firefox se registra solo en AT-SPI. Chromium, Chrome, Brave y las apps de
+Firefox se registra solo **si la sesión tiene la accesibilidad encendida al
+arrancar**. Con `org.a11y.Status.IsEnabled` en `false` (lo normal en
+Hyprland/Omarchy) Firefox y Zen no aparecen en el bus; no se registran
+«solos» en ese caso. Desde cotejo-0v57aq Lazul lo enciende al arrancar con
+el imán (`platform/linux/accesibilidad.go`) y avisa de que los navegadores
+ya abiertos hay que reiniciarlos. Chromium, Chrome, Brave y las apps de
 Electron solo exponen el contenido de la página si arrancan con
 `--force-renderer-accessibility` o con `ACCESSIBILITY_ENABLED=1` en el
 entorno (para dejarlo fijo, la opción en `~/.config/chromium-flags.conf`).
@@ -69,9 +74,27 @@ Sin eso el imán ve, a lo sumo, los botones de la barra del navegador. Si la
 app no está en el bus, `Targets` devuelve «la app de la ventana no está en el
 bus de accesibilidad…» y la línea `imán:` de la app lo dice.
 
-**Sin comprobar** (no se llega al escritorio desde el sandbox): que Firefox
-se registre sin `org.a11y.Status.IsEnabled=true` y que la bandera de Chromium
-baste en Wayland. Es lo primero que dice `TestObjetivosVivo`.
+**Sin comprobar** (no se llega al escritorio desde el sandbox): que la
+bandera de Chromium baste en Wayland. Es lo primero que dice
+`TestObjetivosVivo`.
+
+## Accesibilidad de la sesión (cotejo-0v57aq)
+
+- `platform/linux/accesibilidad.go` (`platform.Accessibility`): al arrancar
+  la app con el imán encendido, lee `org.a11y.Status.IsEnabled` en
+  `/org/a11y/bus` del bus de la sesión (tras `org.a11y.Bus.GetAddress`, que
+  arranca el launcher) y, si está en `false`, lo pone en `true` por D-Bus.
+  Nunca lo apaga al cerrar.
+- `desktop/accesibilidad.go` decide qué hacer con el resultado y anota
+  `"tipo":"accesibilidad"` (`encendida`, `ya_estaba`, `sin_bus`, `error`) en
+  el registro. Si Lazul lo enciende, el indicador avisa una vez de que los
+  navegadores abiertos hay que reiniciarlos.
+- Sin bus de accesibilidad (falta `at-spi2-core`) se avisa y el imán queda
+  apagado, en vez de fallar en cada lectura.
+- Pruebas: `desktop/accesibilidad_test.go` con una capacidad falsa y
+  `platform/linux/accesibilidad_test.go` contra un `dbus-daemon` propio con
+  un `org.a11y.Bus` falso (enciende, no toca si ya estaba, sin servicio y
+  errores de lectura y escritura).
 
 ## Pruebas (`./dev check` en verde)
 

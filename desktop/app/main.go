@@ -907,7 +907,7 @@ func main() {
 	eco := flag.Bool("eco", false, "copiar cada línea del registro a la salida")
 	soloHuella := flag.Bool("solo-huella", false, "mostrar la huella de este equipo y salir")
 	resumen := flag.Bool("resumen", false, "mostrar el resumen del registro y salir")
-	iman := flag.Bool("iman", true, "imán sobre los botones: frenar el puntero sobre los chicos y llevarles el toque que cae casi encima (solo Windows por ahora)")
+	iman := flag.Bool("iman", true, "imán sobre los botones: frenar el puntero sobre los chicos y llevarles el toque que cae casi encima")
 	flag.Parse()
 
 	if *archivoSalida != "" {
@@ -1060,10 +1060,30 @@ func correr(o opciones) error {
 			decir("aviso: %v", err)
 		}
 		if sis.Targets != nil && !app.cfg.Reproducir {
-			app.iman = desktop.NuevoIman(sis.Targets)
-			app.iman.Encender(o.iman)
-			app.panel.Iman = app.iman
-			decir("imán sobre los botones: %v (-iman=false lo apaga)", o.iman)
+			usable := true
+			if o.iman {
+				// La accesibilidad de la sesión se enciende (si hace falta)
+				// antes de leer: los navegadores solo se registran al
+				// arrancar (ver desktop.PrepararAccesibilidad).
+				ctxA11y, cancelar := context.WithTimeout(context.Background(), 3*time.Second)
+				r := desktop.PrepararAccesibilidad(ctxA11y, sis.Accessibility, reg)
+				cancelar()
+				usable = r.Usable
+				if r.Aviso != "" {
+					decir("%s", r.Aviso)
+					if r.Encendida {
+						app.ind.Avisar(r.Aviso, time.Now())
+					}
+				}
+			}
+			if !usable {
+				decir("imán sobre los botones: apagado (sin accesibilidad de la sesión)")
+			} else {
+				app.iman = desktop.NuevoIman(sis.Targets)
+				app.iman.Encender(o.iman)
+				app.panel.Iman = app.iman
+				decir("imán sobre los botones: %v (-iman=false lo apaga)", o.iman)
+			}
 		}
 	} else {
 		app.flujo = &desktop.Vivo{Reg: reg, AlGesto: app.nucleo.Disparar}

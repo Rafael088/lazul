@@ -25,6 +25,9 @@ var (
 	// ErrAccionInvalida: una acción del sistema lleva una dirección o modo
 	// que esa capacidad no admite.
 	ErrAccionInvalida = errors.New("platform: acción inválida")
+	// ErrSinAccesibilidad: no hay bus de accesibilidad (falta at-spi2-core o
+	// no hay bus de sesión); sin él el imán no puede leer objetivos.
+	ErrSinAccesibilidad = errors.New("platform: no hay bus de accesibilidad")
 )
 
 // Todas las llamadas reciben un context.Context. Si llega ya cancelado, la
@@ -228,6 +231,24 @@ type TargetFinder interface {
 	Targets(ctx context.Context) (TargetSet, error)
 }
 
+// AccessibilityResult dice qué hizo Accessibility.Enable.
+type AccessibilityResult struct {
+	WasOn    bool // ya estaba encendida: no se tocó
+	TurnedOn bool // Lazul la encendió ahora
+}
+
+// Accessibility prepara la accesibilidad del sistema para que las ventanas
+// expongan sus botones al imán. En Linux hay que encenderla (AT-SPI:
+// org.a11y.Status.IsEnabled) antes de que las apps arranquen; en Windows la
+// interfaz ya está disponible sin preparación. Es opcional: sin ella el imán
+// usa lo que el sistema tenga encendido.
+type Accessibility interface {
+	// Enable lee si la accesibilidad está encendida y, si no, la enciende.
+	// Nunca la apaga: otras apps pueden estar usándola. Si no hay bus de
+	// accesibilidad devuelve ErrSinAccesibilidad.
+	Enable(ctx context.Context) (AccessibilityResult, error)
+}
+
 // BorderResize enciende y apaga el redimensionado al tocar el borde de una
 // ventana (Hyprland: general:resize_on_border, con extend_border_grab_area).
 // Con él encendido, un toque a menos de 8 px del borde redimensiona la
@@ -254,5 +275,6 @@ type Sistema struct {
 	Displays        Displays
 	Spaces          Spaces
 	Targets         TargetFinder
+	Accessibility   Accessibility
 	BorderResize    BorderResize
 }
