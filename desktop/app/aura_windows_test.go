@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/Rafael088/lazul/platform"
 	plataforma "github.com/Rafael088/lazul/platform/windows"
@@ -27,6 +28,7 @@ func TestAuraVivo(t *testing.T) {
 		t.Fatal("NuevaAura devolvió nil")
 	}
 	defer a.Cerrar()
+	focoAntes, _, _ := getForegroundWindowEntrada.Call()
 	const x, y = .25, .5
 	a.Actualizar(EstadoAura{Activa: true, Calibrado: true, Dentro: true, X: x, Y: y})
 	time.Sleep(300 * time.Millisecond)
@@ -37,11 +39,35 @@ func TestAuraVivo(t *testing.T) {
 	if v, _, _ := isVisible.Call(a.hwnd); v == 0 {
 		t.Fatal("el aura no está visible con la mano dentro")
 	}
+	focoDespues, _, _ := getForegroundWindowEntrada.Call()
+	if focoAntes != 0 && focoDespues != focoAntes {
+		t.Fatalf("mostrar el aura robó el foco: antes=%#x después=%#x", focoAntes, focoDespues)
+	}
+	estilo, _, _ := getWindowLongPtrWEntrada.Call(a.hwnd, gwlExStyle)
+	if estilo&wsExTransparent == 0 || estilo&wsExNoActivate == 0 {
+		t.Fatalf("estilo del aura = %#x; faltan TRANSPARENT y NOACTIVATE", estilo)
+	}
 	ancho, _, _ := getSystemMetricsAura.Call(0)
 	alto, _, _ := getSystemMetricsAura.Call(1)
 	px, py := int32(x*float64(ancho-1)), int32(y*float64(alto-1))
-	if w, _, _ := windowFromPoint.Call(uintptr(px) | uintptr(py)<<32); w == a.hwnd {
-		t.Fatal("WindowFromPoint encuentra el aura: se quedaría con los clics")
+	getWindowRect := user32Aura.NewProc("GetWindowRect")
+	var rect rectWindows
+	if ok, _, e := getWindowRect.Call(a.hwnd, uintptr(unsafe.Pointer(&rect))); ok == 0 {
+		t.Fatalf("medir el aura: %v", e)
+	}
+	puntos := [][2]int32{
+		{px, py},
+		{rect.izquierda, rect.arriba}, {rect.derecha - 1, rect.arriba},
+		{rect.izquierda, rect.abajo - 1}, {rect.derecha - 1, rect.abajo - 1},
+		{(rect.izquierda + rect.derecha) / 2, rect.arriba},
+		{rect.derecha - 1, (rect.arriba + rect.abajo) / 2},
+		{(rect.izquierda + rect.derecha) / 2, rect.abajo - 1},
+		{rect.izquierda, (rect.arriba + rect.abajo) / 2},
+	}
+	for _, p := range puntos {
+		if w, _, _ := windowFromPoint.Call(uintptr(uint32(p[0])) | uintptr(uint32(p[1]))<<32); w == a.hwnd {
+			t.Errorf("WindowFromPoint encuentra el aura en %d,%d: se quedaría con los clics", p[0], p[1])
+		}
 	}
 	dc, _, _ := getDCAura.Call(0)
 	c, _, _ := getPixel.Call(dc, uintptr(px), uintptr(py))

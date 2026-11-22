@@ -108,14 +108,15 @@ type Estado struct {
 }
 
 type App struct {
-	ctx    context.Context
-	cfg    Config
-	nucleo *desktop.Nucleo
-	flujo  flujoCamara
-	reg    *desktop.Registro
-	cap    *captura
-	panel  *desktop.Panel
-	aura   *Aura
+	ctx     context.Context
+	cfg     Config
+	nucleo  *desktop.Nucleo
+	flujo   flujoCamara
+	reg     *desktop.Registro
+	cap     *captura
+	panel   *desktop.Panel
+	aura    *Aura
+	entrada entradaVentana
 	// pantallas decide qué monitor controla el panel (tres dedos y foco).
 	pantallas *desktop.Pantallas
 	// iman es la asistencia de puntería de nivel 2 (nil si el sistema no
@@ -635,6 +636,11 @@ func (a *App) VistaCamara(on bool) string {
 		return ""
 	}
 	if on {
+		if a.entrada != nil {
+			if err := a.entrada.Camara(true); err != nil {
+				decir("aviso: no se activo la entrada de la vista de camara: %v", err)
+			}
+		}
 		x, y := wruntime.WindowGetPosition(a.ctx)
 		a.mu.Lock()
 		a.posIndicadorX, a.posIndicadorY, a.tienePosIndicador = x, y, true
@@ -650,6 +656,11 @@ func (a *App) VistaCamara(on bool) string {
 		a.mu.Unlock()
 		if ok {
 			wruntime.WindowSetPosition(a.ctx, x, y)
+		}
+		if a.entrada != nil {
+			if err := a.entrada.Camara(false); err != nil {
+				decir("aviso: no se protegio la entrada del indicador: %v", err)
+			}
 		}
 	}
 	a.actualizarAura()
@@ -778,8 +789,10 @@ func (a *App) pedirPermiso(permitir string) func(context.Context, core.Solicitud
 		a.mu.Unlock()
 		decir("«%s» %s pide emparejarse: esperando a la persona", s.Nombre, s.Huella.Corta())
 		if a.ctx != nil {
-			wruntime.WindowUnminimise(a.ctx)
-			wruntime.WindowShow(a.ctx)
+			if a.entrada == nil || a.entrada.Mostrar(a.ctx) != nil {
+				wruntime.WindowUnminimise(a.ctx)
+				wruntime.WindowShow(a.ctx)
+			}
 		}
 		select {
 		case si := <-p.resp:
@@ -977,10 +990,11 @@ func correr(o opciones) error {
 		return fmt.Errorf("-modo: %q no es auto, tactil ni transferencia", o.modo)
 	}
 	app := &App{
-		cfg:    Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg, Modo: modoControl},
-		reg:    reg,
-		ind:    &desktop.Indicador{},
-		tactil: gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto),
+		cfg:     Config{Camara: modo, Reproducir: len(cs) > 0, SO: runtime.GOOS, Registro: rutaReg, Modo: modoControl},
+		reg:     reg,
+		ind:     &desktop.Indicador{},
+		tactil:  gestures.NuevoEstadoTactil(false, gestures.AjustesTactilesPorDefecto),
+		entrada: nuevaEntradaVentana(),
 	}
 	if modo == "proceso" {
 		app.cap = nuevaCaptura(o.dispositivo)
@@ -1086,9 +1100,16 @@ func correr(o opciones) error {
 		MinHeight:   desktop.AltoVentanaMinimo,
 		Frameless:   true,
 		AlwaysOnTop: true,
+		StartHidden: iniciarVentanaOculta,
 		AssetServer: &assetserver.Options{Assets: sub, Handler: manejador(app.cap)},
 		OnStartup: func(c context.Context) {
 			app.ctx = c
+			// Windows arranca oculta: primero limita la region de entrada a la
+			// pildora y marca la ventana como no activable. Asi nunca hay un
+			// fotograma en que la superficie transparente pueda tapar otra app.
+			if err := app.entrada.Preparar(); err != nil {
+				decir("aviso: no se preparo la entrada del indicador: %v", err)
+			}
 			// El aura es una superficie layer-shell aparte de la ventana de
 			// Wails (Wails v2 no da más de una ventana): transparente, encima
 			// de todo, sin foco ni clics. Solo tiene sentido en modo táctil.
@@ -1111,12 +1132,19 @@ func correr(o opciones) error {
 				}()
 			}
 		},
+		OnDomReady: func(c context.Context) {
+			if err := app.entrada.Mostrar(c); err != nil {
+				decir("aviso: no se mostro el indicador sin foco: %v", err)
+				wruntime.WindowShow(c)
+			}
+		},
 		OnBeforeClose: func(c context.Context) bool {
 			guardarVentana(c)
 			return false
 		},
 		OnShutdown: func(context.Context) {
 			app.cerrarAura()
+			app.entrada.Cerrar()
 			if app.cap != nil {
 				app.cap.apagar()
 			}
@@ -1134,6 +1162,7 @@ func correr(o opciones) error {
 			WebviewIsTransparent:              true,
 			WindowIsTranslucent:               true,
 			DisableFramelessWindowDecorations: true,
+			WindowClassName:                   claseVentanaLazul,
 		},
 		// Sin esto Wails deja WebKitGTK sin aceleración y no hay WebGL: MediaPipe no corre.
 		Linux: &linux.Options{WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand, ProgramName: "lazul", WindowIsTranslucent: true},
