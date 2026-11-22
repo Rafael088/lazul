@@ -520,15 +520,16 @@ func (m *MedidorEmbrague) elegirDuena(medidas []manoMedida, t int64) (relevo boo
 		// La misma mano con otro lado: en el cuadro siguiente hay las mismas
 		// manos, la clave de la dueña ya no está y otra nace encima, a menos de
 		// media palma. No es un relevo y el filtro sigue, salvo que llegue
-		// apoyando: ese toque es suyo y no hereda el filtro. La app ya fija el
-		// lado (seguimiento.mjs); esto es para el orden crudo de la cámara.
+		// apoyando junto a otra: ese toque es suyo y no hereda el filtro. La
+		// app ya fija el lado (seguimiento.mjs); esto es para el orden crudo
+		// de la cámara.
 		if d.ausente == 0 && d.manos == len(medidas) && !claveEn(medidas, d.clave) {
 			for i := range medidas {
 				md := &medidas[i]
 				if md.llega && enPanel(md) &&
 					math.Hypot(md.palma.X-d.palma.X, md.palma.Y-d.palma.Y) < d.palma.Tamano/2 {
 					d.clave, d.tVista, d.palma = md.clave, t, md.palma
-					return armada(md)
+					return armada(md) && len(medidas) > 1
 				}
 			}
 		}

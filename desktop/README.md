@@ -180,6 +180,14 @@ otro también pueda mandarte, empareja al revés.
   abierta (hasta 400 ms) y el dedo cae ahí, no donde la palma se movió al cerrar. Dos manos pellizcando son dos dedos:
   el navegador, PDF u otra app reconoce directamente su zoom. Cada dedo lleva
   su propio filtro contra el temblor.
+- **El puntero tiene una mano dueña**: la primera que entró al panel. No se lo
+  quita otra que llega o pellizca, aunque la dueña esté quieta: quieta es como se
+  apunta. En un zoom se queda con ella. Si la otra pellizca sola, su dedo cae
+  donde apuntaba esa otra y el puntero no se mueve de la dueña. Solo cambia de
+  mano cuando la dueña se va o sale del panel (250 ms y 3 cuadros, lo mismo que
+  para soltar) y entonces pasa de un paso, sin deslizarse por la pantalla. En
+  modo de respaldo, como el botón pulsa bajo el cursor, el cursor sí va con la
+  que pellizca sola y vuelve a la dueña después de soltar.
 - Al arrancar, la vista de cámara dice **Entrada: pantalla táctil virtual**. Si
   no se puede crear (por ejemplo, falta acceso a `/dev/uinput`), la píldora
   muestra **respaldo** y la vista explica que Lazul conserva el comportamiento
