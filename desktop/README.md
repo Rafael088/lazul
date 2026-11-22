@@ -200,8 +200,8 @@ otro también pueda mandarte, empareja al revés.
     calibrando), el lado, el recorrido en `palmas` y los `ms`; nunca posiciones.
     Para ajustar los umbrales: graba tomas «tres dedos a la derecha/izquierda»
     con `./dev grabar` y mídelas con `./dev replay -pantalla -v`.
-- **Imán sobre los botones chicos (Windows)**: Lazul lee con UI Automation
-  dónde están los botones, enlaces, casillas, pestañas y menús de la ventana
+- **Imán sobre los botones chicos**: Lazul lee con la accesibilidad del
+  sistema (UI Automation en Windows, AT-SPI en Linux) dónde están los botones, enlaces, casillas, pestañas y menús de la ventana
   con el foco (una vez al cambiar de ventana y cada 1,5 s con la mano en el
   panel, nunca por cuadro). Encima de un objetivo chico (lado corto ≤ 48 px)
   el puntero avanza a la mitad, y si el pellizco apoya el dedo a 18 px o menos
@@ -210,7 +210,19 @@ otro también pueda mandarte, empareja al revés.
   12 px de diferencia) no se corrige. Tras levantar el dedo espera 400 ms a
   que la página se asiente; un doble toque repite el mismo ajuste. Se apaga
   con la casilla **Imán sobre los botones chicos** de la vista de cámara o
-  arrancando con `-iman=false`. En Linux todavía no está (falta leer AT-SPI).
+  arrancando con `-iman=false`.
+  En Linux la posición de cada botón dentro de la ventana sale de AT-SPI y la
+  de la ventana, de Hyprland; la barra, los bordes y nada de Hyprland cuentan
+  como objetivo. **Firefox** se expone solo. **Chromium, Chrome, Brave y las
+  apps de Electron** solo exponen la página si se abren con
+  `--force-renderer-accessibility` (o con `ACCESSIBILITY_ENABLED=1` en el
+  entorno); sin eso el imán ve, a lo sumo, los botones de la barra del
+  navegador. Para dejarlo fijo: añadir la opción a
+  `~/.config/chromium-flags.conf` (o `chrome-flags.conf`, `brave-flags.conf`).
+  Si la línea `imán:` dice «no está en el bus de accesibilidad», la app de la
+  ventana no se registró en AT-SPI. Para comprobarlo con un navegador
+  delante: `LAZUL_IMAN_VIVO=1 go test ./platform/linux -run ObjetivosVivo -v`
+  (`LAZUL_IMAN_ESPERA=5s` da tiempo a cambiar de ventana).
   Cada 5 s la salida dice `imán: …` con las lecturas, su tiempo y los ajustes
   y dudas; el registro anota `iman_ajusta`, `iman_duda` e `iman_repetido`, sin
   posiciones.
