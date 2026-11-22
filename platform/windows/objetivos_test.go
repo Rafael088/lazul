@@ -8,15 +8,17 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Rafael088/lazul/platform"
 )
 
 func TestNormalizarObjetivosALaZonaDelTactil(t *testing.T) {
 	// Segundo monitor de 1920×1080 físicos a la derecha, al 150 %.
 	z := zonaTactil{x: 1920, y: 0, ancho: 1920, alto: 1080}
 	s := normalizarObjetivos([]rectFisico{
-		{x: 1920 + 959.5, y: 539.5, ancho: 36, alto: 36}, // en el centro
-		{x: 100, y: 100, ancho: 30, alto: 30},            // en el otro monitor
-		{x: 2000, y: 10, ancho: 0, alto: 20},             // sin tamaño
+		{x: 1920 + 959.5, y: 539.5, ancho: 36, alto: 36, rol: platform.TargetRoleButton}, // en el centro
+		{x: 100, y: 100, ancho: 30, alto: 30},                                            // en el otro monitor
+		{x: 2000, y: 10, ancho: 0, alto: 20},                                             // sin tamaño
 	}, z, 144)
 	if math.Abs(s.LogicalWidth-1280) > .01 || math.Abs(s.LogicalHeight-720) > .01 {
 		t.Fatalf("tamaño lógico %vx%v, quería 1280x720", s.LogicalWidth, s.LogicalHeight)
@@ -31,6 +33,28 @@ func TestNormalizarObjetivosALaZonaDelTactil(t *testing.T) {
 	}
 	if math.Abs(o.Width*float64(z.ancho-1)-36) > .01 {
 		t.Fatalf("ancho %v", o.Width)
+	}
+	if o.Role != platform.TargetRoleButton {
+		t.Fatalf("rol %q", o.Role)
+	}
+	b := normalizarLimitesVentana(rect{izq: 2000, arriba: 20, der: 3000, abajo: 1020}, z)
+	if math.Abs(b.X-80.0/1919) > .01 || math.Abs(b.Width-1000.0/1919) > .01 {
+		t.Fatalf("límites de ventana %+v", b)
+	}
+}
+
+func TestRolesUIASeVuelvenGenericos(t *testing.T) {
+	casos := map[int32]platform.TargetRole{
+		50000: platform.TargetRoleButton,
+		50005: platform.TargetRoleLink,
+		50019: platform.TargetRoleTab,
+		50014: platform.TargetRoleScrollBar,
+		50038: platform.TargetRoleSeparator,
+	}
+	for tipo, quiero := range casos {
+		if got := rolControlUIA(tipo); got != quiero {
+			t.Errorf("tipo %d: %q, quiero %q", tipo, got, quiero)
+		}
 	}
 }
 

@@ -231,13 +231,15 @@ otro también pueda mandarte, empareja al revés.
     Para ajustar los umbrales: graba tomas «tres dedos a la derecha/izquierda»
     con `./dev grabar` y mídelas con `./dev replay -pantalla -v`.
 - **Imán sobre los botones chicos**: Lazul lee con la accesibilidad del
-  sistema (UI Automation en Windows, AT-SPI en Linux) dónde están los botones, enlaces, casillas, pestañas y menús de la ventana
+  sistema (UI Automation en Windows, AT-SPI en Linux) dónde están los botones, enlaces, casillas y menús de la ventana
   con el foco (una vez al cambiar de ventana y cada 1,5 s con la mano en el
   panel, nunca por cuadro). Encima de un objetivo chico (lado corto ≤ 48 px)
   el puntero avanza a la mitad, y si el pellizco apoya el dedo a 18 px o menos
   de uno, pero fuera de todos, el toque cae en él (al centro; en un enlace
   largo, donde tocaste). Si dos objetivos quedan casi igual de cerca (menos de
-  12 px de diferencia) no se corrige. Tras levantar el dedo espera 400 ms a
+  12 px de diferencia) no se corrige. Marcos, barras de desplazamiento,
+  separadores, pestañas y objetivos pegados al borde de la ventana se
+  descartan antes de frenar o ajustar. Tras levantar el dedo espera 400 ms a
   que la página se asiente; un doble toque repite el mismo ajuste. Se apaga
   con la casilla **Imán sobre los botones chicos** de la vista de cámara o
   arrancando con `-iman=false`.
@@ -266,7 +268,8 @@ otro también pueda mandarte, empareja al revés.
   delante: `LAZUL_IMAN_VIVO=1 go test ./platform/linux -run ObjetivosVivo -v`
   (`LAZUL_IMAN_ESPERA=5s` da tiempo a cambiar de ventana).
   Cada 5 s la salida dice `imán: …` con las lecturas, su tiempo y los ajustes
-  y dudas; el registro anota `iman_ajusta`, `iman_duda` e `iman_repetido`, sin
+  y dudas; el registro anota también `iman_frena`. Para un freno o ajuste
+  guarda solo el rol genérico y el tamaño del objetivo, nunca texto ni
   posiciones.
 
 Los gestos se aplican a la ventana que tenga el foco; el panel mueve el

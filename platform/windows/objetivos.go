@@ -45,6 +45,35 @@ var tiposObjetivo = []int32{
 	50031, // SplitButton
 }
 
+func rolControlUIA(t int32) platform.TargetRole {
+	switch t {
+	case 50000:
+		return platform.TargetRoleButton
+	case 50002:
+		return platform.TargetRoleCheckBox
+	case 50003:
+		return platform.TargetRoleComboBox
+	case 50005:
+		return platform.TargetRoleLink
+	case 50011:
+		return platform.TargetRoleMenuItem
+	case 50013:
+		return platform.TargetRoleRadioButton
+	case 50019:
+		return platform.TargetRoleTab
+	case 50031:
+		return platform.TargetRoleSplitButton
+	case 50032:
+		return platform.TargetRoleWindow
+	case 50014:
+		return platform.TargetRoleScrollBar
+	case 50038:
+		return platform.TargetRoleSeparator
+	default:
+		return ""
+	}
+}
+
 const (
 	uiaBoundingRect = 30001
 	uiaIsEnabled    = 30010
@@ -63,9 +92,10 @@ const (
 )
 
 var (
-	safeArrayAccessData   = oleaut32Niveles.NewProc("SafeArrayAccessData")
-	safeArrayUnaccessData = oleaut32Niveles.NewProc("SafeArrayUnaccessData")
-	safeArrayGetUBound    = oleaut32Niveles.NewProc("SafeArrayGetUBound")
+	safeArrayAccessData    = oleaut32Niveles.NewProc("SafeArrayAccessData")
+	safeArrayUnaccessData  = oleaut32Niveles.NewProc("SafeArrayUnaccessData")
+	safeArrayGetUBound     = oleaut32Niveles.NewProc("SafeArrayGetUBound")
+	getWindowRectObjetivos = user32Captura.NewProc("GetWindowRect")
 )
 
 // FocusedWindow es GetForegroundWindow: no toca UIA.
@@ -102,6 +132,10 @@ func (o objetivosWindows) Targets(ctx context.Context) (platform.TargetSet, erro
 			}
 			z := zonaDe(o.destino, pantallaPrincipal)
 			s = normalizarObjetivos(rects, z, dpiEnPixel(punto{z.x + z.ancho/2, z.y + z.alto/2}))
+			var r rect
+			if ok, _, _ := getWindowRectObjetivos.Call(ventana, uintptr(unsafe.Pointer(&r))); ok != 0 {
+				s.WindowBounds = normalizarLimitesVentana(r, z)
+			}
 			return nil
 		})
 		s.Window = uint64(ventana)
@@ -121,7 +155,23 @@ func (o objetivosWindows) Targets(ctx context.Context) (platform.TargetSet, erro
 
 // rectFisico es un rectángulo de UIA en píxeles físicos de la pantalla
 // virtual: izquierda, arriba, ancho y alto.
-type rectFisico struct{ x, y, ancho, alto float64 }
+type rectFisico struct {
+	x, y, ancho, alto float64
+	rol               platform.TargetRole
+}
+
+func normalizarLimitesVentana(r rect, z zonaTactil) platform.TargetBounds {
+	if z.ancho <= 1 || z.alto <= 1 || r.der <= r.izq || r.abajo <= r.arriba {
+		return platform.TargetBounds{}
+	}
+	ax, ay := float64(z.ancho-1), float64(z.alto-1)
+	return platform.TargetBounds{
+		X:      (float64(r.izq) - float64(z.x)) / ax,
+		Y:      (float64(r.arriba) - float64(z.y)) / ay,
+		Width:  float64(r.der-r.izq) / ax,
+		Height: float64(r.abajo-r.arriba) / ay,
+	}
+}
 
 // normalizarObjetivos lleva los rectángulos a (0,0)-(1,1) de la zona que
 // recibe el táctil, con la misma escala que zonaTactil.pixel, y da el tamaño
@@ -148,7 +198,7 @@ func normalizarObjetivos(rs []rectFisico, z zonaTactil, dpi uint32) platform.Tar
 		if x+w < 0 || y+h < 0 || x > 1 || y > 1 {
 			continue
 		}
-		s.Targets = append(s.Targets, platform.Target{X: x, Y: y, Width: w, Height: h})
+		s.Targets = append(s.Targets, platform.Target{X: x, Y: y, Width: w, Height: h, Role: r.rol})
 	}
 	return s
 }
@@ -190,6 +240,9 @@ func leerObjetivosUIA(ventana uintptr) ([]rectFisico, error) {
 	if r := cache.llamar(cacheAddProperty, uiaBoundingRect); r != 0 {
 		return nil, fmt.Errorf("AddProperty: 0x%x", r)
 	}
+	if r := cache.llamar(cacheAddProperty, uiaControlType); r != 0 {
+		return nil, fmt.Errorf("AddProperty(ControlType): 0x%x", r)
+	}
 	var arr *objCOM
 	if r := raiz.llamar(elemFindAllBuildCache, treeScopeDescend, uintptr(unsafe.Pointer(cond)),
 		uintptr(unsafe.Pointer(cache)), uintptr(unsafe.Pointer(&arr))); r != 0 {
@@ -211,6 +264,9 @@ func leerObjetivosUIA(ventana uintptr) ([]rectFisico, error) {
 			continue
 		}
 		if r, ok := rectEnCache(e); ok {
+			if tipo, ok := enteroEnCache(e, uiaControlType); ok {
+				r.rol = rolControlUIA(tipo)
+			}
 			rs = append(rs, r)
 		}
 		e.soltar()
@@ -300,5 +356,17 @@ func rectEnCache(e *objCOM) (rectFisico, bool) {
 	}
 	d := *datos
 	safeArrayUnaccessData.Call(sa)
-	return rectFisico{d[0], d[1], d[2], d[3]}, true
+	return rectFisico{x: d[0], y: d[1], ancho: d[2], alto: d[3]}, true
+}
+
+func enteroEnCache(e *objCOM, propiedad uintptr) (int32, bool) {
+	var v variante
+	if r := e.llamar(elemGetCachedPropertyVa, propiedad, uintptr(unsafe.Pointer(&v))); r != 0 {
+		return 0, false
+	}
+	defer variantClearUIA.Call(uintptr(unsafe.Pointer(&v)))
+	if v.vt != vtI4 {
+		return 0, false
+	}
+	return *(*int32)(unsafe.Pointer(&v.datos[0])), true
 }

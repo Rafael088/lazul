@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rafael088/lazul/platform"
 	"github.com/godbus/dbus/v5"
 )
 
@@ -173,10 +174,14 @@ func TestA11yDBusContraUnaAppFalsa(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if marco != (rectA11y{0, 0, 800, 600}) {
+			if marco != (rectA11y{x: 0, y: 0, ancho: 800, alto: 600}) {
 				t.Errorf("marco = %+v, quiero la ventana activa", marco)
 			}
-			quiero := map[rectA11y]bool{{10, 10, 30, 20}: true, {50, 10, 30, 20}: true, {10, 100, 200, 18}: true}
+			quiero := map[rectA11y]bool{
+				{x: 10, y: 10, ancho: 30, alto: 20, rol: platform.TargetRoleButton}:       true,
+				{x: 50, y: 10, ancho: 30, alto: 20, rol: platform.TargetRoleToggleButton}: true,
+				{x: 10, y: 100, ancho: 200, alto: 18, rol: platform.TargetRoleLink}:       true,
+			}
 			if len(rs) != len(quiero) {
 				t.Fatalf("objetivos = %+v, quiero los 2 botones y el enlace", rs)
 			}

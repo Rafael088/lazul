@@ -203,10 +203,39 @@ type Spaces interface {
 	Switch(ctx context.Context, direction NavigationDirection) error
 }
 
-// Target es un elemento que se puede tocar (botón, enlace, casilla,
-// pestaña…) de la ventana con el foco. X, Y, Width y Height van normalizados
-// como los de TouchPoint: (0,0)-(1,1) es el monitor que recibe el táctil.
+// TargetRole es la clase genérica de un objetivo de accesibilidad. Nunca
+// contiene el nombre ni el texto que se ve en pantalla.
+type TargetRole string
+
+const (
+	TargetRoleButton       TargetRole = "button"
+	TargetRoleToggleButton TargetRole = "toggle_button"
+	TargetRoleCheckBox     TargetRole = "check_box"
+	TargetRoleComboBox     TargetRole = "combo_box"
+	TargetRoleLink         TargetRole = "link"
+	TargetRoleMenu         TargetRole = "menu"
+	TargetRoleMenuItem     TargetRole = "menu_item"
+	TargetRoleRadioButton  TargetRole = "radio_button"
+	TargetRoleTab          TargetRole = "tab"
+	TargetRoleSplitButton  TargetRole = "split_button"
+	TargetRoleFrame        TargetRole = "frame"
+	TargetRoleDialog       TargetRole = "dialog"
+	TargetRoleWindow       TargetRole = "window"
+	TargetRoleScrollBar    TargetRole = "scrollbar"
+	TargetRoleSeparator    TargetRole = "separator"
+)
+
+// Target es un elemento que se puede tocar (botón, enlace, casilla…) de
+// la ventana con el foco. X, Y, Width y Height van normalizados como los de
+// TouchPoint: (0,0)-(1,1) es el monitor que recibe el táctil.
 type Target struct {
+	X, Y, Width, Height float64
+	Role                TargetRole
+}
+
+// TargetBounds es un rectángulo normalizado al monitor que recibe el
+// táctil. Un ancho o alto cero significa que el adaptador no pudo saberlo.
+type TargetBounds struct {
 	X, Y, Width, Height float64
 }
 
@@ -217,6 +246,7 @@ type Target struct {
 type TargetSet struct {
 	Window                      uint64 // la ventana con el foco cuando se leyó
 	Targets                     []Target
+	WindowBounds                TargetBounds
 	LogicalWidth, LogicalHeight float64
 }
 

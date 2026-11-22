@@ -29,6 +29,10 @@ const monitoresImanJSON = `[
 
 func cerca(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
+func rectObjetivo(x, y, ancho, alto float64) rectA11y {
+	return rectA11y{x: x, y: y, ancho: ancho, alto: alto, rol: platform.TargetRoleButton}
+}
+
 func TestLeerVentanaActiva(t *testing.T) {
 	v, id, err := leerVentanaActiva([]byte(ventanaJSON))
 	if err != nil || id != 0x55d4c8a0b2f0 || v.PID != 4242 || v.En != [2]float64{100, 50} || v.Tamano != [2]float64{800, 600} {
@@ -44,15 +48,15 @@ func TestLeerVentanaActiva(t *testing.T) {
 func TestAPantallaLlevaLaVentanaAlMonitor(t *testing.T) {
 	v, _, _ := leerVentanaActiva([]byte(ventanaJSON))
 	m := platform.Display{Name: "eDP-1", Width: 1440, Height: 900}
-	marco := rectA11y{0, 0, 800, 600}
+	marco := rectObjetivo(0, 0, 800, 600)
 	rs := []rectA11y{
-		{10, 10, 30, 20},    // botón
-		{0, 0, 800, 600},    // la ventana entera: el borde no es objetivo
-		{20, 20, 780, 560},  // casi toda la ventana
-		{10, 900, 50, 20},   // desplazado fuera de la vista
-		{-200, 10, 50, 20},  // a la izquierda, fuera
-		{40, 40, 0, 20},     // sin ancho
-		{700, 580, 120, 40}, // centro dentro, se sale un poco
+		rectObjetivo(10, 10, 30, 20),    // botón
+		rectObjetivo(0, 0, 800, 600),    // la ventana entera: el borde no es objetivo
+		rectObjetivo(20, 20, 780, 560),  // casi toda la ventana
+		rectObjetivo(10, 900, 50, 20),   // desplazado fuera de la vista
+		rectObjetivo(-200, 10, 50, 20),  // a la izquierda, fuera
+		rectObjetivo(40, 40, 0, 20),     // sin ancho
+		rectObjetivo(700, 580, 120, 40), // centro dentro, se sale un poco
 	}
 	s := aPantalla(v, 2, marco, rs, m)
 	if s.LogicalWidth != 1440 || s.LogicalHeight != 900 {
@@ -62,8 +66,11 @@ func TestAPantallaLlevaLaVentanaAlMonitor(t *testing.T) {
 		t.Fatalf("objetivos = %+v, quiero 2", s.Targets)
 	}
 	b := s.Targets[0]
-	if !cerca(b.X, 110.0/1440) || !cerca(b.Y, 60.0/900) || !cerca(b.Width, 30.0/1440) || !cerca(b.Height, 20.0/900) {
+	if !cerca(b.X, 110.0/1440) || !cerca(b.Y, 60.0/900) || !cerca(b.Width, 30.0/1440) || !cerca(b.Height, 20.0/900) || b.Role != platform.TargetRoleButton {
 		t.Errorf("botón = %+v", b)
+	}
+	if !cerca(s.WindowBounds.X, 100.0/1440) || !cerca(s.WindowBounds.Y, 50.0/900) || !cerca(s.WindowBounds.Width, 800.0/1440) {
+		t.Errorf("límites de ventana = %+v", s.WindowBounds)
 	}
 	if !cerca(s.Targets[1].X, 800.0/1440) {
 		t.Errorf("segundo = %+v", s.Targets[1])
@@ -74,7 +81,7 @@ func TestAPantallaConPixelesFisicos(t *testing.T) {
 	// Una app de XWayland a escala 2 sin escalar da el doble de todo.
 	v, _, _ := leerVentanaActiva([]byte(ventanaJSON))
 	m := platform.Display{Width: 1440, Height: 900}
-	s := aPantalla(v, 2, rectA11y{0, 0, 1600, 1200}, []rectA11y{{20, 20, 60, 40}}, m)
+	s := aPantalla(v, 2, rectObjetivo(0, 0, 1600, 1200), []rectA11y{rectObjetivo(20, 20, 60, 40)}, m)
 	if len(s.Targets) != 1 {
 		t.Fatalf("objetivos = %+v", s.Targets)
 	}
@@ -83,7 +90,7 @@ func TestAPantallaConPixelesFisicos(t *testing.T) {
 		t.Errorf("botón = %+v, quiero el de píxeles lógicos", b)
 	}
 	// A escala 1 nunca se divide.
-	s = aPantalla(v, 1, rectA11y{0, 0, 800, 600}, []rectA11y{{20, 20, 60, 40}}, m)
+	s = aPantalla(v, 1, rectObjetivo(0, 0, 800, 600), []rectA11y{rectObjetivo(20, 20, 60, 40)}, m)
 	if !cerca(s.Targets[0].X, 120.0/1440) {
 		t.Errorf("escala 1: %+v", s.Targets[0])
 	}
@@ -93,12 +100,12 @@ func TestAPantallaQuitaLaSombraYElOrigenDelMarco(t *testing.T) {
 	v, _, _ := leerVentanaActiva([]byte(ventanaJSON))
 	m := platform.Display{Width: 1440, Height: 900}
 	// GTK con decoración propia: el marco lleva 20 px de sombra a cada lado.
-	s := aPantalla(v, 1, rectA11y{0, 0, 840, 640}, []rectA11y{{30, 30, 30, 20}}, m)
+	s := aPantalla(v, 1, rectObjetivo(0, 0, 840, 640), []rectA11y{rectObjetivo(30, 30, 30, 20)}, m)
 	if len(s.Targets) != 1 || !cerca(s.Targets[0].X, 110.0/1440) || !cerca(s.Targets[0].Y, 60.0/900) {
 		t.Errorf("con sombra: %+v", s.Targets)
 	}
 	// Un marco que empieza en (8, 30) de su ventana.
-	s = aPantalla(v, 1, rectA11y{8, 30, 800, 600}, []rectA11y{{18, 40, 30, 20}}, m)
+	s = aPantalla(v, 1, rectObjetivo(8, 30, 800, 600), []rectA11y{rectObjetivo(18, 40, 30, 20)}, m)
 	if len(s.Targets) != 1 || !cerca(s.Targets[0].X, 110.0/1440) || !cerca(s.Targets[0].Y, 60.0/900) {
 		t.Errorf("con origen: %+v", s.Targets)
 	}
@@ -107,12 +114,12 @@ func TestAPantallaQuitaLaSombraYElOrigenDelMarco(t *testing.T) {
 func TestAPantallaEnElSegundoMonitor(t *testing.T) {
 	v := ventanaHyprland{En: [2]float64{1540, 100}, Tamano: [2]float64{1000, 800}, Monitor: 1}
 	m := platform.Display{Name: "HDMI-A-1", X: 1440, Width: 1920, Height: 1080}
-	s := aPantalla(v, 1, rectA11y{0, 0, 1000, 800}, []rectA11y{{100, 50, 40, 40}}, m)
+	s := aPantalla(v, 1, rectObjetivo(0, 0, 1000, 800), []rectA11y{rectObjetivo(100, 50, 40, 40)}, m)
 	if len(s.Targets) != 1 || !cerca(s.Targets[0].X, 200.0/1920) || !cerca(s.Targets[0].Y, 150.0/1080) {
 		t.Errorf("objetivos = %+v", s.Targets)
 	}
 	// La misma ventana vista desde el otro monitor queda fuera de (0,0)-(1,1).
-	s = aPantalla(v, 1, rectA11y{0, 0, 1000, 800}, []rectA11y{{100, 50, 40, 40}}, platform.Display{Width: 1440, Height: 900})
+	s = aPantalla(v, 1, rectObjetivo(0, 0, 1000, 800), []rectA11y{rectObjetivo(100, 50, 40, 40)}, platform.Display{Width: 1440, Height: 900})
 	if len(s.Targets) != 0 {
 		t.Errorf("desde el otro monitor: %+v", s.Targets)
 	}
@@ -204,7 +211,7 @@ func hyprPrueba(ventana string) func(context.Context, string) ([]byte, error) {
 }
 
 func TestTargetsJuntaHyprlandYAccesibilidad(t *testing.T) {
-	a := &a11yPrueba{marco: rectA11y{0, 0, 800, 600}, rs: []rectA11y{{10, 10, 30, 20}, {0, 0, 800, 600}}}
+	a := &a11yPrueba{marco: rectObjetivo(0, 0, 800, 600), rs: []rectA11y{rectObjetivo(10, 10, 30, 20), rectObjetivo(0, 0, 800, 600)}}
 	o := objetivosHyprland{hypr: hyprPrueba(ventanaJSON), a11y: a}
 	id, err := o.FocusedWindow(context.Background())
 	if err != nil || id != 0x55d4c8a0b2f0 {

@@ -547,7 +547,11 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 		// así el contacto nace donde estaba el puntero frenado y el
 		// arrastre después va con la mano.
 		if r.Dentro && !p.presionado && contarDedos(p.dedosAbajo) == 0 {
-			pos = p.freno.Aplicar(p.objetivosIman(), pos)
+			var objetivo *detalleObjetivoIman
+			pos, objetivo = p.freno.aplicar(p.objetivosIman(), pos)
+			if objetivo != nil {
+				p.anotarObjetivoIman("iman_frena", objetivo)
+			}
 		} else {
 			p.freno.Reiniciar()
 		}
@@ -681,6 +685,7 @@ type ajusteHecho struct {
 	t            time.Time
 	desde, hasta gestures.PuntoPanel
 	ancho, alto  float64
+	objetivo     detalleObjetivoIman
 	hay          bool
 }
 
@@ -707,26 +712,34 @@ func (p *Panel) ajustarIman(contacto gestures.PuntoPanel) gestures.PuntoPanel {
 	if u.hay && ahora.Sub(u.t) <= RepetirToqueIman &&
 		math.Hypot((contacto.X-u.desde.X)*u.ancho, (contacto.Y-u.desde.Y)*u.alto) <= RadioIman {
 		p.ultimoAjuste.t = ahora
-		p.anotarIman(AjusteRepetir)
+		p.anotarIman(AjusteRepetir, &u.objetivo)
 		return u.hasta
 	}
 	o := p.objetivosIman()
-	final, res := o.AjustarToque(contacto)
+	final, res, objetivo := o.ajustarToque(contacto)
 	if res == AjusteMovido {
-		p.ultimoAjuste = ajusteHecho{t: ahora, desde: contacto, hasta: final, ancho: o.ancho, alto: o.alto, hay: true}
+		p.ultimoAjuste = ajusteHecho{t: ahora, desde: contacto, hasta: final, ancho: o.ancho, alto: o.alto, objetivo: *objetivo, hay: true}
 	} else {
 		p.ultimoAjuste.hay = false
 	}
-	p.anotarIman(res)
+	p.anotarIman(res, objetivo)
 	return final
 }
 
-func (p *Panel) anotarIman(res ResultadoAjuste) {
+func (p *Panel) anotarIman(res ResultadoAjuste, objetivo *detalleObjetivoIman) {
 	p.Iman.Anotar(res)
 	switch res {
 	case AjusteMovido, AjusteDuda, AjusteRepetir:
-		p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "iman_" + string(res)})
+		p.anotarObjetivoIman("iman_"+string(res), objetivo)
 	}
+}
+
+func (p *Panel) anotarObjetivoIman(resultado string, objetivo *detalleObjetivoIman) {
+	l := Linea{Tipo: TipoPanel, Resultado: resultado}
+	if objetivo != nil {
+		l.Rol, l.Ancho, l.Alto = string(objetivo.rol), objetivo.ancho, objetivo.alto
+	}
+	p.Reg.Anotar(l)
 }
 
 func contarDedos(d [2]bool) int {
