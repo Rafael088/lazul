@@ -112,12 +112,9 @@ func JuzgarToma(t TomaToques) (intento, acierto bool, falsos, deMas int) {
 			direccionDe(t.Toques[0].Inicio, t.Toques[0].Fin) == quiere
 		return true, acierto, 0, deMas
 	case t.Toma == "zoom-dos-manos":
-		if len(t.Toques) > 2 {
-			deMas = len(t.Toques) - 2
-		}
-		acierto = len(t.Toques) == 2 && t.Toques[0].Ranura != t.Toques[1].Ranura &&
-			t.Toques[1].InicioMs < t.Toques[0].FinMs
-		return true, acierto, 0, deMas
+		// Sin zoom (23-nov) estas tomas no piden un gesto ni cuentan falsos:
+		// la segunda mano ya no apoya. Quedan para medir dos manos a la vista.
+		return false, false, 0, 0
 	default:
 		return false, false, len(t.Toques), 0
 	}

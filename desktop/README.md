@@ -5,7 +5,7 @@ Muestra si el modo táctil está **activo** o **inactivo**, y un halo sobre toda
 la pantalla sigue la mano: nada fuera del panel, suave dentro y encendido al
 agarrar. No tapa la clase. En Linux y en Windows, un panel imaginario delante de la persona
 mueve el puntero; al pellizcar, una pantalla táctil virtual toca la ventana que
-tenga el foco (un dedo para tocar o arrastrar y dos para el zoom nativo). Los
+tenga el foco (un dedo para tocar o arrastrar; no hay zoom). Los
 otros gestos desplazan o cambian de diapositiva. Es la prueba de uso real
 de la 0.2.0 (dec-gzgl). La vista de la cámara queda como opción para acomodarse
 y está apagada por defecto.
@@ -177,13 +177,13 @@ otro también pueda mandarte, empareja al revés.
   pellizco muy cerrado apoya desde el primer cuadro (un tap rápido cuenta) y
   uno tibio, apenas cerrado, espera 3 cuadros cerrados seguidos.
   Mientras se cierra el pellizco el puntero se queda donde apuntaba la mano
-  abierta (hasta 400 ms) y el dedo cae ahí, no donde la palma se movió al cerrar. Dos manos pellizcando son dos dedos:
-  el navegador, PDF u otra app reconoce directamente su zoom. Cada dedo lleva
-  su propio filtro contra el temblor.
+  abierta (hasta 400 ms) y el dedo cae ahí, no donde la palma se movió al cerrar. Un solo dedo a la vez: mientras una mano
+  pellizca, la otra no apoya (sin zoom desde el 23-nov). El dedo lleva su
+  propio filtro contra el temblor.
 - Al arrancar, la vista de cámara dice **Entrada: pantalla táctil virtual**. Si
   no se puede crear (por ejemplo, falta acceso a `/dev/uinput`), la píldora
   muestra **respaldo** y la vista explica que Lazul conserva el comportamiento
-  anterior: un pellizco pulsa el botón y dos manos mandan `Ctrl` + `+` / `-`.
+  anterior: un pellizco pulsa el botón.
   Apagar la cámara, salir o recalibrar levanta cualquier dedo o botón pendiente.
 - **La L** (índice arriba, pulgar al lado, los demás recogidos), quieta un
   momento: enciende o apaga el modo táctil; el indicador lo muestra.
@@ -294,8 +294,8 @@ Cada gesto se traduce según la ventana con foco (`platform/linux/perfiles_tacti
 El scroll normal es continuo por la rueda virtual (`platform/linux/rueda.go`,
 `/dev/uinput`, que el usuario de la sesión puede escribir); las flechas solo
 se usan si no se puede crear. La velocidad está en `desktop.VelocidadRueda`.
-El zoom de dos manos lo reconoce la app como dos dedos. `Ctrl` + `+` / `-`
-solo se usa como respaldo si no se pudo crear la pantalla táctil virtual.
+Lazul no hace zoom (decisión del dueño del 23-nov): ni a dos manos ni con la
+pinza ni con `Ctrl` + `+` / `-`.
 
 ## La prueba de las activaciones falsas (30 min)
 
@@ -316,7 +316,7 @@ motivo junto a las activaciones falsas.
 Pose corre normalmente una vez cada 3 cuadros. Si Hand tarda 24 ms o más,
 Lazul la espacia temporalmente a una vez cada 6 cuadros para aliviar la GPU.
 Con una mano a la vista sigue solo esa y busca la segunda cada ~0,5 s; con
-dos sigue las dos, porque el zoom las necesita. `-manos dos` sigue siempre
+dos sigue las dos. `-manos dos` sigue siempre
 dos, para comparar; la línea de rendimiento anota el modo y las búsquedas. En
 Windows el reloj de la cámara mantiene 30 Hz sin sumar otros 33 ms después de
 cada inferencia.

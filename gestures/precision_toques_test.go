@@ -19,10 +19,8 @@ func TestJuzgarToma(t *testing.T) {
 		{"arrastre al revés", TomaToques{Toma: "arrastrar-arriba", Toques: []Toque{arr(.5, .2, .5, .6)}}, true, false, 0, 0},
 		{"un corte deja dos toques", TomaToques{Toma: "arrastrar-abajo", Toques: []Toque{arr(.5, .2, .5, .4), arr(.5, .4, .5, .6)}}, true, false, 0, 1},
 		{"arrastre sin toque", TomaToques{Toma: "arrastrar-derecha"}, true, false, 0, 0},
-		{"zoom con dos dedos a la vez", TomaToques{Toma: "zoom-dos-manos", Toques: []Toque{
-			{Ranura: 0, InicioMs: 0, FinMs: 900}, {Ranura: 1, InicioMs: 100, FinMs: 900}}}, true, true, 0, 0},
-		{"zoom con dos dedos uno tras otro", TomaToques{Toma: "zoom-dos-manos", Toques: []Toque{
-			{Ranura: 0, InicioMs: 0, FinMs: 300}, {Ranura: 0, InicioMs: 400, FinMs: 900}}}, true, false, 0, 0},
+		{"las tomas de zoom ya no piden gesto", TomaToques{Toma: "zoom-dos-manos", Toques: []Toque{
+			{Ranura: 0, InicioMs: 0, FinMs: 900}}}, false, false, 0, 0},
 		{"toque en movimiento normal es falso", TomaToques{Toma: "normal", Toques: []Toque{{Tipo: ToqueTap}}}, false, false, 1, 0},
 		{"salir sin toques", TomaToques{Toma: "salir-panel"}, false, false, 0, 0},
 	}

@@ -172,24 +172,14 @@ func TestPanelTactilMuevePunteroSinBotonFiltraYLevanta(t *testing.T) {
 		t.Fatalf("el filtro no redujo el temblor: %+v", ultimo)
 	}
 
-	// Dos manos llegan como dos dedos; el zoom de teclado no se ejecuta.
-	r := gestures.ResultadoEmbrague{TMs: 200, Fase: gestures.EmbragueAgarrando, Dentro: true, TienePos: true, X: .4, Y: .5,
-		ManosArmadas: 2, Armadas: []gestures.ManoArmada{{Clave: clave, X: .4, Y: .5}, {Clave: gestures.ClaveMano{Derecha: true}, X: .7, Y: .5}},
-		Zoom: &gestures.Zoom{Direccion: gestures.ZoomAcercar}}
-	p.mu.Lock()
-	p.aplicar(r, r.TMs, true)
-	p.mu.Unlock()
-	if got := tactil.frames[len(tactil.frames)-1]; len(got) != 2 || !got[0].Down || !got[1].Down {
-		t.Fatalf("zoom no salió como dos dedos: %+v", got)
-	}
 	if acciones.zoom != 0 {
-		t.Fatalf("el táctil también mandó Ctrl +/−: %d", acciones.zoom)
+		t.Fatalf("el táctil mandó Ctrl +/−: %d", acciones.zoom)
 	}
 
 	p.Parar()
 	final := tactil.frames[len(tactil.frames)-1]
-	if len(final) != 2 || final[0].Down || final[1].Down {
-		t.Fatalf("Parar no levantó los dedos: %+v", final)
+	if len(final) != 1 || final[0].Down {
+		t.Fatalf("Parar no levantó el dedo: %+v", final)
 	}
 
 	// Recalibrar usa la misma garantía: ningún contacto queda pegado.
@@ -229,13 +219,8 @@ func TestPanelRespaldoSiNoPuedePrepararTactil(t *testing.T) {
 	if len(puntero.botones) != 1 || !puntero.botones[0] {
 		t.Fatalf("el respaldo no pulsó el botón: %+v", puntero.botones)
 	}
-	r.ManosArmadas = 2
-	r.Zoom = &gestures.Zoom{Direccion: gestures.ZoomAlejar}
-	p.mu.Lock()
-	p.aplicar(r, 2, true)
-	p.mu.Unlock()
-	if acciones.zoom != 1 {
-		t.Fatalf("el respaldo no mandó zoom: %d", acciones.zoom)
+	if acciones.zoom != 0 {
+		t.Fatalf("el respaldo mandó zoom: %d", acciones.zoom)
 	}
 }
 

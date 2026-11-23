@@ -445,7 +445,7 @@ func sinteticasTactiles() []sintetica {
 		if abre {
 			inicio, fin, dir = 0.08, 1.10, "ABRIR"
 		}
-		agregar(fmt.Sprintf("zoom-%02d-%s", i+1, strings.ToLower(dir)), 1, "ZOOM", dir, "", "activo", "", "pellizco cambia su apertura", func(_ int) []tramo {
+		agregar(fmt.Sprintf("zoom-%02d-%s", i+1, strings.ToLower(dir)), 1, "", "", "tactil-pinza-sin-zoom", "activo", "", "la pinza que abre o cierra ya no hace zoom", func(_ int) []tramo {
 			return []tramo{{f: formaZoom(inicio), ms: 250}, {f: formaZoom(fin), ms: 550, trans: 420}}
 		})
 	}
@@ -539,6 +539,9 @@ func TestTactilesSinteticasMiden(t *testing.T) {
 		}
 	}
 	for a := TactilModo; a <= TactilBarrido; a++ {
+		if a == TactilZoom { // ya no se emite (23-nov)
+			continue
+		}
 		if m.PorAccion[a][1] == 0 {
 			t.Errorf("sin grabaciones de %v", a)
 		}

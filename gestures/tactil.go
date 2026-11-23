@@ -3,7 +3,8 @@ package gestures
 import "math"
 
 // AccionTactil es una orden discreta del modo táctil. No hay acciones de
-// cursor ni clic: el modo solo produce scroll, zoom y barrido.
+// cursor ni clic: el modo solo produce scroll y barrido. TactilZoom queda
+// para leer grabaciones viejas: el clasificador ya no lo emite (23-nov).
 type AccionTactil int
 
 const (
@@ -82,10 +83,6 @@ type AjustesTactiles struct {
 	UmbralScroll      float64
 	UmbralBarrido     float64
 	DominioDireccion  float64
-	UmbralZoom        float64
-	ZoomCerradoMax    float64
-	ZoomAbiertoMin    float64
-	ZoomCentroMax     float64
 }
 
 var AjustesTactilesPorDefecto = AjustesTactiles{
@@ -103,10 +100,6 @@ var AjustesTactilesPorDefecto = AjustesTactiles{
 	UmbralScroll:       0.70,
 	UmbralBarrido:      1.20,
 	DominioDireccion:   1.50,
-	UmbralZoom:         0.90,
-	ZoomCerradoMax:     0.25,
-	ZoomAbiertoMin:     0.95,
-	ZoomCentroMax:      0.55,
 }
 
 type formaTactil int
@@ -114,7 +107,6 @@ type formaTactil int
 const (
 	formaTactilNinguna formaTactil = iota
 	formaTactilDosDedos
-	formaTactilZoom
 	formaTactilAgarre // pulgar, índice y medio con las puntas juntas
 )
 
@@ -189,8 +181,6 @@ func formaTactilDe(r rasgos) formaTactil {
 		return formaTactilAgarre
 	case idx > dedoEstirado && med > dedoEstirado && anu < dedoRecogido && men < dedoRecogido:
 		return formaTactilDosDedos
-	case idx > 0.10 && r.recto > 25 && med < dedoRecogido && anu < dedoRecogido && men < dedoRecogido && r.puntas > 0.04 && r.puntas < 1.35:
-		return formaTactilZoom
 	default:
 		return formaTactilNinguna
 	}
@@ -295,7 +285,7 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 		return e, EventoTactil{}
 	}
 
-	// Mientras la L se está formando no puede ser el inicio de un zoom.
+	// Mientras la L se está formando no puede ser el inicio de un gesto.
 	if esL {
 		e.reiniciarMovimiento()
 		return e, EventoTactil{}
@@ -368,15 +358,6 @@ func ClasificarTactil(e EstadoTactil, c Cuadro) (EstadoTactil, EventoTactil) {
 				dir = TactilDerecha
 			}
 			ev = EventoTactil{Accion: TactilBarrido, Direccion: dir, Confianza: confianzaMovimiento(s, math.Abs(dx), aj.UmbralBarrido), Activo: true, CuadroMs: t}
-		}
-	case formaTactilZoom:
-		delta := r.puntas - s.anclaApertura
-		centro := math.Hypot(dx, dy)
-		switch {
-		case s.anclaApertura <= aj.ZoomCerradoMax && delta >= aj.UmbralZoom && centro <= aj.ZoomCentroMax:
-			ev = EventoTactil{Accion: TactilZoom, Direccion: TactilAbrir, Confianza: confianzaMovimiento(s, delta, aj.UmbralZoom), Activo: true, CuadroMs: t}
-		case s.anclaApertura >= aj.ZoomAbiertoMin && -delta >= aj.UmbralZoom && centro <= aj.ZoomCentroMax:
-			ev = EventoTactil{Accion: TactilZoom, Direccion: TactilCerrar, Confianza: confianzaMovimiento(s, -delta, aj.UmbralZoom), Activo: true, CuadroMs: t}
 		}
 	}
 	if ev.Accion == TactilScroll && e.palancaActiva {

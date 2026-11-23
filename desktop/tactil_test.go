@@ -82,7 +82,8 @@ func TestTactilConectaGestosConAccionesDeLinux(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	quiere := []string{"scroll-arriba", "scroll-abajo", "zoom-acercar", "zoom-alejar", "navegar-derecha-diapositivas", "navegar-izquierda-diapositivas"}
+	// Las tomas de pinza ya no hacen zoom (23-nov): pasan sin acción.
+	quiere := []string{"scroll-arriba", "scroll-abajo", "navegar-derecha-diapositivas", "navegar-izquierda-diapositivas"}
 	if !slices.Equal(acciones.hechas, quiere) {
 		t.Fatalf("acciones %v, quiere %v", acciones.hechas, quiere)
 	}
@@ -90,7 +91,7 @@ func TestTactilConectaGestosConAccionesDeLinux(t *testing.T) {
 		t.Errorf("vista final %+v", vista)
 	}
 	gestos := deTipo(lineas(t, ruta), TipoGesto)
-	if len(gestos) != 7 {
+	if len(gestos) != 5 {
 		t.Fatalf("registro de gestos %+v", gestos)
 	}
 	for _, l := range gestos {

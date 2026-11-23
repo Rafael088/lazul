@@ -30,7 +30,7 @@ func TestIndicadorSigueLaLYNoDestellaAlApagar(t *testing.T) {
 	}
 }
 
-func TestIndicadorDestellaScrollZoomYBarrido(t *testing.T) {
+func TestIndicadorDestellaScrollYBarrido(t *testing.T) {
 	casos := []struct {
 		nombre string
 		ev     gestures.EventoTactil
@@ -39,8 +39,6 @@ func TestIndicadorDestellaScrollZoomYBarrido(t *testing.T) {
 	}{
 		{"scroll arriba", gestures.EventoTactil{Accion: gestures.TactilScroll, Direccion: gestures.TactilArriba, Activo: true}, "scroll", "arriba"},
 		{"scroll abajo", gestures.EventoTactil{Accion: gestures.TactilScroll, Direccion: gestures.TactilAbajo, Activo: true}, "scroll", "abajo"},
-		{"zoom abrir", gestures.EventoTactil{Accion: gestures.TactilZoom, Direccion: gestures.TactilAbrir, Activo: true}, "zoom", "abrir"},
-		{"zoom cerrar", gestures.EventoTactil{Accion: gestures.TactilZoom, Direccion: gestures.TactilCerrar, Activo: true}, "zoom", "cerrar"},
 		{"barrido izquierda", gestures.EventoTactil{Accion: gestures.TactilBarrido, Direccion: gestures.TactilIzquierda, Activo: true}, "barrido", "izquierda"},
 		{"barrido derecha", gestures.EventoTactil{Accion: gestures.TactilBarrido, Direccion: gestures.TactilDerecha, Activo: true}, "barrido", "derecha"},
 	}
@@ -72,9 +70,9 @@ func TestIndicadorElDestelloDuraPocoYLaSecuenciaAvanza(t *testing.T) {
 	if v := i.Vista(t0.Add(DuracionDestello)); v.Destello {
 		t.Fatalf("a los %.0f ms ya no debía destellar: %+v", DuracionDestello.Seconds()*1000, v)
 	}
-	i.Aplicar(gestures.EventoTactil{Accion: gestures.TactilZoom, Direccion: gestures.TactilAbrir, Activo: true}, t0.Add(2*time.Second))
-	if v := i.Vista(t0.Add(2 * time.Second)); !v.Destello || v.Secuencia != 2 || v.Gesto != "zoom" {
-		t.Fatalf("segundo gesto = %+v; quería zoom con secuencia 2", v)
+	i.Aplicar(gestures.EventoTactil{Accion: gestures.TactilBarrido, Direccion: gestures.TactilDerecha, Activo: true}, t0.Add(2*time.Second))
+	if v := i.Vista(t0.Add(2 * time.Second)); !v.Destello || v.Secuencia != 2 || v.Gesto != "barrido" {
+		t.Fatalf("segundo gesto = %+v; quería barrido con secuencia 2", v)
 	}
 }
 

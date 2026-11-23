@@ -19,7 +19,7 @@ const DuracionAviso = 6 * time.Second
 // modo táctil está activo y, durante un destello breve, el gesto reconocido.
 type VistaIndicador struct {
 	Activo    bool   `json:"activo"`
-	Gesto     string `json:"gesto,omitempty"`     // scroll | zoom | barrido
+	Gesto     string `json:"gesto,omitempty"`     // scroll | barrido
 	Direccion string `json:"direccion,omitempty"` // arriba, abajo, abrir, cerrar, izquierda, derecha
 	Destello  bool   `json:"destello"`
 	Secuencia uint64 `json:"secuencia"` // cambia con cada gesto: la página reinicia la animación
@@ -42,7 +42,7 @@ type Indicador struct {
 }
 
 // Aplicar incorpora un evento del clasificador táctil. La L cambia el modo;
-// scroll, zoom y barrido solo hacen destellar el gesto (el modo lo enciende
+// scroll y barrido solo hacen destellar el gesto (el modo lo enciende
 // y lo apaga la L, no cada movimiento).
 func (i *Indicador) Aplicar(ev gestures.EventoTactil, ahora time.Time) {
 	i.mu.Lock()
@@ -51,7 +51,7 @@ func (i *Indicador) Aplicar(ev gestures.EventoTactil, ahora time.Time) {
 	case gestures.TactilModo:
 		i.activo = ev.Activo
 		i.gesto, i.direccion, i.cuando = "", "", time.Time{}
-	case gestures.TactilScroll, gestures.TactilZoom, gestures.TactilBarrido:
+	case gestures.TactilScroll, gestures.TactilBarrido:
 		if !ev.Activo {
 			return
 		}

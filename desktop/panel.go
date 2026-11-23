@@ -58,7 +58,6 @@ type EstadoPanel struct {
 	Fase             string  `json:"fase"` // fuera | dentro | agarrando
 	ManosArmadas     int     `json:"manos_armadas,omitempty"`
 	Arrastre         string  `json:"arrastre,omitempty"`
-	Zoom             string  `json:"zoom,omitempty"`
 	ModoEntrada      string  `json:"modo_entrada"` // tactil | respaldo
 	AvisoEntrada     string  `json:"aviso_entrada,omitempty"`
 	AvisoCalibracion string  `json:"aviso_calibracion,omitempty"`
@@ -113,7 +112,6 @@ type Panel struct {
 	fase             gestures.FaseEmbrague
 	armadas          int
 	arrastre         string
-	zoom             string
 	presionado       bool
 	tactilListo      bool
 	avisoTactil      string
@@ -519,7 +517,7 @@ func (p *Panel) Encender(on bool) {
 	}
 	p.dentro = false
 	p.fase, p.armadas = gestures.EmbragueFuera, 0
-	p.arrastre, p.zoom = "", ""
+	p.arrastre = ""
 	p.filtro.Reiniciar()
 	p.Reg.Anotar(Linea{Tipo: TipoPanel, Resultado: "apaga"})
 	p.mu.Unlock()
@@ -596,20 +594,6 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 			p.err = err.Error()
 		} else {
 			p.presionado, p.err = debePresionar, ""
-		}
-	}
-
-	if r.Zoom != nil && mover && !p.tactilListo && p.Acciones != nil {
-		p.zoom = string(r.Zoom.Direccion)
-		dir := platform.ZoomIn
-		if r.Zoom.Direccion == gestures.ZoomAlejar {
-			dir = platform.ZoomOut
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		err := p.Acciones.Zoom(ctx, dir)
-		cancel()
-		if err != nil {
-			p.err = "zoom: " + err.Error()
 		}
 	}
 }
@@ -867,7 +851,7 @@ func (p *Panel) Estado() EstadoPanel {
 	}
 	e := EstadoPanel{Calibrado: p.calibrado, Calibrando: p.calibrando, Paso: p.paso,
 		Dentro: p.dentro, Fase: string(fase), ManosArmadas: p.armadas,
-		Arrastre: p.arrastre, Zoom: p.zoom, X: p.x, Y: p.y, Error: p.err,
+		Arrastre: p.arrastre, X: p.x, Y: p.y, Error: p.err,
 		Encendido: !p.apagado, ModoEntrada: "respaldo", AvisoEntrada: p.avisoTactil, AvisoCalibracion: p.avisoCalibracion}
 	if p.tactilListo {
 		e.ModoEntrada = "tactil"
@@ -881,12 +865,6 @@ func (p *Panel) Estado() EstadoPanel {
 		e.Instruccion = "Junta los dedos: toca la punta del índice con la del pulgar, como al pellizcar, mantenlo quieto y captura. Así el pellizco se ajusta a tu mano."
 	case !p.calibrado:
 		e.Instruccion = "Calibra dos esquinas y tu pellizco para crear el panel delante de ti."
-	case p.armadas == 2:
-		if p.tactilListo {
-			e.Instruccion = "Dos manos pellizcando: dos dedos hacen zoom directamente en la app."
-		} else {
-			e.Instruccion = "Dos manos pellizcando: sepáralas o júntalas para hacer zoom."
-		}
 	case p.armadas == 1:
 		if p.tactilListo {
 			e.Instruccion = "Pellizco apoyado como dedo. Abre para levantarlo."
