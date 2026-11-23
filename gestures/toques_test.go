@@ -277,25 +277,26 @@ func TestEmbraguePublicaCadaManoArmada(t *testing.T) {
 	}
 }
 
-func TestEmbragueOrdenaDosManosPorClave(t *testing.T) {
+// Dos manos que pellizcan a la vez dan un solo dedo, siempre en la ranura 0.
+func TestEmbragueDosManosALaVezDanUnDedo(t *testing.T) {
 	med := NuevoMedidorEmbrague(panelCuadrado(t))
 	manoIzquierda := manoEnPanel(-0.3, 0, .2, true)
 	manoDerecha := manoEnPanel(0.3, 0, .2, true)
 	manoDerecha.Derecha = true
-	var r ResultadoEmbrague
-	for i := 0; i < 4; i++ {
-		r = med.Cuadro(cuadroPanel(int64(i)*67, manoDerecha, manoIzquierda))
+	var rs []ResultadoEmbrague
+	for i := 0; i < 6; i++ {
+		rs = append(rs, med.Cuadro(cuadroPanel(int64(i)*67, manoDerecha, manoIzquierda)))
 	}
-	if len(r.Armadas) != 2 {
-		t.Fatalf("dos manos armadas: %+v", r)
+	r := rs[len(rs)-1]
+	if len(r.Armadas) != 1 || r.ManosArmadas != 1 {
+		t.Fatalf("un solo dedo: %+v", r)
 	}
-	if r.Armadas[0].Clave != izq(0) || r.Armadas[1].Clave != der(0) {
-		t.Fatalf("orden %v, quiere izquierda y luego derecha", []ClaveMano{r.Armadas[0].Clave, r.Armadas[1].Clave})
-	}
-	cuadros := ToquesDe([]ResultadoEmbrague{r})
-	if len(cuadros[0].Dedos) != 2 ||
-		cuadros[0].Dedos[0].Ranura != 0 || cuadros[0].Dedos[1].Ranura != 1 {
-		t.Fatalf("dos dedos en las ranuras 0 y 1: %v", cuadros[0].Dedos)
+	for _, c := range ToquesDe(rs) {
+		for _, d := range c.Dedos {
+			if d.Ranura != 0 {
+				t.Fatalf("dedo en la ranura %d: %v", d.Ranura, c.Dedos)
+			}
+		}
 	}
 }
 
@@ -389,8 +390,8 @@ func TestToquesDeTomasRealesLevantanTodoDedo(t *testing.T) {
 	if apoyos != levantes {
 		t.Fatalf("%d apoyos y %d levantes: quedó un dedo pegado", apoyos, levantes)
 	}
-	if conDosDedos == 0 {
-		t.Fatal("ninguna toma tuvo dos dedos a la vez: falta la prueba del zoom")
+	if conDosDedos != 0 {
+		t.Fatalf("%d cuadros con dos dedos a la vez: ya no hay zoom de dos manos", conDosDedos)
 	}
 	t.Logf("%d tomas: %d toques, todos levantados, %d cuadros con dos dedos",
 		len(gs), apoyos, conDosDedos)

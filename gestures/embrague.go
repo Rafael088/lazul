@@ -23,8 +23,10 @@ import (
 //     espera 3 cuadros cerrados seguidos, porque un cierre tibio de uno o dos
 //     cuadros es el parpadeo y no un toque. Y el dedo cae en el ancla, donde
 //     apuntaba la mano abierta (cotejo-uy84og).
-//   - Dos manos pellizcando y separándose o juntándose son un zoom; el resto
-//     de los casos es un arrastre, con la dirección del eje que más se movió.
+//   - Un solo dedo a la vez: mientras una mano pellizca, la otra no se
+//     arma (sin zoom de dos manos, decisión del dueño del 23-nov). Al
+//     soltar, el pellizco que se movió es un arrastre en el eje que más
+//     se movió.
 //
 // La apertura y el estado de cada mano salen de MedidorPellizco (pellizco.go):
 // aquí no se duplica el umbral ni la histéresis.
@@ -49,14 +51,6 @@ const (
 	ArrastreDerecha   DireccionArrastre = "derecha"
 )
 
-// DireccionZoom distingue separar las manos (acercar) de juntarlas (alejar).
-type DireccionZoom string
-
-const (
-	ZoomAcercar DireccionZoom = "acercar"
-	ZoomAlejar  DireccionZoom = "alejar"
-)
-
 // AjustesEmbrague reúne los umbrales del embrague. CuadrosParaSoltar y
 // MsParaSoltar se exigen juntos: el que tarde más decide, así el parpadeo no
 // corta el arrastre ni con fps altos ni con fps bajos.
@@ -75,7 +69,6 @@ type AjustesEmbrague struct {
 	// quedó la palma al cerrar y no donde se apuntaba. 0 lo apaga.
 	MsAncla         int64
 	DistanciaMinima float64 // en unidades del panel (0 a 1)
-	ZoomMinimo      float64 // cambio de separación entre manos
 }
 
 var AjustesEmbraguePorDefecto = AjustesEmbrague{
@@ -87,7 +80,6 @@ var AjustesEmbraguePorDefecto = AjustesEmbrague{
 	// Un arrastre tiene que mover al menos un 15 % del panel: así un
 	// pellizco involuntario que apenas se desplaza no cuenta.
 	DistanciaMinima: 0.15,
-	ZoomMinimo:      0.15,
 }
 
 // Arrastre es un pellizco que se movió y se soltó.
@@ -96,12 +88,6 @@ type Arrastre struct {
 	Distancia float64           `json:"distancia"`
 	DX        float64           `json:"dx"`
 	DY        float64           `json:"dy"`
-}
-
-// Zoom es un pellizco de dos manos que cambió su separación.
-type Zoom struct {
-	Direccion  DireccionZoom `json:"direccion"`
-	Separacion float64       `json:"separacion"`
 }
 
 // ManoArmada es una mano con el pellizco agarrado en este cuadro. Clave la
@@ -122,8 +108,8 @@ type ResultadoEmbrague struct {
 	Fase     FaseEmbrague `json:"fase"`
 	Dentro   bool         `json:"dentro"`
 	TienePos bool         `json:"tiene_pos"`
-	// ManosArmadas es cuántas manos tienen el pellizco agarrado. Con una, el
-	// botón virtual se pulsa; con dos, el gesto es zoom y no se arrastra.
+	// ManosArmadas es cuántas manos tienen el pellizco agarrado: 0 o 1. Con
+	// una, el dedo virtual (o el botón de respaldo) está apoyado.
 	ManosArmadas int `json:"manos_armadas"`
 	// Armadas es cada una de esas manos con su clave y su posición, ordenadas
 	// por clave para que el orden no cambie entre cuadros. ToquesDe las usa
@@ -132,7 +118,6 @@ type ResultadoEmbrague struct {
 	X        float64      `json:"x"`
 	Y        float64      `json:"y"`
 	Arrastre *Arrastre    `json:"arrastre,omitempty"`
-	Zoom     *Zoom        `json:"zoom,omitempty"`
 }
 
 // estadoManoEmbrague sigue una mano entre cuadros. La clave es la misma que
@@ -151,7 +136,6 @@ type estadoManoEmbrague struct {
 	tienePos      bool
 	abiertos      int
 	ultimoCerrado int64
-	sinArrastre   bool // participó en un zoom: al soltar no es arrastre
 	// ancla: posición con la mano abierta del todo y su tiempo; desfase:
 	// lo que se suma a la palma mientras el dedo está apoyado.
 	ancla    PuntoPanel
@@ -160,15 +144,7 @@ type estadoManoEmbrague struct {
 	desfase  PuntoPanel
 }
 
-type estadoZoom struct {
-	activo     bool
-	claves     [2]ClaveMano
-	referencia float64
-	ultima     float64
-}
-
-// MedidorEmbrague convierte los cuadros de la cámara en fase, arrastres y
-// zoom. Es puro respecto de la cámara: la misma entrada da la misma salida.
+// MedidorEmbrague convierte los cuadros de la cámara en fase y arrastres. Es puro respecto de la cámara: la misma entrada da la misma salida.
 type MedidorEmbrague struct {
 	Calibracion CalibracionPanel
 	Ajustes     AjustesEmbrague
@@ -176,7 +152,6 @@ type MedidorEmbrague struct {
 	pellizco *MedidorPellizco
 	manos    map[ClaveMano]*estadoManoEmbrague
 	panel    map[ClaveMano]*MapeadorPanel
-	zoom     estadoZoom
 }
 
 // NuevoMedidorEmbrague arranca con la calibración del panel.
@@ -275,12 +250,7 @@ func (m *MedidorEmbrague) Cuadro(c Cuadro) ResultadoEmbrague {
 			Y:     est.ultima.Y + est.desfase.Y,
 		})
 	}
-	m.resolverZoom(armadas, soltadas, &r)
 	for _, est := range soltadas {
-		if est.sinArrastre {
-			est.sinArrastre = false
-			continue
-		}
 		if a := m.arrastreDe(est); a != nil && r.Arrastre == nil {
 			r.Arrastre = a
 		}
@@ -305,9 +275,14 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 			est.cerrada = true
 			est.abiertos = 0
 			est.cerrados = 0
-			est.pendiente = !est.armada && md.dentroReal
+			// Con otra mano ya agarrando tampoco: un solo dedo a la vez.
+			est.pendiente = !est.armada && md.dentroReal && !m.otraArmada(est.clave)
 		}
 		est.cerrados++
+		if est.pendiente && m.otraArmada(est.clave) {
+			// Las dos empezaron a la vez: gana la que se armó primero.
+			est.pendiente = false
+		}
 		if est.pendiente && (est.cerrados >= m.Ajustes.CuadrosParaApoyar || m.firme(md.estado)) {
 			est.pendiente = false
 			est.armada = true
@@ -316,7 +291,6 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 			est.inicioGesto = md.gesto
 			est.ultimaGesto = md.gesto
 			est.tienePos = md.ok
-			est.sinArrastre = false
 			est.desfase = PuntoPanel{}
 			if md.ok && m.anclaVigente(est, t) {
 				est.desfase = PuntoPanel{X: est.ancla.X - md.pos.X, Y: est.ancla.Y - md.pos.Y}
@@ -340,6 +314,16 @@ func (m *MedidorEmbrague) actualizar(md manoMedida, t int64) *estadoManoEmbrague
 	est.cerrada = false
 	est.pendiente = false
 	return m.abrir(est, t)
+}
+
+// otraArmada dice si alguna mano distinta de clave tiene el pellizco agarrado.
+func (m *MedidorEmbrague) otraArmada(clave ClaveMano) bool {
+	for c, est := range m.manos {
+		if c != clave && est.armada {
+			return true
+		}
+	}
+	return false
 }
 
 // firme dice si el pellizco está tan cerrado que apoya sin esperar a
@@ -370,56 +354,6 @@ func (m *MedidorEmbrague) abrir(est *estadoManoEmbrague, t int64) *estadoManoEmb
 	return est
 }
 
-// resolverZoom actualiza o cierra el zoom de dos manos y arranca uno nuevo
-// cuando las dos manos se agarran a la vez. Las tomas reales separan y juntan
-// las manos varias veces en la misma toma, así que el zoom se emite por
-// tramos: cada cambio de separación mayor que ZoomMinimo es un paso.
-func (m *MedidorEmbrague) resolverZoom(armadas []*estadoManoEmbrague, soltadas []*estadoManoEmbrague, r *ResultadoEmbrague) {
-	if m.zoom.activo {
-		if len(armadas) == 2 {
-			d, ok := separacion(clavesDe(armadas), m.manos)
-			if !ok {
-				return
-			}
-			m.zoom.ultima = d
-			cambio := d - m.zoom.referencia
-			if cambio >= m.Ajustes.ZoomMinimo {
-				r.Zoom = &Zoom{Direccion: ZoomAcercar, Separacion: cambio}
-				m.zoom.referencia = d
-			} else if -cambio >= m.Ajustes.ZoomMinimo {
-				r.Zoom = &Zoom{Direccion: ZoomAlejar, Separacion: cambio}
-				m.zoom.referencia = d
-			}
-			return
-		}
-		// Se soltó una mano: el zoom termina. La mano que siga agarrada
-		// continúa como un arrastre desde donde terminó el zoom, no desde
-		// donde empezó.
-		involucradas := m.zoom.claves
-		m.zoom = estadoZoom{}
-		for _, est := range armadas {
-			est.sinArrastre = false
-			est.inicio = est.ultima
-			est.inicioGesto = est.ultimaGesto
-		}
-		for _, est := range soltadas {
-			if est.clave == involucradas[0] || est.clave == involucradas[1] {
-				est.sinArrastre = true
-			}
-		}
-		return
-	}
-	if len(armadas) == 2 && len(soltadas) == 0 {
-		claves := clavesDe(armadas)
-		if d, ok := separacion(claves, m.manos); ok {
-			m.zoom = estadoZoom{activo: true, claves: claves, referencia: d, ultima: d}
-			for _, est := range armadas {
-				est.sinArrastre = true
-			}
-		}
-	}
-}
-
 // antesQue ordena las claves: primero la izquierda de la persona y, dentro
 // del mismo lado, por orden de aparición.
 func antesQue(a, b ClaveMano) bool {
@@ -427,22 +361,6 @@ func antesQue(a, b ClaveMano) bool {
 		return !a.Derecha
 	}
 	return a.N < b.N
-}
-
-func clavesDe(ests []*estadoManoEmbrague) [2]ClaveMano {
-	var c [2]ClaveMano
-	for i := 0; i < 2 && i < len(ests); i++ {
-		c[i] = ests[i].clave
-	}
-	return c
-}
-
-func separacion(claves [2]ClaveMano, manos map[ClaveMano]*estadoManoEmbrague) (float64, bool) {
-	a, b := manos[claves[0]], manos[claves[1]]
-	if a == nil || b == nil || !a.tienePos || !b.tienePos {
-		return 0, false
-	}
-	return math.Hypot(b.ultimaGesto.X-a.ultimaGesto.X, b.ultimaGesto.Y-a.ultimaGesto.Y), true
 }
 
 // arrastreDe clasifica el desplazamiento agarrado de una mano soltada.
@@ -523,5 +441,4 @@ func (m *MedidorEmbrague) Parar() {
 	m.pellizco = NuevoMedidorPellizco(m.Ajustes.Pellizco)
 	m.manos = map[ClaveMano]*estadoManoEmbrague{}
 	m.panel = map[ClaveMano]*MapeadorPanel{}
-	m.zoom = estadoZoom{}
 }

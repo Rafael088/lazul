@@ -28,7 +28,6 @@ function etiquetaGesto(ind) {
   if (!ind || !ind.gesto) return "";
   const f = FLECHAS[ind.direccion] || "";
   if (ind.gesto === "scroll") return "scroll " + f;
-  if (ind.gesto === "zoom") return "zoom " + f;
   if (ind.gesto === "barrido") return f || "barrido";
   return ind.gesto;
 }

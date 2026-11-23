@@ -18,7 +18,7 @@ todavía (dec-0j4m). El video y los puntos de la mano nunca salen del equipo.
 | `./dev sim [-receptores N] [-mdns]` | controlador + N receptores falsos: descubrir (mDNS en memoria; `-mdns` usa la red), rechazar al no emparejado, código erróneo y caducado, emparejar con permiso, intruso e impostor rechazados, Órdenes por TLS y, al final, de punta a punta con las grabaciones reales (captura por LocalSend, gesto 4 por niveles) |
 | `./dev e2e win\|linux [args]` | de punta a punta entre los 2 PCs de verdad: `win` controla este Linux y recibe Windows (túnel de ssh: el cortafuegos de Windows no deja entrar), `linux` al revés por la red local (puerto 53317). `LAZUL_ABRIR=1` abre de verdad; args del controlador: `-adelantar`, `-intentos N`, `-casos`, `-ventanas` |
 | `./dev replay [-v] [-barrer|-tactil|-toques|-pantalla]` | precisión y falsos positivos del clasificador: grabaciones reales (`fixtures/gestos`) y sintéticas, por separado; `-barrer` prueba varios tiempos de sostén de la L; `-tactil` mide el modo táctil; `-pantalla` mide los tres dedos (cambiar de pantalla) en `fixtures/gestos` y `fixtures/pellizco`; `-toques` mide los toques de `fixtures/pellizco` (embrague y `ToquesDe`): tap, pulsación larga, arrastre y pellizcos descartados por empezar fuera del panel; la última línea, `PRECISIÓN`, es la métrica de cotejo-uy84og (aciertos, falsos, de más, bordes y salto al apoyar, por el mismo recorrido que la app; `gestures/precision_toques.go`) |
-| `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`): los gestos 0.1 y las tomas del modelo nuevo de manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a dos manos, movimiento normal y tres dedos a cada lado) |
+| `./dev grabar` | página en 127.0.0.1:8137 para grabar tomas con la cámara (necesita `prototipos/camara/traer-assets.sh`): los gestos 0.1 y las tomas del modelo nuevo de manipulación directa (pellizco y arrastre, entrar/salir del panel, zoom a dos manos (ya sin gesto, se conservan las tomas), movimiento normal y tres dedos a cada lado) |
 | `./dev pista` | abre en el navegador la pista local de precisión: 14 blancos de distintos tamaños en centro, bordes y esquinas, seguidos de una zona de reposo; descarga el resumen JSON sin datos de cámara |
 | `./dev gen` | regenera `proto/go` y `proto/ts/src` desde `proto/lazul/v1/lazul.proto` |
 | `./dev app [args]` | la app de escritorio (en Linux con gráfica NVIDIA, MediaPipe corre en ella por EGL; `LAZUL_GPU=intel` para la integrada); en Linux y Windows abre el modo táctil y `-modo transferencia` conserva el recorrido entre PCs; `./dev app win` la copia a `%USERPROFILE%\Lazul`; `./dev app resumen` dice las activaciones de los últimos 30 min; `./dev app compilar`; `./dev app e2e win\|linux` prueba la transferencia con grabaciones |
@@ -103,15 +103,15 @@ mide aciertos en las tomas `tres-derecha`/`tres-izquierda` y falsos en el resto
 `hl.dsp.focus` y el puntero llevado al rectángulo del monitor; Windows: toques
 y puntero en las coordenadas de ese monitor.
 El pellizco pulgar-índice pasa cuadro a cuadro por `TraductorToques` y apoya,
-mueve o levanta un dedo de `platform.TouchScreen`; dos manos son dos dedos y
-la app hace su zoom nativo. Cada ranura tiene su filtro One Euro. Si TouchScreen
-no se prepara, `Panel` conserva el botón principal y Ctrl +/-, lo muestra y lo
-registra sin coordenadas. Parar, apagar o recalibrar levanta todas las ranuras.
+mueve o levanta un dedo de `platform.TouchScreen`. **Sin zoom** (decisión del
+dueño, 23-nov): un solo dedo a la vez; mientras una mano pellizca, el embrague no
+arma la otra. Si TouchScreen no se prepara, `Panel` conserva el botón principal,
+lo muestra y lo registra sin coordenadas. Parar, apagar o recalibrar levanta todas las ranuras.
 
 Con las manos que pasan el panel corre además `ClasificarTactil`: la L y, con el
 modo encendido, los gestos anteriores al táctil virtual, que siguen activos
-(agarre de pulgar, índice y medio = scroll con la rueda virtual; pinza que
-abre/cierra = zoom por teclado; dos dedos en horizontal = Re Pág/Av Pág). Van a
+(agarre de pulgar, índice y medio = scroll con la rueda virtual; dos dedos en
+horizontal = Re Pág/Av Pág; la pinza que abre o cierra ya no hace zoom). Van a
 la ventana con foco por `platform.TactileActions`. Cada gesto y su resultado se
 anota en `factibilidad.jsonl`, sin contenido de cámara o pantalla.
 

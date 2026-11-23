@@ -179,28 +179,11 @@ func TestTactilScrollAgarre(t *testing.T) {
 		base, tramo{f: formaAgarre(), ms: 450, mov: v3{0, -0.08, 0}}))
 }
 
-func TestTactilZoomAbreYCierra(t *testing.T) {
-	casos := []struct {
-		nombre        string
-		inicio, final float64
-		dir           DireccionTactil
-	}{
-		{"abre", 0.08, 1.10, TactilAbrir},
-		{"cierra", 1.10, 0.08, TactilCerrar},
+func TestTactilLaPinzaYaNoHaceZoom(t *testing.T) {
+	for _, c := range [][2]float64{{0.08, 1.10}, {1.10, 0.08}} {
+		quiereTactiles(t, "pinza que abre o cierra", correrTactil(true,
+			tramo{f: formaZoom(c[0]), ms: 250}, tramo{f: formaZoom(c[1]), ms: 500, trans: 400}))
 	}
-	for _, caso := range casos {
-		eventos := correrTactil(true,
-			tramo{f: formaZoom(caso.inicio), ms: 250},
-			tramo{f: formaZoom(caso.final), ms: 500, trans: 400})
-		quiereTactiles(t, caso.nombre, eventos, TactilZoom)
-		if len(eventos) == 1 && eventos[0].Direccion != caso.dir {
-			t.Errorf("%s: dirección %v", caso.nombre, eventos[0].Direccion)
-		}
-	}
-	quiereTactiles(t, "pellizco solo trasladado", correrTactil(true,
-		tramo{f: formaZoom(0.12), ms: 250}, tramo{f: formaZoom(0.12), ms: 500, mov: v3{0.25, 0, 0}}))
-	quiereTactiles(t, "cambio pequeño", correrTactil(true,
-		tramo{f: formaZoom(0.35), ms: 250}, tramo{f: formaZoom(0.58), ms: 500, trans: 400}))
 }
 
 func TestTactilBarridoHorizontal(t *testing.T) {

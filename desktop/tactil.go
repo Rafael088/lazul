@@ -171,13 +171,6 @@ func (t *Tactil) ejecutar(ev gestures.EventoTactil) error {
 		case gestures.TactilAbajo:
 			return t.Acciones.Scroll(ctx, platform.ScrollDown)
 		}
-	case gestures.TactilZoom:
-		switch ev.Direccion {
-		case gestures.TactilAbrir:
-			return t.Acciones.Zoom(ctx, platform.ZoomIn)
-		case gestures.TactilCerrar:
-			return t.Acciones.Zoom(ctx, platform.ZoomOut)
-		}
 	case gestures.TactilBarrido:
 		switch ev.Direccion {
 		case gestures.TactilIzquierda:

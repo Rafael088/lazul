@@ -187,59 +187,45 @@ func TestEmbragueElParpadeoNoCortaElArrastre(t *testing.T) {
 	}
 }
 
-func TestEmbragueDosManosHacenZoom(t *testing.T) {
-	med := NuevoMedidorEmbrague(panelCuadrado(t))
-	var r ResultadoEmbrague
-	var zooms []Zoom
-	var arrastres []Arrastre
-	recoger := func(r ResultadoEmbrague) {
-		if r.Zoom != nil {
-			zooms = append(zooms, *r.Zoom)
+// Sin zoom (23-nov): mientras una mano pellizca, la otra no se arma, aunque
+// pellizque y se mueva; y si las dos cierran en el mismo cuadro, solo una.
+func TestEmbragueUnSoloDedoALaVez(t *testing.T) {
+	for _, juntas := range []bool{false, true} {
+		med := NuevoMedidorEmbrague(panelCuadrado(t))
+		var r ResultadoEmbrague
+		var arrastres []Arrastre
+		recoger := func(r ResultadoEmbrague) {
+			if r.ManosArmadas > 1 || len(r.Armadas) > 1 {
+				t.Fatalf("juntas=%v: dos dedos a la vez: %+v", juntas, r)
+			}
+			if r.Arrastre != nil {
+				arrastres = append(arrastres, *r.Arrastre)
+			}
 		}
-		if r.Arrastre != nil {
-			arrastres = append(arrastres, *r.Arrastre)
+		segunda := juntas
+		for i := 0; i < 4; i++ {
+			r = med.Cuadro(cuadroPanel(int64(i)*67,
+				manoEnPanel(-0.3, 0, .2, true), manoEnPanel(0.3, 0, .2, segunda)))
+			recoger(r)
 		}
-	}
-	for i := 0; i < 4; i++ {
-		r = med.Cuadro(cuadroPanel(int64(i)*67,
-			manoEnPanel(-0.3, 0, .2, true), manoEnPanel(0.3, 0, .2, true)))
-		recoger(r)
-	}
-	if r.Fase != EmbragueAgarrando || r.ManosArmadas != 2 {
-		t.Fatalf("no agarraron: %+v", r)
-	}
-	for i := 1; i <= 10; i++ {
-		sep := 0.3 + float64(i)*0.05
-		r = med.Cuadro(cuadroPanel(int64(4+i)*67,
-			manoEnPanel(-sep, 0, .2, true), manoEnPanel(sep, 0, .2, true)))
-		recoger(r)
-	}
-	if len(zooms) == 0 {
-		t.Fatal("separar las manos no emitió zoom")
-	}
-	for _, z := range zooms {
-		if z.Direccion != ZoomAcercar {
-			t.Fatalf("zoom al separar: %+v", zooms)
+		segunda = true
+		for i := 1; i <= 10; i++ {
+			sep := 0.3 + float64(i)*0.05
+			r = med.Cuadro(cuadroPanel(int64(4+i)*67,
+				manoEnPanel(-sep, 0, .2, true), manoEnPanel(sep, 0, .2, segunda)))
+			recoger(r)
 		}
-	}
-	// Al juntarlas, el zoom va al revés.
-	zooms = nil
-	for i := 10; i >= 1; i-- {
-		sep := 0.3 + float64(i)*0.05
-		r = med.Cuadro(cuadroPanel(int64(15+10-i)*67,
-			manoEnPanel(-sep, 0, .2, true), manoEnPanel(sep, 0, .2, true)))
-		recoger(r)
-	}
-	if len(zooms) == 0 {
-		t.Fatal("juntar las manos no emitió zoom")
-	}
-	for _, z := range zooms {
-		if z.Direccion != ZoomAlejar {
-			t.Fatalf("zoom al juntar: %+v", zooms)
+		if r.Fase != EmbragueAgarrando || r.ManosArmadas != 1 {
+			t.Fatalf("juntas=%v: quiere una mano agarrando: %+v", juntas, r)
 		}
-	}
-	if len(arrastres) != 0 {
-		t.Fatalf("el zoom también contó arrastre: %+v", arrastres)
+		for i := 0; i < 6; i++ {
+			r = med.Cuadro(cuadroPanel(int64(15+i)*67,
+				manoEnPanel(-0.8, 0, .2, false), manoEnPanel(0.8, 0, .2, false)))
+			recoger(r)
+		}
+		if r.ManosArmadas != 0 || len(arrastres) != 1 {
+			t.Fatalf("juntas=%v: al soltar, un solo arrastre y nada armado: %+v · %+v", juntas, arrastres, r)
+		}
 	}
 }
 
@@ -261,8 +247,8 @@ func calibracionDeToma(g Grabacion, tamano float64) CalibracionPanel {
 func tamanoMedianoPellizco(gs []Grabacion) float64 { return TamanoMedianoPellizco(gs) }
 
 type medidaToma struct {
-	arrastres []Arrastre
-	zooms     []Zoom
+	arrastres  []Arrastre
+	maxArmadas int
 }
 
 func medirToma(g Grabacion, tamano float64) medidaToma {
@@ -273,9 +259,7 @@ func medirToma(g Grabacion, tamano float64) medidaToma {
 		if r.Arrastre != nil {
 			m.arrastres = append(m.arrastres, *r.Arrastre)
 		}
-		if r.Zoom != nil {
-			m.zooms = append(m.zooms, *r.Zoom)
-		}
+		m.maxArmadas = max(m.maxArmadas, r.ManosArmadas)
 	}
 	// Si la toma termina con el pellizco cerrado, cuatro cuadros sin manos
 	// cumplen los umbrales de soltar y cierran el embrague con la última
@@ -286,9 +270,6 @@ func medirToma(g Grabacion, tamano float64) medidaToma {
 			r := med.Cuadro(Cuadro{TMs: fin + 1000 + int64(i)*67, Aspecto: g.Cuadros[0].Aspecto})
 			if r.Arrastre != nil {
 				m.arrastres = append(m.arrastres, *r.Arrastre)
-			}
-			if r.Zoom != nil {
-				m.zooms = append(m.zooms, *r.Zoom)
 			}
 		}
 	}
@@ -483,7 +464,7 @@ func ambasManosEmpiezanDentro(g Grabacion, cal CalibracionPanel) bool {
 	return false
 }
 
-func TestEmbragueConTomasRealesDeZoom(t *testing.T) {
+func TestEmbragueTomasDeZoomSoloUnDedo(t *testing.T) {
 	gs, err := LeerDirectorio(filepath.Join("..", "fixtures", "pellizco"))
 	if err != nil {
 		t.Fatal(err)
@@ -501,22 +482,10 @@ func TestEmbragueConTomasRealesDeZoom(t *testing.T) {
 		}
 		validas++
 		m := medirToma(g, tam)
-		if len(m.arrastres) != 0 {
-			t.Fatalf("%s: el zoom contó arrastres %+v", g.Archivo, m.arrastres)
+		if m.maxArmadas > 1 {
+			t.Fatalf("%s: dos dedos a la vez (%d manos armadas): ya no hay zoom", g.Archivo, m.maxArmadas)
 		}
-		var acercar, alejar int
-		for _, z := range m.zooms {
-			switch z.Direccion {
-			case ZoomAcercar:
-				acercar++
-			case ZoomAlejar:
-				alejar++
-			}
-		}
-		if acercar < 1 || alejar < 1 {
-			t.Fatalf("%s: zooms acercar=%d alejar=%d (las tomas separan y juntan varias veces)", g.Archivo, acercar, alejar)
-		}
-		t.Logf("%s: %d pasos de zoom (%d acercar, %d alejar)", g.Archivo, acercar+alejar, acercar, alejar)
+		t.Logf("%s: %d arrastres con una mano", g.Archivo, len(m.arrastres))
 	}
 	if vistas == 0 || validas < 7 {
 		t.Fatalf("tomas de zoom: %d, válidas (empiezan dentro): %d", vistas, validas)
@@ -534,8 +503,8 @@ func TestEmbragueNormalNoArrastra(t *testing.T) {
 			continue
 		}
 		m := medirToma(g, tam)
-		if len(m.arrastres) != 0 || len(m.zooms) != 0 {
-			t.Fatalf("%s: arrastres %+v, zoom %+v", g.Archivo, m.arrastres, m.zooms)
+		if len(m.arrastres) != 0 {
+			t.Fatalf("%s: arrastres %+v", g.Archivo, m.arrastres)
 		}
 	}
 }
