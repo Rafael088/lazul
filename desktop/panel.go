@@ -115,8 +115,6 @@ type Panel struct {
 	arrastre         string
 	zoom             string
 	presionado       bool
-	manoBoton        gestures.ClaveMano          // la mano que pulsó el botón de respaldo
-	filtroAjeno      gestures.FiltroOneEuroPanel // su cursor, si no es la dueña del puntero
 	tactilListo      bool
 	avisoTactil      string
 	traductor        *gestures.TraductorToques
@@ -136,7 +134,7 @@ type Panel struct {
 // devuelve un panel utilizable (sin calibrar) junto con el error para que la
 // app lo muestre y permita repetirla.
 func NuevoPanel(ruta string, puntero platform.AbsolutePointer) (*Panel, error) {
-	p := &Panel{apagado: true, Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), filtroAjeno: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques(), mapeadores: map[gestures.ClaveMano]*gestures.MapeadorPanel{}}
+	p := &Panel{apagado: true, Puntero: puntero, ruta: ruta, filtro: gestures.NuevoFiltroOneEuroPanel(), traductor: gestures.NuevoTraductorToques(), mapeadores: map[gestures.ClaveMano]*gestures.MapeadorPanel{}}
 	for i := range p.filtrosDedo {
 		p.filtrosDedo[i] = gestures.NuevoFiltroOneEuroPanel()
 	}
@@ -537,13 +535,6 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 	if r.Arrastre != nil {
 		p.arrastre = string(r.Arrastre.Direccion)
 	}
-	if r.Relevo {
-		// Otra mano lleva el puntero: empieza donde está ella, sin recorrer
-		// la pantalla por el One Euro ni arrastrar el freno del imán.
-		p.filtro.Reiniciar()
-		p.freno.Reiniciar()
-	}
-	cursorAjeno := p.cursorDeRespaldo(r, tMs, mover)
 	if r.TienePos {
 		entrada := gestures.PuntoPanel{X: r.X, Y: r.Y}
 		if !r.Dentro && r.Fase == gestures.EmbragueAgarrando {
@@ -569,7 +560,7 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 		}
 		// Con el pellizco agarrado el puntero sigue aunque la palma se salga
 		// del rectángulo; se limita al borde de la pantalla.
-		if mover && !cursorAjeno && p.Puntero != nil && (r.Dentro || r.Fase == gestures.EmbragueAgarrando) {
+		if mover && p.Puntero != nil && (r.Dentro || r.Fase == gestures.EmbragueAgarrando) {
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			err := p.Puntero.MoveAbsolute(ctx, limitar01(pos.X), limitar01(pos.Y))
 			cancel()
@@ -595,13 +586,17 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 	}
 
 	// Con la pantalla táctil, el puntero solo anticipa dónde caerá el dedo:
-	// nunca pulsa el botón. En respaldo conserva el embrague anterior, bajo
-	// la mano que agarra.
-	debePresionar := mover && !p.tactilListo && p.Puntero != nil && r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1 &&
-		(cursorAjeno || r.Armadas[0].Clave == r.Puntero)
-	p.ponerBoton(debePresionar)
-	if p.presionado && debePresionar {
-		p.manoBoton = r.Armadas[0].Clave
+	// nunca pulsa el botón. En respaldo conserva el embrague anterior.
+	debePresionar := mover && !p.tactilListo && p.Puntero != nil && r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1
+	if debePresionar != p.presionado {
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		err := p.Puntero.Button(ctx, debePresionar)
+		cancel()
+		if err != nil {
+			p.err = err.Error()
+		} else {
+			p.presionado, p.err = debePresionar, ""
+		}
 	}
 
 	if r.Zoom != nil && mover && !p.tactilListo && p.Acciones != nil {
@@ -619,41 +614,6 @@ func (p *Panel) aplicar(r gestures.ResultadoEmbrague, tMs int64, mover bool) {
 	}
 }
 
-// cursorDeRespaldo es para el modo sin pantalla táctil, donde el botón pulsa
-// bajo el cursor: si agarra una sola mano y no es la dueña del puntero, el
-// cursor va con ella mientras dure. Devuelve si lo llevó. El botón se suelta
-// antes de que el cursor cambie de mano, para no arrastrar de una a otra.
-// Se llama con p.mu tomado, antes de mover el puntero.
-func (p *Panel) cursorDeRespaldo(r gestures.ResultadoEmbrague, tMs int64, mover bool) bool {
-	var mano gestures.ClaveMano
-	sola := r.Fase == gestures.EmbragueAgarrando && r.ManosArmadas == 1
-	if sola {
-		mano = r.Armadas[0].Clave
-	}
-	sigue := p.presionado && sola && mano == p.manoBoton
-	if p.presionado && !sigue && (sola || r.Relevo || p.manoBoton != r.Puntero) {
-		p.ponerBoton(false)
-	}
-	if !mover || p.tactilListo || p.Puntero == nil || !sola || mano == r.Puntero {
-		if sigue && r.Relevo && mano == r.Puntero {
-			// La dueña se fue y hereda la que ya arrastraba: sigue sin salto.
-			p.filtro = p.filtroAjeno
-		}
-		p.filtroAjeno.Reiniciar()
-		return false
-	}
-	a := r.Armadas[0]
-	pos := p.filtroAjeno.Filtrar(tMs, gestures.PuntoPanel{X: limitar01(a.X), Y: limitar01(a.Y)})
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	if err := p.Puntero.MoveAbsolute(ctx, pos.X, pos.Y); err != nil {
-		p.err = err.Error()
-	} else {
-		p.err = ""
-	}
-	return true
-}
-
 func (p *Panel) enviarToques(r gestures.ResultadoEmbrague, tMs int64) error {
 	cuadro := p.traductor.Cuadro(r)
 	if len(cuadro.Dedos) == 0 {
@@ -668,14 +628,9 @@ func (p *Panel) enviarToques(r gestures.ResultadoEmbrague, tMs int64) error {
 				p.filtrosDedo[d.Ranura].Reiniciar()
 				p.conDesfase[d.Ranura] = false
 				// Con un solo dedo, el primer contacto coincide exactamente con
-				// el puntero si su mano es la que lo venía moviendo. Si es la
-				// otra, cae donde apuntaba ella (su ancla, que ya viene en d):
-				// p.x y p.y son de la dueña y no sirven ni para el imán.
+				// el puntero que la palma venía moviendo.
 				if r.ManosArmadas == 1 && r.TienePos {
-					contacto := pos
-					if r.Armadas[0].Clave == r.Puntero {
-						contacto = gestures.PuntoPanel{X: p.x, Y: p.y}
-					}
+					contacto := gestures.PuntoPanel{X: p.x, Y: p.y}
 					if p.Iman.Encendido() {
 						// Con el imán, el dedo entero se corre lo que se
 						// corrió el contacto: el tap no se vuelve un
@@ -816,26 +771,9 @@ func limitar01(v float64) float64 {
 	return v
 }
 
-// ponerBoton pulsa o suelta el botón de respaldo si no estaba ya así. Se
-// llama con p.mu tomado.
-func (p *Panel) ponerBoton(pulsado bool) {
-	if pulsado == p.presionado || p.Puntero == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	err := p.Puntero.Button(ctx, pulsado)
-	cancel()
-	if err != nil {
-		p.err = err.Error()
-	} else {
-		p.presionado, p.err = pulsado, ""
-	}
-}
-
 // soltarBoton suelta el botón virtual si estaba pulsado. Se llama con p.mu
 // tomado; en Parar y al recalibrar, para no dejarlo pulsado al apagar.
 func (p *Panel) soltarBoton() {
-	p.filtroAjeno.Reiniciar()
 	if !p.presionado || p.Puntero == nil {
 		p.presionado = false
 		return

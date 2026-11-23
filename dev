@@ -197,23 +197,7 @@ cmd_win() {
 # Los intentos fallidos uno a uno (líneas "  caso · ...") quedan en el registro.
 cmd_sim() { paso sim go run ./core/cmd/sim "$@"; local r=$?; grep -v -E '^ok|^  [a-z0-9]+ · ' .dev/sim.log | head -40 | sed 's/^/       /'; return $r; }
 
-cmd_replay() {
-	paso replay go run ./gestures/cmd/replay "$@"
-	local r=$?
-	sed 's/^/       /' .dev/replay.log
-	[ $r = 0 ] || return $r
-	case " $* " in *" -dir"* | *" --dir"*) return 0 ;; *" -toques "* | *" --toques "*) replay_orden_app ;; esac
-}
-
-# Las tomas guardan el orden crudo de la cámara; la app le entrega a Go el de
-# seguimiento.mjs. Los saltos del puntero dependen de cuál es cada mano.
-replay_orden_app() {
-	command -v node >/dev/null || { echo "omitido orden-app  (falta node)"; return 0; }
-	paso orden-app node herramientas/orden-app.mjs fixtures/pellizco .dev/orden-app || return 1
-	paso replay-app go run ./gestures/cmd/replay -toques -dir .dev/orden-app || return 1
-	echo "       con el orden de manos de la app:"
-	tail -4 .dev/replay-app.log | sed 's/^/       /'
-}
+cmd_replay() { paso replay go run ./gestures/cmd/replay "$@"; local r=$?; sed 's/^/       /' .dev/replay.log; return $r; }
 
 # grabar no es un paso: queda corriendo hasta Ctrl+C.
 cmd_grabar() { go run ./gestures/cmd/grabar "$@"; }

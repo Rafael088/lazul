@@ -77,10 +77,6 @@ type TomaToques struct {
 	Bordes, BordesPosibles int
 	Saltos                 []float64
 	Temblor, Retraso       []float64
-	// UnaMano: ningún cuadro de la toma trae una segunda mano.
-	UnaMano bool
-	// SaltosPuntero: los del puntero con dos manos (saltos_puntero.go).
-	SaltosPuntero SaltosPuntero
 }
 
 // ConteoToques resume una o varias tomas.
@@ -147,19 +143,14 @@ func ToquesDeToma(g Grabacion, tamano float64) (TomaToques, error) {
 	filtro := filtroPanelApp{cal: cal}
 	puntero := punteroApp{filtro: NuevoFiltroOneEuroPanel()}
 	seg := seguimientoPrecision{cal: cal}
-	saltos := seguimientoSaltos{cal: cal}
 	resultados := make([]ResultadoEmbrague, 0, len(g.Cuadros)+toqueCuadrosApartar)
 	var tUltimo int64
 	var aspecto float32
-	unaMano := true
 	for _, c := range g.Cuadros {
-		unaMano = unaMano && len(c.Manos) <= 1
 		tUltimo, aspecto = c.TMs, c.Aspecto
-		fc := filtro.cuadro(c)
-		r := med.Cuadro(fc)
+		r := med.Cuadro(filtro.cuadro(c))
 		puntero.cuadro(r)
 		seg.cuadro(c, r, &puntero)
-		saltos.cuadro(fc, r, &puntero)
 		resultados = append(resultados, r)
 	}
 	// Se aparta la mano de la toma, como en la prueba de las tomas reales.
@@ -178,8 +169,6 @@ func ToquesDeToma(g Grabacion, tamano float64) (TomaToques, error) {
 		Saltos:         seg.saltos,
 		Temblor:        puntero.temblor,
 		Retraso:        puntero.retraso,
-		UnaMano:        unaMano,
-		SaltosPuntero:  saltos.total,
 	}, nil
 }
 
